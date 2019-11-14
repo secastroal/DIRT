@@ -3,10 +3,11 @@
 .Rapp.history
 # Session Data files
 .RData
+*.Rproj
 # RStudio files
 .Rproj.user/
 # Other files
 .Ruserdata
 .Rproj.user
-.rds
+Stan/*.rds
 #Folders
