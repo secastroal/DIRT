@@ -17,8 +17,10 @@ parameters {
   vector[n] r_i;           // Random amplitude
   vector[n] phi_i;         // Random phase shift
   real<lower = 0> sigma_2; // Residual variance
-  vector[p - 1] lambda_f;  // Location parameters free
-  vector[K - 2] delta_f;   // Tresholds parameters free
+  //vector[p - 1] lambda_f;  // Location parameters free
+  //vector[K - 2] delta_f;   // Tresholds parameters free
+  vector[p] lambda;        // Location parameters  
+  vector[K - 1] delta;     // Threshold parameters
   vector[nr] theta;        // Theta of person i at time t
   
   // Hyper parameters
@@ -37,8 +39,8 @@ transformed parameters {
   real<lower=0> s_gamma2; // Sd r
   real<lower=0> s_gamma3; // Sd phi
   real<lower=0> sigma;    // Sd residual variance
-  vector[p] lambda;       // Location parameters
-  vector[K - 1] delta;    // Threshold parameters
+  //vector[p] lambda;       // Location parameters
+  //vector[K - 1] delta;    // Threshold parameters
   vector[K] deltasum; // Cumulative sum threshold parameters
   vector[nr] theta_i;     // Predicted Theta of person i at time t
   vector[K] args [nr];        // Create vector argument for softmax function
@@ -52,15 +54,15 @@ transformed parameters {
   sigma    = sqrt(sigma_2);
   
   // Constrain sum of location and threshold parameters to 0
-  for (i in 1:(p-1)) {
-    lambda[i] = lambda_f[i]; 
-  }
-  lambda[p] = -sum(lambda_f);
+  //for (i in 1:(p-1)) {
+  //  lambda[i] = lambda_f[i]; 
+  //}
+  //lambda[p] = -sum(lambda_f);
   
-  for (j in 1:(K-2)) {
-    delta[j] = delta_f[j]; 
-  }
-  delta[K-1] = -sum(delta_f);
+  //for (j in 1:(K-2)) {
+  //  delta[j] = delta_f[j]; 
+  //}
+  //delta[K-1] = -sum(delta_f);
   
   // Compute cumulative sum of threshold parameters
   deltasum[1] = 0.0;
@@ -85,8 +87,10 @@ model {
   r_i ~ normal(mu_gamma2, s_gamma2);           
   phi_i ~ normal(mu_gamma3, s_gamma3);
   sigma_2 ~ inv_gamma(1, 1) ;// Residual variance
-  lambda_f ~ normal(0, 1);  // Location parameters free
-  delta_f ~ normal(0, 1);   // Tresholds parameters free
+  //lambda_f ~ normal(0, 1);  // Location parameters free
+  //delta_f ~ normal(0, 1);   // Tresholds parameters free
+  lambda ~ normal(0, 1);
+  delta ~ normal(0, 1);
   theta ~ normal(theta_i, sigma);        // Theta of person i at time t
   
   // Hyper parameters
