@@ -11,27 +11,9 @@ library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-# This function is to compute the probabilities of the Graded Response Model, which will be quite useful.
-P.GRM <- function(C, IP, theta)
-{
-  N         <- length(theta)
-  I         <- nrow(IP)
-  alpha     <- IP[, ncol(IP)]
-  betas     <- IP[, -ncol(IP)]
-  res.cum   <- array(NA, c(N, I, C))
-  for (i in 1:I)
-  {
-    for (c in 1:C)
-    {
-      arg              <- alpha[i] * (theta - betas[i, c])
-      res.cum[ , i, c] <- exp(arg) / (1 + exp(arg))
-    }
-  }
-  res.cum <- array(c(matrix(1, N, I), res.cum, matrix(0, N, I)), dim = c(N, I, C + 2))
-  res     <- array(NA, c(N, I, C + 1))
-  for (c in 1:(C + 1)) res[, , c] <- res.cum[, , c] - res.cum[, , c + 1]
-  return(res)
-}
+rfiles <- list.files("R/", full.names = TRUE)
+sapply(rfiles,source,.GlobalEnv)
+rm(rfiles)
 
 # 1. Vandemeulebroecke et al (2017) ----
 # We will generate date based on the model proposed by Vandemeulebroecke et al (2017), 
@@ -154,7 +136,7 @@ set.seed(123)
 n  <- 100 # Number of subjects.
 p  <- 5   # Number of items.
 K  <- 5   # Number of categories per items.
-nt <- 56  # Number of time points. #! not necessarily the same for all the persons
+nt <- 10  # Number of time points. #! not necessarily the same for all the persons
 
 # Now, we generate the thetas given spectral analysis proposed by Ram
 # We need the next random parameters:
@@ -162,13 +144,13 @@ nt <- 56  # Number of time points. #! not necessarily the same for all the perso
 mu    <- rnorm(n, -0.5, 1)  # Random intercept.
 beta  <- rnorm(n, 0, .01)   # Random linear slope, which multiplies time_it. Detrend data.
 R     <- rnorm(n, 0.2, 0.2) # Random amplitude of the cycle.
-omega <- (2 * pi) / 7       # Period of oscillattion assumed to be 7 days.
+omega <- (2 * pi) / 5       # Period of oscillattion assumed to be 7 days.
 phi   <- rnorm(n, 0.2, 0.4) # Random phase shift.
 
 # Create matrix to store thetas over time
 theta <- matrix(NA, n, nt)
 for (i in 1:nt) {
-  theta[, i] <- mu + beta * (i - 1) + R * (cos((omega * i) + phi)) + rnorm(1, 0, 0.5) 
+  theta[, i] <- mu + R * (cos((omega * i) + phi)) + rnorm(1, 0, 0.5) #+ beta * (i - 1)
 }
 rm(i)
 
@@ -178,22 +160,21 @@ theta <- reshape(as.data.frame(theta),
                  direction     = "long") # Turn theta matrix into long format.
 theta <- theta[order(theta[, 3]), c(3, 1, 2)]                                    # Order theta matrix by id.    
 
-# Generate GRM responses given the generated thetas.
+# Generate RSM responses given the generated thetas.
 
 # Create item parameters
-alpha      <- rep(1, p)            # Discrimination parameters.
-delta      <- matrix(NA, p, K - 1) # Matrix to store difficulty parameters.
-delta[, 1] <- rnorm(p)
-for (i in 2:(K - 1)){
-  delta[, i] <- delta[, i - 1] + runif(1, 0.4, 0.9)
+alpha <- rep(1, p)            # Discrimination parameters.
+delta <- rnorm(p)
+taus <- runif(p - 2, -.3, .3)
+taus <- sort(c(taus, -sum(taus)))
+
+probs.array       <- array(NA, dim = c(length(theta[, 3]), p, p))
+for (y in 0:(p - 1)) 
+{
+  probs.array[, , y + 1] <- P.GPCM(y, alpha = alpha, delta = delta, taus = taus, theta = theta[, 3], M = p - 1)
 }
-rm(i)
-
-IP          <- cbind(delta, alpha) # Matrix of item parameters to input in P.GRM
-
-probs.array <- P.GRM(K - 1, IP, theta[, 3])
-responses   <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 1, vec) == 1) - 1 })
-rm(probs.array, delta, alpha)
+responses               <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 1, vec) == 1) - 1 })
+rm(probs.array)
 
 # Restructure data to add id, time, and item factors.
 simdata <- data.frame(theta[, 1:2], responses)
@@ -231,19 +212,19 @@ fit.ram <- stan(file = "Stan/ram.stan",
                          "delta",
                          "mu_gamma0",
                          "v_gamma0",
-                         "mu_gamma1",
-                         "v_gamma1",
+                         #"mu_gamma1",
+                         #"v_gamma1",
                          "mu_gamma2",
                          "v_gamma2",
                          "mu_gamma3",
                          "v_gamma3",
                          "sigma_2"),
-                iter   = 1000, 
+                iter   = 500, 
                 chains = 3, 
-                thin   = 5, 
+                thin   = 1, 
                 cores  = 3)
 
-traceplot(fit.ram, pars = "v_gamma2", inc_warmup = TRUE)
+traceplot(fit.ram, pars = "lambda[1]", inc_warmup = TRUE)
 
 summary(fit.ram, pars = "delta")$summary
 

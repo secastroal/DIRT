@@ -13,7 +13,7 @@ data {
 parameters {
   // Parameters
   vector[n] mu_i;          // Random intercept
-  vector[n] beta_i;        // Random slope for TP
+  //vector[n] beta_i;        // Random slope for TP
   vector[n] r_i;           // Random amplitude
   vector[n] phi_i;         // Random phase shift
   real<lower = 0> sigma_2; // Residual variance
@@ -24,8 +24,8 @@ parameters {
   // Hyper parameters
   real mu_gamma0;         // Mean mu
   real<lower=0> v_gamma0; // Var mu
-  real mu_gamma1;         // Mean beta  
-  real<lower=0> v_gamma1; // Var beta
+  //real mu_gamma1;         // Mean beta  
+  //real<lower=0> v_gamma1; // Var beta
   real mu_gamma2;         // Mean r
   real<lower=0> v_gamma2; // Var r
   real mu_gamma3;         // Mean phi
@@ -33,7 +33,7 @@ parameters {
 }
 transformed parameters {
   real<lower=0> s_gamma0; // Sd mu
-  real<lower=0> s_gamma1; // Sd beta
+  //real<lower=0> s_gamma1; // Sd beta
   real<lower=0> s_gamma2; // Sd r
   real<lower=0> s_gamma3; // Sd phi
   real<lower=0> sigma;    // Sd residual variance
@@ -46,7 +46,7 @@ transformed parameters {
   
   // Compute standard deviations
   s_gamma0 = sqrt(v_gamma0);
-  s_gamma1 = sqrt(v_gamma1);
+  //s_gamma1 = sqrt(v_gamma1);
   s_gamma2 = sqrt(v_gamma2);
   s_gamma3 = sqrt(v_gamma3);
   sigma    = sqrt(sigma_2);
@@ -69,7 +69,7 @@ transformed parameters {
   // Compute intraindividual means of theta
   
   for (rr in 1:nr) {
-    theta_i[rr] = mu_i[X1[rr]] + beta_i[X1[rr]] * TP[rr] + r_i[X1[rr]] * (cos(((2*pi())/7))*TP[rr] + phi_i[X1[rr]]);
+    theta_i[rr] = mu_i[X1[rr]] + r_i[X1[rr]] * (cos(((2*pi())/7))*TP[rr] + phi_i[X1[rr]]); //+ beta_i[X1[rr]] * TP[rr];
   }
   
   // Compute probabilities to input in likelihood
@@ -81,7 +81,7 @@ transformed parameters {
 model {
   // Define priors
   mu_i ~ normal(mu_gamma0, s_gamma0);          
-  beta_i ~ normal(mu_gamma1, s_gamma1);
+  //beta_i ~ normal(mu_gamma1, s_gamma1);
   r_i ~ normal(mu_gamma2, s_gamma2);           
   phi_i ~ normal(mu_gamma3, s_gamma3);
   sigma_2 ~ inv_gamma(1, 1) ;// Residual variance
@@ -94,8 +94,8 @@ model {
   // Define Hyperpriors
   mu_gamma0 ~ normal(0, 1);
   v_gamma0 ~ inv_gamma(1, 1);
-  mu_gamma1 ~ normal(0, 1);   
-  v_gamma1 ~ inv_gamma(1, 1);
+  //mu_gamma1 ~ normal(0, 1);   
+  //v_gamma1 ~ inv_gamma(1, 1);
   mu_gamma2 ~ normal(0, 1);  
   v_gamma2 ~ inv_gamma(1, 1);
   mu_gamma3 ~ normal(0, 1);
