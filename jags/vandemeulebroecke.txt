@@ -1,0 +1,47 @@
+model {
+
+  for (r in 1:nr){
+    Y[r] ~ dcat ( prob [r ,   1: K[item[r]] ])                 # categorical variable
+    pred[r] <- inprod(Z[X1[r],], beta)
+    theta [r] <- gamma0[X1[r]] + (gamma1[X1[r]]+pred[r])*TP[r] # standardized to gamma0 at t=1
+  }
+  for (s in 1:n){
+    gamma0[s] ~ dnorm(0,1)                                     # standardization of abilities
+    gamma1[s] ~ dnorm(mu.gamma1,pr.gamma1)
+  }
+  mu.gamma1 ~ dnorm(m.mu.gamma1, pr.mu.gamma1)
+  pr.gamma1 ~ dgamma(a.pr.gamma1, b.pr.gamma1)
+  sigsq.gamma1 <- 1/pr.gamma1
+  pr.mu.gamma1 <- pow(s.mu.gamma1, -2)
+  for(i in 1:6){
+    beta[i] ~ dnorm(0,1)
+  }
+
+  for (r in 1:nr){                      # r: row in dataset
+    for (k in 1:(K[item[r]]-1)){        # k: value category
+      logit(P[r,k]) <- kappa[item[r], k] - alpha[item[r]]*theta[r]
+    }
+    P[r,K[item[r]]] <- 1.0
+    prob[r,1] <- P[r,1]
+    for (k in 2:K[item[r]]){
+      prob[r,k] <- max(P[r,k] - P[r,k-1], 0.0000001)
+    }
+  }
+
+  for (j in 1:p){
+    alpha.tmp[j] ~ dnorm (m.alpha, pr.alpha)
+    alpha[j] <- abs(alpha.tmp[j])
+  }
+  pr.alpha <- pow(s.alpha,-2)
+
+  for (j in 1:p){
+    kappa.star.sorted[j,1:(K[j]-1)] <- sort(kappa.star[j, 1:(K[j]-1)])
+    for (k in 1:(K[j]-1)){
+      kappa.star[j,k] ~ dnorm(m.kappa, pr.kappa)
+      kappa[j,k] <- kappa.star.sorted[j,k]
+    }
+  }
+  pr.kappa <- pow(s.kappa,-2)
+
+}
+

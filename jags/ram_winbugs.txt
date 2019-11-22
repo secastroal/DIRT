@@ -1,0 +1,69 @@
+Model Multilevel Model of Sinusoidal Change Incorporating RSM
+
+#variable specification
+theta[N,T]	person trait levels
+delta[I]	item difficulties
+gamma[J]  	step difficulties
+tau		precision for person distribution
+sigma2		variance of person distribution
+p[N,I,T,J]  	category probabilities
+x[N,I,T]	item responses
+z[N,I,T,J]	working matrix
+
+
+#likelihood
+
+model{
+	for (n in 1:N) {
+		for (t in 1:T) {
+			for (i in 1:(I-1)) {
+				z[n,i,t,1]<-1
+				p[n,i,t,1]<-1/sum(z[n,i,t,])
+				for (j in 2:(J-1)) {
+					log(z[n,i,t,j])<-(j-1)*(theta[n,t]-delta[i])-sum(gamma[1:(j-1)])
+					p[n,i,t,j]<-z[n,i,t,j]/sum(z[n,i,t,])
+				}
+				log(z[n,i,t,J])<-(J-1)*(theta[n,t]-delta[i])
+				p[n,i,t,J]<-z[n,i,t,J]/sum(z[n,i,t,])
+				x[n,i,t] ~ dcat(p[n,i,t,])
+			}
+			z[n,I,t,1]<-1
+			p[n,I,t,1]<-1/sum(z[n,I,t,])
+			for (j in 2:(J-1)) {
+				log(z[n,I,t,j])<-(j-1)*theta[n,t]-sum(gamma[1:(j-1)])
+				p[n,I,t,j]<-z[n,I,t,j]/sum(z[n,I,t,])
+			}
+			log(z[n,I,t,J])<-(J-1)*theta[n,t]
+			p[n,I,t,J]<-z[n,I,t,J]/sum(z[n,I,t,])
+			x[n,I,t] ~ dcat(p[n,I,t,])
+		
+			
+			theta[n , t] ~ dnorm(mu[n , t],tauy)
+      day[n,t]<-t
+      eta[n , t] <- .8976*day[n , t]+b[n,4]
+      mu[n , t] <- b[n,1]+b[n,2]*day[n,t]+b[n,3]*cos(eta[n,t]) 
+		}
+	}
+
+	
+#priors
+
+	for (i in 1:(I-1)) {
+		delta[i] ~ dnorm(0,1.0E-6)
+	}
+	for (j in 1:(J-2)) {
+		gamma[j] ~ dnorm(0,1.0E-6)
+	}
+  tauy ~ dgamma(0.001,0.001)
+  for( n in 1 : N ) {
+  	b[n,1:4]~dmnorm(mub[1:4],taub[1:4,1:4])
+  }
+  mub[1:4]~dmnorm(mean[1:4],prec[1:4,1:4])
+	taub[1:4,1:4]~dwish(R[1:4, 1:4],4)
+	sigma2b[1:4, 1:4]<-inverse(taub[1:4,1:4])
+  sigmay <- 1 / sqrt(tauy)
+}
+
+
+
+#Starting Values and Data follow
