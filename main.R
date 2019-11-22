@@ -114,8 +114,8 @@ standata <- list(nr           = nr,
                  b_pr_gamma1  = 1
                  )
 
-fit.vande <- stan(file = "Stan/vandemeulebroecke.stan", data = standata, iter = 1000, chains = 3, 
-                  thin = 5, cores = 3)
+fit.vande <- stan(file = "Stan/vandemeulebroecke.stan", data = standata, iter = 2000, chains = 3, 
+                  thin = 10, cores = 3)
 
 traceplot(fit.vande, pars = "alpha[1]", inc_warmup = TRUE)
 
@@ -164,8 +164,8 @@ theta <- theta[order(theta[, 3]), c(3, 1, 2)]                                   
 
 # Create item parameters
 alpha <- rep(1, p)            # Discrimination parameters.
-delta <- rnorm(p)
-taus <- runif(p - 2, -.3, .3)
+delta <- sort(rnorm(p))
+taus <- runif(p - 2, -1, 1)
 taus <- sort(c(taus, -sum(taus)))
 
 probs.array       <- array(NA, dim = c(length(theta[, 3]), p, p))
@@ -219,12 +219,12 @@ fit.ram <- stan(file = "Stan/ram.stan",
                          "mu_gamma3",
                          "v_gamma3",
                          "sigma_2"),
-                iter   = 500, 
+                iter   = 2000, 
                 chains = 3, 
-                thin   = 1, 
+                thin   = 10, 
                 cores  = 3)
 
-traceplot(fit.ram, pars = "lambda[1]", inc_warmup = TRUE)
+traceplot(fit.ram, pars = "lambda", inc_warmup = TRUE)
 
 summary(fit.ram, pars = "delta")$summary
 
