@@ -71,7 +71,7 @@ transformed parameters {
   // Compute intraindividual means of theta
   
   for (rr in 1:nr) {
-    theta_i[rr] = mu_i[X1[rr]] + r_i[X1[rr]] * (cos(((2*pi())/5))*TP[rr] + phi_i[X1[rr]]); //+ beta_i[X1[rr]] * TP[rr];
+    theta_i[rr] = mu_i[X1[rr]] + r_i[X1[rr]] * (cos(((2*pi())/7))*TP[rr] + phi_i[X1[rr]]); //+ beta_i[X1[rr]] * TP[rr];
   }
   
   // Compute probabilities to input in likelihood

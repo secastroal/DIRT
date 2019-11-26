@@ -27,20 +27,20 @@ rm(rfiles)
 
 set.seed(123)
 # Let's define the conditions of the data
-n  <- 100 # Number of subjects.
-p  <- 5   # Number of items.
-K  <- 5   # Number of categories per items.
-nC <- 2   # Number of covariates.
-nt <- 5  # Number of time points. #! not necessarily the same for all the persons
+n  <- 100  # Number of subjects.
+p  <- 5    # Number of items.
+K  <- 5    # Number of categories per items.
+nC <- 2    # Number of covariates.
+nt <- 10   # Number of time points. #! In the paper not all persons were measured the same number of times.
 
 # Now, we generate the thetas given the longitudinal model proposed by Vandemeulebroecke
 
-gamma0    <- rnorm(n)                             # Random intercept, which varies over persons.
-gammastar <- rnorm(n, 0, 0.3)                     # Random intercept of the random slope, which varies over persons.
-beta      <- sample((-3:3)/50, nC, replace = TRUE) # Coefficients of the covariates. 
-Z         <- replicate(nC, rnorm(n))              # Generate nC standardized covariates. 
+gamma0    <- rnorm(n)                # Random intercept, which varies over persons.
+gammastar <- rnorm(n, 0, 0.03)       # Random intercept of the random slope, which varies over persons.
+beta      <- runif(nC, -0.05, 0.05)  # Coefficients of the covariates. 
+Z         <- replicate(nC, rnorm(n)) # Generate nC standardized covariates. 
 
-gamma1    <- gammastar + Z %*% beta               # Compute random slope.
+gamma1    <- gammastar + Z %*% beta  # Compute random slope.
 
 # Create matrix to store thetas over time
 theta <- matrix(NA, n, nt)
@@ -52,17 +52,17 @@ rm(i)
 theta <- reshape(as.data.frame(theta), 
                  varying       = list(1:nt), 
                  new.row.names = 1:(n * nt),
-                 direction     = "long") # Turn theta matrix into long format.
-theta <- theta[order(theta[, 3]), c(3, 1, 2)]                                    # Order theta matrix by id.    
+                 direction     = "long")      # Turn theta matrix into long format.
+theta <- theta[order(theta[, 3]), c(3, 1, 2)] # Order theta matrix by id.    
 
 # Generate GRM responses given the generated thetas.
 
 # Create item parameters
-alpha      <- runif(p, 0.5 , 2)    # Discrimination parameters.
-delta      <- matrix(NA, p, K - 1) # Matrix to store difficulty parameters.
-delta[, 1] <- rnorm(p)
+alpha      <- rlnorm(p, 0, 0.25)    # Discrimination parameters.
+delta      <- matrix(NA, p, K - 1)  # Matrix to store difficulty parameters.
+delta[, 1] <- rnorm(p, -2)
 for (i in 2:(K - 1)){
-  delta[, i] <- delta[, i - 1] + runif(1, 0.4, 0.9)
+  delta[, i] <- delta[, i - 1] + runif(1, 0.4, 1.2)
 }
 rm(i)
 
@@ -77,7 +77,7 @@ simdata <- data.frame(theta[, 1:2], responses)
 
 simdatalong <- reshape(simdata, 
                        idvar         = c("id", "time"),
-                       varying       = list(3:7),
+                       varying       = list(3:(2 + p)),
                        new.row.names = 1:(n * nt * p),
                        direction     = "long") 
 
@@ -92,34 +92,47 @@ nr <- nrow(simdatalong) # Number of observed responses. Might be fewer than p * 
 
 # Run Vandemeulebroecke's model
 
+# In the paper, Vandemeulebroecke run 10000 iterations in stan (half burn-in) with 10 chains and no thining. 
+# Nine out of the ten chains converge to the same results, one chain got stuck.The running time was 24 hours
+# per chain. The reported effective size was 3700 on average using the function effectiveSize of the coda 
+# package.
+
 # Prepare data for stan
 
-standata <- list(nr           = nr,
-                 n            = n,
-                 p            = p,
-                 K            = K,
-                 nC           = nC,
-                 Y            = simdatalong[, "X"] + 1,
-                 TP           = simdatalong[, "time"],
-                 X1           = simdatalong[, "id"],
-                 item         = simdatalong[, "item"],
-                 Z            = Z,
-                 m_mu_gamma1  = 0,
-                 sd_mu_gamma1 = 1,
-                 m_alpha      = 0,
-                 sd_alpha     = 1,
-                 m_kappa      = 0,
-                 sd_kappa     = 1,
-                 a_pr_gamma1  = 1,
-                 b_pr_gamma1  = 1
+standata <- list(nr           = nr,                     # Number of rows.                
+                 n            = n,                      # Number of persons.
+                 p            = p,                      # Number of items.
+                 K            = K,                      # Number of categories per item.
+                 nC           = nC,                     # Number of standardized covariates.
+                 Y            = simdatalong[, "X"] + 1, # Vector of responses.
+                 TP           = simdatalong[, "time"],  # Vector of time indicators.
+                 X1           = simdatalong[, "id"],    # Vector of ID.
+                 item         = simdatalong[, "item"],  # Vector of item indicator.
+                 Z            = Z,                      # Matrix of standardized covariates.
+                 m_mu_gamma1  = 0,                      # Mean of the Hyperprior gamma 1.
+                 sd_mu_gamma1 = 2.5^2,                  # SD of the Hyperprior gamma 1.
+                 m_alpha      = 1,                      # Mean of the Hyperprior alpha.
+                 sd_alpha     = 2.5^2,                  # SD of the Hyperprior alpha.
+                 m_kappa      = 0,                      # Mean of the Hyperprior kappa.
+                 sd_kappa     = 2.5^2,                  # SD of the Hyperprior kappa.
+                 a_pr_gamma1  = 0.2,                    # shape of the Hyperprior gamma 1
+                 b_pr_gamma1  = 0.2                     # rate of the Hyperprior gamma 1
                  )
+t0 <- proc.time()
+fit.vande <- stan(file = "Stan/vandemeulebroecke.stan", 
+                  data = standata,
+                  iter = 2000, 
+                  chains = 3, 
+                  thin = 1, 
+                  cores = 3)
+time.vande <- proc.time() - t0
+rm(t0)
 
-fit.vande <- stan(file = "Stan/vandemeulebroecke.stan", data = standata, iter = 2000, chains = 3, 
-                  thin = 10, cores = 3)
-
-traceplot(fit.vande, pars = "alpha[1]", inc_warmup = TRUE)
+traceplot(fit.vande, pars = "alpha", inc_warmup = TRUE)
 
 summary(fit.vande, pars = "alpha")$summary
+
+save(fit.vande, file = "Fits/fit.vande.R")
 
 # 2. Ram et al (2005) ----
 # LIRT model proposed by Ram et al. (2005) is based on the rating scale model. 
@@ -133,18 +146,18 @@ summary(fit.vande, pars = "alpha")$summary
 
 set.seed(123)
 # Let's define the conditions of the data
-n  <- 100 # Number of subjects.
-p  <- 5   # Number of items.
+n  <- 200 # Number of subjects.
+p  <- 8   # Number of items.
 K  <- 5   # Number of categories per items.
-nt <- 10  # Number of time points. #! not necessarily the same for all the persons
+nt <- 35  # Number of time points. #! not necessarily the same for all the persons
 
 # Now, we generate the thetas given spectral analysis proposed by Ram
 # We need the next random parameters:
 
 mu    <- rnorm(n, -0.5, 1)  # Random intercept.
-beta  <- rnorm(n, 0, .01)   # Random linear slope, which multiplies time_it. Detrend data.
+beta  <- rnorm(n, 0, .1)   # Random linear slope, which multiplies time_it. Detrend data.
 R     <- rnorm(n, 0.2, 0.2) # Random amplitude of the cycle.
-omega <- (2 * pi) / 5       # Period of oscillattion assumed to be 7 days.
+omega <- (2 * pi) / 7       # Period of oscillattion assumed to be 7 days.
 phi   <- rnorm(n, 0.2, 0.4) # Random phase shift.
 
 # Create matrix to store thetas over time
@@ -164,14 +177,14 @@ theta <- theta[order(theta[, 3]), c(3, 1, 2)]                                   
 
 # Create item parameters
 alpha <- rep(1, p)            # Discrimination parameters.
-delta <- sort(rnorm(p))
-taus <- runif(p - 2, -1, 1)
+lambda <- sort(rnorm(p))
+taus <- runif(K - 2, -1, 1) 
 taus <- sort(c(taus, -sum(taus)))
 
-probs.array       <- array(NA, dim = c(length(theta[, 3]), p, p))
-for (y in 0:(p - 1)) 
+probs.array       <- array(NA, dim = c(length(theta[, 3]), p, K))
+for (y in 0:(K - 1)) 
 {
-  probs.array[, , y + 1] <- P.GPCM(y, alpha = alpha, delta = delta, taus = taus, theta = theta[, 3], M = p - 1)
+  probs.array[, , y + 1] <- P.GPCM(y, alpha = alpha, delta = lambda, taus = taus, theta = theta[, 3], M = K - 1)
 }
 responses               <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 1, vec) == 1) - 1 })
 rm(probs.array)
@@ -181,7 +194,7 @@ simdata <- data.frame(theta[, 1:2], responses)
 
 simdatalong <- reshape(simdata, 
                        idvar         = c("id", "time"),
-                       varying       = list(3:7),
+                       varying       = list(3:(2 + p)),
                        new.row.names = 1:(n * nt * p),
                        direction     = "long") 
 
@@ -196,6 +209,10 @@ nr <- nrow(simdatalong) # Number of observed responses.
 
 # Run Ram's model
 
+# There is no information on the paper about the conditions in which the analyses were run. They only
+# mentioned that it took over 30 hours.
+
+
 standata <- list(nr           = nr,
                  n            = n,
                  p            = p,
@@ -206,6 +223,7 @@ standata <- list(nr           = nr,
                  item         = simdatalong[, "item"]
                  )
 
+t0 <- proc.time()
 fit.ram <- stan(file = "Stan/ram.stan", 
                 data = standata,
                 pars = c("lambda", 
@@ -219,13 +237,16 @@ fit.ram <- stan(file = "Stan/ram.stan",
                          "mu_gamma3",
                          "v_gamma3",
                          "sigma_2"),
-                iter   = 2000, 
+                iter   = 10000, 
                 chains = 3, 
-                thin   = 10, 
+                thin   = 1, 
                 cores  = 3)
+time.ram <- proc.time() - t0
+rm(t0)
 
 traceplot(fit.ram, pars = "lambda", inc_warmup = TRUE)
 
 summary(fit.ram, pars = "delta")$summary
 
+save(fit.ram, file = "Fits/fit.ram.R")
 
