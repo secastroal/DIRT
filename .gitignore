@@ -4,10 +4,13 @@
 # Session Data files
 .RData
 *.Rproj
+*.sh
 # RStudio files
 .Rproj.user/
 # Other files
 .Ruserdata
 .Rproj.user
 Stan/*.rds
+vandemeulebroecke.R
+Fits/fit.vande.peregrine.R
 #Folders
