@@ -7,6 +7,7 @@
 
 # 0. Prepare enviroment ----
 rm(list = ls())
+library(rjags)
 library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
@@ -110,18 +111,18 @@ standata <- list(nr           = nr,                     # Number of rows.
                  item         = simdatalong[, "item"],  # Vector of item indicator.
                  Z            = Z,                      # Matrix of standardized covariates.
                  m_mu_gamma1  = 0,                      # Mean of the Hyperprior gamma 1.
-                 sd_mu_gamma1 = 2.5^2,                  # SD of the Hyperprior gamma 1.
+                 sd_mu_gamma1 = 2.5,                    # SD of the Hyperprior gamma 1.
                  m_alpha      = 1,                      # Mean of the Hyperprior alpha.
-                 sd_alpha     = 2.5^2,                  # SD of the Hyperprior alpha.
+                 sd_alpha     = 2.5,                    # SD of the Hyperprior alpha.
                  m_kappa      = 0,                      # Mean of the Hyperprior kappa.
-                 sd_kappa     = 2.5^2,                  # SD of the Hyperprior kappa.
+                 sd_kappa     = 2.5,                    # SD of the Hyperprior kappa.
                  a_pr_gamma1  = 0.2,                    # shape of the Hyperprior gamma 1
                  b_pr_gamma1  = 0.2                     # rate of the Hyperprior gamma 1
                  )
 t0 <- proc.time()
 fit.vande <- stan(file = "Stan/vandemeulebroecke.stan", 
                   data = standata,
-                  iter = 2000, 
+                  iter = 500, 
                   chains = 3, 
                   thin = 1, 
                   cores = 3)
@@ -133,6 +134,46 @@ traceplot(fit.vande, pars = "alpha", inc_warmup = TRUE)
 summary(fit.vande, pars = "alpha")$summary
 
 save(fit.vande, file = "Fits/fit.vande.R")
+
+# Fit vandemeleubroecke model in jags
+
+jagsdata <- list(nr           = nr,                     # Number of rows.                
+                 n            = n,                      # Number of persons.
+                 p            = p,                      # Number of items.
+                 K            = K,                      # Number of categories per item.
+                 nC           = nC,                     # Number of standardized covariates.
+                 Y            = simdatalong[, "X"] + 1, # Vector of responses.
+                 TP           = simdatalong[, "time"],  # Vector of time indicators.
+                 X1           = simdatalong[, "id"],    # Vector of ID.
+                 item         = simdatalong[, "item"],  # Vector of item indicator.
+                 Z            = Z,                      # Matrix of standardized covariates.
+                 m.mu.gamma1  = 0,                      # Mean of the Hyperprior gamma 1.
+                 s.mu.gamma1  = 2.5,                    # SD of the Hyperprior gamma 1.
+                 m.alpha      = 1,                      # Mean of the Hyperprior alpha.
+                 s.alpha      = 2.5,                    # SD of the Hyperprior alpha.
+                 m.kappa      = 0,                      # Mean of the Hyperprior kappa.
+                 s.kappa      = 2.5,                    # SD of the Hyperprior kappa.
+                 a.pr.gamma1  = 0.2,                    # shape of the Hyperprior gamma 1
+                 b.pr.gamma1  = 0.2                     # rate of the Hyperprior gamma 1
+)
+
+# Compile the model:
+jagscompiled <- jags.model("jags/vandemeulebroecke.txt", 
+                           data     = jagsdata, 
+                           n.chains = 3, 
+                           n.adapt  = 1000)
+
+# Warm up:
+update(jagscompiled, 1000)
+
+# Draw samples:
+vande.fit.jags <- coda.samples(jagscompiled, 
+                               data           = jagsdata, 
+                               variable.names = c("alpha", "kappa"), 
+                               n.iter         = 1000, 
+                               thin           = 1)
+
+save(vande.fit.jags, file = "Fits/fit.vande.jags.R")
 
 # 2. Ram et al (2005) ----
 # LIRT model proposed by Ram et al. (2005) is based on the rating scale model. 
