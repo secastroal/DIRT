@@ -166,14 +166,14 @@ jagscompiled <- jags.model("jags/vandemeulebroecke.txt",
 # Warm up:
 update(jagscompiled, 1000)
 
-# Draw samples:
+ # Draw samples:
 vande.fit.jags <- coda.samples(jagscompiled, 
                                data           = jagsdata, 
                                variable.names = c("alpha", "kappa"), 
                                n.iter         = 1000, 
                                thin           = 1)
 
-save(vande.fit.jags, file = "Fits/fit.vande.jags.R")
+save(vande.fit.jags, file = "Fits/fit.vande.jags.RData")
 
 # 2. Ram et al (2005) ----
 # LIRT model proposed by Ram et al. (2005) is based on the rating scale model. 
