@@ -12,9 +12,15 @@ library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-rfiles <- list.files("R/", full.names = TRUE)
-sapply(rfiles,source,.GlobalEnv)
-rm(rfiles)
+# rfiles <- list.files("R/", full.names = TRUE)
+# sapply(rfiles,source,.GlobalEnv)
+# rm(rfiles)
+source("R/IRT_models.R")
+
+# Jorge:
+# I tested the functions in IRT_models.R, just in case.
+# It all seems ok.
+# See R/testing_functions.R
 
 # 1. Vandemeulebroecke et al (2017) ----
 # We will generate date based on the model proposed by Vandemeulebroecke et al (2017), 
@@ -38,8 +44,18 @@ nt <- 10   # Number of time points. #! In the paper not all persons were measure
 
 gamma0    <- rnorm(n)                # Random intercept, which varies over persons.
 gammastar <- rnorm(n, 0, 0.03)       # Random intercept of the random slope, which varies over persons.
-beta      <- runif(nC, -0.05, 0.05)  # Coefficients of the covariates. 
+#J# Let's closely follow the priors (please check, Sebas!!):
+gammastar_mu <- rnorm(1, 0, 2.5)
+gammastar_pr <- rgamma(1, shape=.2, rate=.2)
+gammastar_sd <- 1 / sqrt(gammastar_pr)
+
+beta      <- runif(nC, -0.05, 0.05)  # Coefficients of the covariates.
+#J# Probably it won't matter, but let's draw these from N(0,1), its prior:
+beta <- rnorm(nC)
+
 Z         <- replicate(nC, rnorm(n)) # Generate nC standardized covariates. 
+#J# Z is not standardized. Better like this:
+Z <- replicate(nC, scale(rnorm(n))[1:n, ])
 
 gamma1    <- gammastar + Z %*% beta  # Compute random slope.
 
