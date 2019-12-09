@@ -133,7 +133,7 @@ traceplot(fit.vande, pars = "alpha", inc_warmup = TRUE)
 
 summary(fit.vande, pars = "alpha")$summary
 
-save(fit.vande, file = "Fits/fit.vande.R")
+save(fit.vande, file = "Fits/fit.vande.RData")
 
 # Fit vandemeleubroecke model in jags
 
@@ -173,7 +173,8 @@ vande.fit.jags <- coda.samples(jagscompiled,
                                n.iter         = 1000, 
                                thin           = 1)
 
-save(vande.fit.jags, file = "Fits/fit.vande.jags.R")
+save(vande.fit.jags, file = "Fits/fit.vande.jags.RData")
+load(file = "Fits/fit.vande.jags.RData")
 
 # 2. Ram et al (2005) ----
 # LIRT model proposed by Ram et al. (2005) is based on the rating scale model. 
@@ -289,5 +290,5 @@ traceplot(fit.ram, pars = "lambda", inc_warmup = TRUE)
 
 summary(fit.ram, pars = "delta")$summary
 
-save(fit.ram, file = "Fits/fit.ram.R")
+save(fit.ram, file = "Fits/fit.ram.RData")
 
