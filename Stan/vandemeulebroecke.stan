@@ -59,7 +59,7 @@ model {
   }
 
   for(r in 1:nr){
-    Y[r] ~ ordered_logistic(alpha[item[r]]*theta[r],kappa[item[r]]);
+    Y[r] ~ ordered_logistic(alpha[item[r]]*theta[r],alpha[item[r]]*kappa[item[r]]);
   }
 }
 
