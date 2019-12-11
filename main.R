@@ -7,7 +7,6 @@
 
 # 0. Prepare enviroment ----
 rm(list = ls())
-library(rjags)
 library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores()-1)
@@ -34,31 +33,38 @@ source("R/IRT_models.R")
 
 set.seed(123)
 # Let's define the conditions of the data
-n  <- 2000  # Number of subjects. 
-p  <- 50    # Number of items. 
+n  <- 100  # Number of subjects. 
+p  <- 5    # Number of items. 
 K  <- 5    # Number of categories per items.
 nC <- 2    # Number of covariates.
 nt <- 10   # Number of time points. #! In the paper not all persons were measured the same number of times.
 
 # Now, we generate the thetas given the longitudinal model proposed by Vandemeulebroecke
+# Priors are based on the supplementary Table 1 (Vandemeulebroecke et al., 2017).
 
-gamma0    <- rnorm(n)                # Random intercept, which varies over persons.
-gammastar <- rnorm(n, 0, 0.03)       # Random intercept of the random slope, which varies over persons.
+gamma0    <- rnorm(n)                               # Random intercept, which varies over persons.
 #J# Let's closely follow the priors (please check, Sebas!!):
-# gammastar_mu <- rnorm(1, 0, 2.5)
-# gammastar_pr <- rgamma(1, shape=.2, rate=.2)
-# gammastar_sd <- 1 / sqrt(gammastar_pr)
-# gammastar    <- gammastar_mu + gammastar_sd * rnorm(n)
+#S# These are in fact the priors used in the original paper, which would result in generating gammastar
+# as follows:
+#gammastar_mu <- rnorm(1, 0, 2.5)
+#gammastar_pr <- rgamma(1, shape=.2, rate=.2)
+#gammastar_sd <- 1 / sqrt(gammastar_pr)
+#gammastar    <- rnorm(n, gammastar_mu, gammastar_sd) 
 
-beta      <- runif(nC, -0.05, 0.05)  # Coefficients of the covariates.
+# Given the stan code, gammastar should be generated as follows:
+#gammastar <- gammastar_mu + gammastar_sd * rnorm(n)
+
+# However, this way of generating gammastar can be problematic if gammastar_sd is too big. Therefore,
+# here we generate gammastar from a normal standard distribution. Still, the priors of gammastar_mu and
+# gammastar_sd are used in the stan model.
+gammastar <- rnorm(n) # Random intercept of the random slope, which varies over persons.
+
 #J# Probably it won't matter, but let's draw these from N(0,1), its prior:
-beta <- rnorm(nC)
+beta   <- rnorm(nC) # Coefficients of the covariates.
 
-Z         <- replicate(nC, rnorm(n)) # Generate nC standardized covariates. 
 #J# Z is not standardized. Better like this:
-Z <- replicate(nC, scale(rnorm(n))[1:n, ])
-
-gamma1    <- gammastar + Z %*% beta  # Compute random slope.
+Z      <- replicate(nC, scale(rnorm(n))[1:n, ]) # Generate nC standardized covariates.
+gamma1 <- gammastar + Z %*% beta                # Compute random slope.
 
 # Create matrix to store thetas over time
 theta <- matrix(NA, n, nt)
@@ -140,13 +146,13 @@ standata <- list(nr           = nr,                     # Number of rows.
                  b_pr_gamma1  = 0.2                     # rate of the Hyperprior gamma 1
                  )
 t0 <- proc.time()
-fit.vande <- stan(file = "Stan/vandemeulebroecke.stan", 
-                  data = standata,
-                  iter = 6667, 
+fit.vande <- stan(file   = "Stan/vandemeulebroecke.stan", 
+                  data   = standata,
+                  iter   = 500, 
                   chains = 3, 
-                  thin = 1, 
-                  cores = 3, 
-                  pars = c("alpha", "kappa"))
+                  thin   = 1, 
+                  cores  = 3, 
+                  pars   = c("alpha", "kappa"))
 time.vande <- proc.time() - t0
 rm(t0)
 
@@ -154,9 +160,13 @@ traceplot(fit.vande, pars = "alpha", inc_warmup = TRUE)
 
 summary(fit.vande, pars = "alpha")$summary
 
-save(fit.vande, file = "Fits/fit.vande.RData")
+saveRDS(fit.vande, file = "Fits/fit.vande.rds")
+
+detach("package:rstan")
 
 # Fit vandemeleubroecke model in jags
+
+library(rjags)
 
 jagsdata <- list(nr           = nr,                     # Number of rows.                
                  n            = n,                      # Number of persons.
@@ -194,9 +204,9 @@ vande.fit.jags <- coda.samples(jagscompiled,
                                n.iter         = 1000, 
                                thin           = 1)
 
-save(vande.fit.jags, file = "Fits/fit.vande.jags.RData")
+saveRDS(vande.fit.jags, file = "Fits/fit.vande.jags.rds")
 
-load(file = "Fits/fit.vande.jags.RData")
+loadRDS(file = "Fits/fit.vande.jags.rds")
 
 # 2. Ram et al (2005) ----
 # LIRT model proposed by Ram et al. (2005) is based on the rating scale model. 
@@ -312,5 +322,5 @@ traceplot(fit.ram, pars = "lambda", inc_warmup = TRUE)
 
 summary(fit.ram, pars = "delta")$summary
 
-save(fit.ram, file = "Fits/fit.ram.RData")
+saveRDS(fit.ram, file = "Fits/fit.ram.rds")
 

@@ -1,6 +1,7 @@
 # Here I test each function in 'IRT_models.R', to make sure they are all ok.
 
 library(mirt)
+source("R/IRT_models.R")
 
 # Test gen.1PL() ----
 set.seed(1)
