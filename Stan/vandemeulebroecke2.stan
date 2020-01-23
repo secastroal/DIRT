@@ -86,6 +86,7 @@ model {
     for (t in 1:nt) {
       for (k in 1:p) {
         Y[i, t, k] ~ ordered_logistic(alpha[k]*theta[i, t], alpha[k]*kappa[k]);
+        // Read stan manual on this function and cross we data generation.
       }
     }
   }
