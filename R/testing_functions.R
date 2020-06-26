@@ -2,6 +2,10 @@
 
 library(mirt)
 source("R/IRT_models.R")
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores()-1)
+
 
 # Test gen.1PL() ----
 set.seed(1)
@@ -92,7 +96,7 @@ set.seed(4)
 N             <- 1000
 I             <- 50
 K             <- 5
-theta         <- rnorm(N)
+theta         <- runif(N, -3, 3)
 # I use Sebastian's code here, with some edits:
 alpha         <- rlnorm(I, 0, 0.25)    # Discrimination parameters.
 delta         <- matrix(NA, I, K - 1)  # Matrix to store difficulty parameters.
@@ -113,6 +117,31 @@ rm(probs.array, delta, alpha)
 mirt.grm       <- mirt(gen.data.grm, model = 1, itemtype = "graded")
 mirt.grm.items <- coef(mirt.grm, IRTpars = TRUE, simplify = TRUE)
 mirt.grm.theta <- fscores(mirt.grm)
+
+# Fit GRM in Stan
+standata <- list(n_student    = N,                      # Number of persons.
+                 n_item       = I,                      # Number of time points
+                 K            = K,                      # Number of categories per item.
+                 Y            = gen.data.grm + 1       # Array of responses.
+)
+t0 <- proc.time()
+fit.grm <- stan(file   = "Stan/grm_2.stan", 
+                data   = standata,
+                iter   = 500, 
+                warmup = 250, # it seems enough from previous runs
+                chains = 3, 
+                thin   = 1, 
+                cores  = 3, 
+                pars   = c("alpha", "beta", "theta"))
+time.vande <- proc.time() - t0
+rm(t0)
+
+sum.grm <- list()
+
+sum.grm$alpha   <- summary(fit.grm, pars = "alpha")$summary
+sum.grm$beta    <- summary(fit.grm, pars = "beta")$summary
+sum.grm$theta   <- summary(fit.grm, pars = "theta")$summary
+
 # 
 plot(IP[, "alpha"], mirt.grm.items$items[, "a"], pch = 4, 
      main = paste0("Discrimination; cor = ", round(cor(IP[, "alpha"], mirt.grm.items$items[, "a"]), 3)))
@@ -129,7 +158,29 @@ plot(theta, mirt.grm.theta, pch = 4,
      main = paste0("Thetas; cor = ", round(cor(theta, mirt.grm.theta), 3)))
 abline(0, 1, col = 2, lwd = 2)
 # 
+
+plot(IP[, "alpha"], sum.grm$alpha[, 1], pch = 4, 
+     main = paste0("Discrimination; cor = ", round(cor(IP[, "alpha"], sum.grm$alpha[, 1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+# 
+plot(c(t(IP[, paste0("delta", 1:4)])), sum.grm$beta[, 1], pch = 4, 
+       main = paste0("cor = ", round(cor(c(t(IP[, paste0("delta", 1:4)])), sum.grm$beta[, 1]), 4)))
+  abline(0, 1, col = 2, lwd = 2)
+
+# 
+plot(theta, sum.grm$theta[, 1], pch = 4, 
+     main = paste0("Thetas; cor = ", round(cor(theta, sum.grm$theta[, 1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+
+
+
+
 rm(list = setdiff(ls(), lsf.str()))
+
+
 
 # Test P.GPCM() ----
 # Not today.
+
+
+# Fit vandemeleubroecke but ignoring the linear trend of theta ... just N(0, 1)
