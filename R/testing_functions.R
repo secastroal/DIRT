@@ -153,6 +153,11 @@ for (i in 1:(K-1))
        main = paste0("cor = ", round(cor(IP[, paste0("delta", i)], mirt.grm.items$items[, paste0("b", i)]), 4)))
   abline(0, 1, col = 2, lwd = 2)
 }
+
+plot(c(IP[, paste0("delta", 1:4)]), c(mirt.grm.items$items[, paste0("b", 1:4)]), pch = 4, 
+     main = paste0("cor = ", round(cor(c(IP[, paste0("delta", 1:4)]), c(mirt.grm.items$items[, paste0("b", 1:4)])), 4)))
+abline(0, 1, col = 2, lwd = 2)
+
 # 
 plot(theta, mirt.grm.theta, pch = 4, 
      main = paste0("Thetas; cor = ", round(cor(theta, mirt.grm.theta), 3)))
@@ -171,9 +176,6 @@ plot(c(t(IP[, paste0("delta", 1:4)])), sum.grm$beta[, 1], pch = 4,
 plot(theta, sum.grm$theta[, 1], pch = 4, 
      main = paste0("Thetas; cor = ", round(cor(theta, sum.grm$theta[, 1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
-
-
-
 
 rm(list = setdiff(ls(), lsf.str()))
 
