@@ -71,10 +71,10 @@ model {
   a_raw ~ normal(0, 1);
   a0    ~ normal(0, 1);
   tau   ~ normal(0, 1);
-  alpha ~ normal(0, 2.5);
+  alpha ~ lognormal(0, 1);
 
   for(k in 1:I){
-    kappa[k] ~ normal(0, 2.5);
+    kappa[k] ~ normal(0, 1);
   }
 
   //Likelihood

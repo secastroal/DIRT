@@ -1,8 +1,12 @@
-# In this document I try out some of the longitudinal IRT models.
-# The next sections are included:
-# 0. Prepare enviroment
-# 1. Vandemeulebroecke et al (2017)
+# This document is used to fit the IRT longitudinal model proposed
+# in Vandemeulebroecke(2017).
 
+# The stan model used in this script is a modification of the stan
+# model available in the original paper. Specifically, we included 
+# some indexes variables, which optimize the model to not estimate
+# the same theta parameter multiple times. This makes the stan model
+# more efficient (memory) while also keeping the long-format structure
+# of the data
 
 # 0. Prepare enviroment ----
 rm(list = ls())
@@ -17,8 +21,15 @@ library(bayesplot)
 source("R/IRT_models.R")
 
 # 1. Vandemeulebroecke et al (2017) ----
-# We will generate date based on the model proposed by Vandemeulebroecke et al (2017), 
-# and fit the model to the data. 
+# We will generate data based on the model proposed by Vandemeulebroecke et al (2017), 
+# and fit the model to the data.
+
+## Optional ##
+# If this script is executed through a batch file. One can specify
+# additional arguments to change the number of subjects, the number
+# of time points, and the number of items.
+
+#arg <- commandArgs(trailingOnly = TRUE)
 
 # Simulating data
 # For this, we need: 
@@ -34,10 +45,15 @@ K  <- 5    # Number of categories per items.
 nC <- 2    # Number of covariates.
 nt <- 15   # Number of time points. #! In the paper not all persons were measured the same number of times.
 
+## Optional ## # When batched.
+# n  <- arg[1]
+# nt <- arg[2]
+# p  <- arg[3]
+
 # Now, we generate the thetas given the longitudinal model proposed by Vandemeulebroecke
 # Priors are based on the supplementary Table 1 (Vandemeulebroecke et al., 2017).
 
-gamma0    <- rnorm(n)                               # Random intercept, which varies over persons.
+gamma0    <- rnorm(n) # Random intercept, which varies over persons.
 #J# Let's closely follow the priors (please check, Sebas!!):
 #gammastar_mu <- rnorm(1, 0, 2.5)
 #gammastar_pr <- rgamma(1, shape=.2, rate=.2)
@@ -47,6 +63,7 @@ gammastar    <- rnorm(n, 0, 0.01) # Random intercept of the random slope, which 
 #J# Probably it won't matter, but let's draw these from N(0,1), its prior:
 #beta   <- rnorm(nC, 0, 0.005) # Coefficients of the covariates.
 beta <- runif(nC, -0.05, 0.05)
+
 #J# Z is not standardized. Better like this:
 Z      <- replicate(nC, scale(rnorm(n))[1:n, ]) # Generate nC standardized covariates.
 gamma1 <- gammastar + Z %*% beta                # Compute random slope.
@@ -63,8 +80,6 @@ theta <- reshape(as.data.frame(theta),
                  new.row.names = 1:(n * nt),
                  direction     = "long")      # Turn theta matrix into long format.
 theta <- theta[order(theta[, 3]), c(3, 1, 2)] # Order theta matrix by id. 
-
-#theta[, 3] <- rnorm(length(theta[, 3]), 0, 1)   
 
 # Generate GRM responses given the generated thetas.
 
@@ -130,19 +145,19 @@ standata <- list(nr           = nr,                     # Number of rows.
                  Z            = Z,                      # Matrix of standardized covariates.
                  Tobs         = Tobs,                   # Total number ob observations.
                  indoxp       = indoxp,                 # Indicator of person per observation.
-                 m_mu_gamma1  = 0,                      # Mean of the Hyperprior gamma 1.
-                 sd_mu_gamma1 = 2.5,                    # SD of the Hyperprior gamma 1.
-                 m_alpha      = 1,                      # Mean of the Hyperprior alpha.
-                 sd_alpha     = 2.5,                    # SD of the Hyperprior alpha.
-                 m_kappa      = 0,                      # Mean of the Hyperprior kappa.
-                 sd_kappa     = 2.5,                    # SD of the Hyperprior kappa.
-                 a_pr_gamma1  = 0.2,                    # shape of the Hyperprior gamma 1
-                 b_pr_gamma1  = 0.2                     # rate of the Hyperprior gamma 1
+                 m_mu_gamma1  = 0,                      # Mean of the priorof the mean of gamma 1.
+                 sd_mu_gamma1 = 2.5,                    # SD of the prior of the mean of gamma 1.
+                 m_alpha      = 1,                      # Mean of the prior of alpha.
+                 sd_alpha     = 2.5,                    # SD of the prior of alpha.
+                 m_kappa      = 0,                      # Mean of the prior of kappa.
+                 sd_kappa     = 2.5,                    # SD of the prior of kappa.
+                 a_pr_gamma1  = 0.2,                    # shape of the prior of the sd of gamma 1
+                 b_pr_gamma1  = 0.2                     # rate of the prior of the sd of gamma 1
 )
 t0 <- proc.time()
 fit.vande <- stan(file   = "Stan/vandemeulebroecke_mlindex.stan", 
                   data   = standata,
-                  pars   = c("alpha", "kappa", "theta"),
+                  pars   = c("alpha", "kappa", "theta", "beta_i"),
                   iter   = 5250,
                   warmup = 250, 
                   chains = 10, 
@@ -153,14 +168,15 @@ rm(t0)
 
 sum.vande <- list()
 
-sum.vande$alpha   <- summary(fit.vande, pars = "alpha")$summary
-sum.vande$kappa   <- summary(fit.vande, pars = "kappa")$summary
+sum.vande$alpha    <- summary(fit.vande, pars = "alpha")$summary
+sum.vande$kappa    <- summary(fit.vande, pars = "kappa")$summary
+sum.vande$beta_i   <- summary(fit.vande, pars = "beta_i")$summary
 #sum.vande$gamma0  <- summary(fit.vande, pars = "gamma0")$summary
 #sum.vande$gamma1s <- summary(fit.vande, pars = "gamma1s")$summary
 #sum.vande$gamma1  <- summary(fit.vande, pars = "gamma1")$summary
-sum.vande$theta   <- summary(fit.vande, pars = "theta")$summary
+sum.vande$theta    <- summary(fit.vande, pars = "theta")$summary
 
-kappapars <- paste0("kappa[", rep(c(1, ceiling(p / 2), p), each = 3), 
+betapars <- paste0("beta_i[", rep(c(1, ceiling(p / 2), p), each = 3), 
                     ",", rep(c(1, ceiling(K / 2), K - 1), times = 3), "]")
 thetapars <- paste0("theta[", rep(c(0, ceiling(n / 2) - 1, n - 1), each = 3) * nt + 
                       rep(c(1, ceiling(nt / 2), nt), times = 3), "]")
@@ -175,7 +191,7 @@ if (length(warnings()) != 0) {
 mcmc_rhat(rhat(fit.vande))
 
 traceplot(fit.vande, pars = "alpha", inc_warmup = TRUE)
-traceplot(fit.vande, pars = kappapars, inc_warmup = TRUE)
+traceplot(fit.vande, pars = betapars, inc_warmup = TRUE)
 traceplot(fit.vande, pars = thetapars, inc_warmup = TRUE)
 
 fit.array <- as.array(fit.vande)
@@ -185,7 +201,7 @@ mcmc_acf(fit.array[,c(1, 5, 10),],
          lags = 20)
 
 mcmc_acf(fit.array[,c(1, 5, 10),], 
-         pars = kappapars[c(1, 5, 9)], 
+         pars = betapars[c(1, 5, 9)], 
          lags = 20)
 
 mcmc_acf(fit.array[,c(1, 5, 10),], 
@@ -199,15 +215,23 @@ plot(IP[,5], sum.vande$alpha[,1], pch = 20,
      ylim = c(0.5, 2.5),
      main = paste0("Discrimination; cor = ", round(cor(IP[,5], sum.vande$alpha[,1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
+segments(x0 = IP[, 5], 
+         y0 = sum.vande$alpha[, 4], 
+         y1 = sum.vande$alpha[, 8],
+         col = rgb(0, 0, 0, 0.25))
 
-plot(c(t(IP[,1:4])), sum.vande$kappa[,1] / rep(sum.vande$alpha[,1], each = K - 1), pch = 20,
-     xlab = "True kappa",
-     ylab = "Estimated kappa",
+plot(c(t(IP[,1:4])), sum.vande$beta_i[,1], pch = 20,
+     xlab = "True Locations",
+     ylab = "Estimated Locations",
      xlim = c(-3, 3),
      ylim = c(-3, 3),
-     main = paste0("Thresholds; cor = ", 
-                   round(cor(c(t(IP[,1:4])), sum.vande$kappa[,1] / rep(sum.vande$alpha[,1], each = K - 1)), 3)))
+     main = paste0("Locations; cor = ", 
+                   round(cor(c(t(IP[,1:4])), sum.vande$beta_i[,1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
+segments(x0 = c(t(IP[, 1:4])), 
+         y0 = sum.vande$beta_i[, 4], 
+         y1 = sum.vande$beta_i[, 8],
+         col = rgb(0, 0, 0, 0.25))
 
 #plot(gamma0, sum.vande$gamma0[,1], pch = 20,
  #    xlab = "True gamma 0",

@@ -1,11 +1,10 @@
 # Jorge: Trying out a new Stan model (vandemeulebroecke2.stan).
 # 
-# In this document I try out some of the longitudinal IRT models.
-# The next sections are included:
-# 0. Prepare enviroment
-# 1. Vandemeulebroecke et al (2017)
-
-
+# This document fit a variation of the longitudinal IRT model proposed 
+# by Vandemeulebroecke(2017). The new stan model aims to optimize the 
+# original one by not estimating the theta parameters repeatedly. For
+# this, the model was rewritten such that it uses arrays. Data need 
+# to be in array.
 
 # 0. Prepare enviroment ----
 rm(list = ls())
@@ -27,6 +26,13 @@ source("R/IRT_models.R")
 # We will generate date based on the model proposed by Vandemeulebroecke et al (2017), 
 # and fit the model to the data. 
 
+## Optional ##
+# If this script is executed through a batch file. One can specify
+# additional arguments to change the number of subjects, the number
+# of time points, and the number of items.
+
+#arg <- commandArgs(trailingOnly = TRUE)
+
 # Simulating data
 # For this, we need: 
 #   The parameters of the model,
@@ -41,6 +47,11 @@ K  <- 5    # Number of categories per items.
 nC <- 2    # Number of covariates.
 nt <- 20   # Number of time points. #! In the paper not all persons were measured the same number of times.
 
+## Optional ## # When batched.
+# n  <- arg[1]
+# nt <- arg[2]
+# p  <- arg[3]
+
 # Now, we generate the thetas given the longitudinal model proposed by Vandemeulebroecke
 
 gamma0    <- rnorm(n)                # Random intercept, which varies over persons.
@@ -53,13 +64,11 @@ gammastar <- rnorm(n, 0, 0.03)       # Random intercept of the random slope, whi
 
 beta      <- runif(nC, -0.05, 0.05)  # Coefficients of the covariates.
 #J# Probably it won't matter, but let's draw these from N(0,1), its prior:
-beta <- rnorm(nC)
+#beta <- rnorm(nC)
 
-Z         <- replicate(nC, rnorm(n)) # Generate nC standardized covariates. 
 #J# Z is not standardized. Better like this:
-Z <- replicate(nC, scale(rnorm(n))[1:n, ])
-
-gamma1    <- gammastar + Z %*% beta  # Compute random slope.
+Z      <- replicate(nC, scale(rnorm(n))[1:n, ])
+gamma1 <- gammastar + Z %*% beta  # Compute random slope.
 
 # Create matrix to store thetas over time
 theta <- matrix(NA, n, nt)
@@ -125,106 +134,105 @@ standata <- list(n            = n,                      # Number of persons.
                  nC           = nC,                     # Number of standardized covariates.
                  Y            = simdata2 + 1,           # Array of responses.
                  Z            = Z,                      # Matrix of standardized covariates.
-                 m_mu_gamma1  = 0,                      # Mean of the Hyperprior gamma 1.
-                 sd_mu_gamma1 = 2.5,                    # SD of the Hyperprior gamma 1.
-                 m_alpha      = 1,                      # Mean of the Hyperprior alpha.
-                 sd_alpha     = 2.5,                    # SD of the Hyperprior alpha.
-                 m_kappa      = 0,                      # Mean of the Hyperprior kappa.
-                 sd_kappa     = 2.5,                    # SD of the Hyperprior kappa.
-                 a_pr_gamma1  = 0.2,                    # shape of the Hyperprior gamma 1
-                 b_pr_gamma1  = 0.2                     # rate of the Hyperprior gamma 1
+                 m_mu_gamma1  = 0,                      # Mean of the prior of the mean of gamma 1.
+                 sd_mu_gamma1 = 2.5,                    # SD of the prior of the mean gamma 1.
+                 m_alpha      = 1,                      # Mean of the prior of alpha.
+                 sd_alpha     = 2.5,                    # SD of the prior of alpha.
+                 m_kappa      = 0,                      # Mean of the prior of kappa.
+                 sd_kappa     = 2.5,                    # SD of the prior of kappa.
+                 a_pr_gamma1  = 0.2,                    # shape of the prior of the sd of gamma 1
+                 b_pr_gamma1  = 0.2                     # rate of the prior of the sd of gamma 1
                  )
 t0 <- proc.time()
-fit.vande <- stan(file   = "Stan/vandemeulebroecke2.stan", 
+
+# There are two parameterizations of this stan model. The first one is 
+# the classical IRT parameterization: alpha_j * (theta_i - delta_j). The
+# second one is as follows: alpha_j * theta_i - kappa_j.
+# Use the stan models "vandemeulebroecke2.stan" and 
+# "vandemeulebroecke_oriarray.stan", respectively.
+
+fit.vande <- stan(file   = "Stan/vandemeulebroecke_oriarray.stan", 
                   data   = standata,
-                  iter   = 2000, 
-                  warmup = 200, # it seems enough from previous runs
-                  chains = 3, 
-                  thin   = 1, 
-                  cores  = 3, 
-                  pars   = c("alpha", "kappa",  "beta", "theta"))
+                  iter   = 5250, 
+                  warmup = 250, # it seems enough from previous runs
+                  chains = 10, 
+                  thin   = 5, 
+                  cores  = 10, 
+                  pars   = c("alpha", "kappa",  "beta_i", "theta"))
 time.vande <- proc.time() - t0
 rm(t0)
 
-# Warning message:
-#   Bulk Effective Samples Size (ESS) is too low, indicating posterior means and medians may be unreliable.
-# Running the chains for more iterations may help. See
-# http://mc-stan.org/misc/warnings.html#bulk-ess 
+sum.vande <- list()
 
-print(object.size(fit.vande), units="Mb") # 470Mb (n=2000, p=10, nt=10, nC=2, K=5, 
-                                          #        iter=1000, chains=3, thin=1, cores=3, 
-                                          #        pars = c("alpha", "kappa", "theta"))
-                                          # 1855Mb (n=2000, p=10, nt=20, nC=2, K=5, 
-                                          #        iter=2000, chains=3, thin=1, cores=3, 
-                                          #        pars = c("alpha", "kappa", "beta", "theta")), 18.5hr
+sum.vande$alpha    <- summary(fit.vande, pars = "alpha")$summary
+sum.vande$kappa    <- summary(fit.vande, pars = "kappa")$summary
+sum.vande$beta_i   <- summary(fit.vande, pars = "beta_i")$summary
+sum.vande$theta    <- summary(fit.vande, pars = "theta")$summary
 
-saveRDS(fit.vande, "fit_vande.rds")
+betapars <- paste0("beta_i[", rep(c(1, ceiling(p / 2), p), each = 3), 
+                   ",", rep(c(1, ceiling(K / 2), K - 1), times = 3), "]")
+thetapars <- paste0("theta[", rep(c(0, ceiling(n / 2) - 1, n - 1), each = 3) * nt + 
+                      rep(c(1, ceiling(nt / 2), nt), times = 3), "]")
+
+pdf(file = paste0("Vandeplots_oriarray_N", n, "_nT", nt, "_I", p, ".pdf"))
+if (length(warnings()) != 0) {
+  plot(NA, xlim=c(0,5), ylim=c(0,5), bty='n',
+       xaxt='n', yaxt='n', xlab='', ylab='')
+  mtext(names(warnings()), side = 3, line = (1:length(warnings())) * -5, adj = 0)
+}
+
+mcmc_rhat(rhat(fit.vande))
 
 traceplot(fit.vande, pars = "alpha", inc_warmup = TRUE)
-traceplot(fit.vande, pars = "kappa", inc_warmup = TRUE)
-traceplot(fit.vande, pars = "beta",  inc_warmup = TRUE)
-traceplot(fit.vande, pars = "theta", inc_warmup = TRUE)
+traceplot(fit.vande, pars = betapars, inc_warmup = TRUE)
+traceplot(fit.vande, pars = thetapars, inc_warmup = TRUE)
 
-summary(fit.vande, pars = "alpha")$summary
-plot(IP[, 5], summary(fit.vande, pars = "alpha")$summary[, "mean"])
+fit.array <- as.array(fit.vande)
+
+mcmc_acf(fit.array[,c(1, 5, 10),], 
+         regex_pars = "alpha", 
+         lags = 20)
+
+mcmc_acf(fit.array[,c(1, 5, 10),], 
+         pars = betapars[c(1, 5, 9)], 
+         lags = 20)
+
+mcmc_acf(fit.array[,c(1, 5, 10),], 
+         pars = thetapars[c(1, 5, 9)], 
+         lags = 20)
+
+plot(IP[,5], sum.vande$alpha[,1], pch = 20,
+     xlab = "True alpha",
+     ylab = "Estimated alpha",
+     xlim = c(0.5, 2.5),
+     ylim = c(0.5, 2.5),
+     main = paste0("Discrimination; cor = ", round(cor(IP[,5], sum.vande$alpha[,1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
+segments(x0 = IP[, 5], 
+         y0 = sum.vande$alpha[, 4], 
+         y1 = sum.vande$alpha[, 8],
+         col = rgb(0, 0, 0, 0.25))
 
-summary(fit.vande, pars = "kappa")$summary
-plot(c(t(IP[, 1:4])), summary(fit.vande, pars = "kappa")$summary[, "mean"])
+plot(c(t(IP[,1:4])), sum.vande$beta_i[,1], pch = 20,
+     xlab = "True Locations",
+     ylab = "Estimated Locations",
+     xlim = c(-3, 3),
+     ylim = c(-3, 3),
+     main = paste0("Locations; cor = ", 
+                   round(cor(c(t(IP[,1:4])), sum.vande$beta_i[,1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
+segments(x0 = c(t(IP[, 1:4])), 
+         y0 = sum.vande$beta_i[, 4], 
+         y1 = sum.vande$beta_i[, 8],
+         col = rgb(0, 0, 0, 0.25))
 
-beta
-summary(fit.vande, pars = "beta")$summary
-
-summary(fit.vande, pars = "theta")$summary
-plot(theta[, 3], summary(fit.vande, pars = "theta")$summary[, "mean"])
+plot(theta[, 3], sum.vande$theta[,1], pch = 20,
+     xlab = "True theta",
+     ylab = "Estimated theta",
+     xlim = c(-10, 10),
+     ylim = c(-10, 10),
+     main = paste0("Theta; cor = ", 
+                   round(cor(theta[,3], sum.vande$theta[,1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
-
-save(fit.vande, file = "Fits/fit.vande.RData")
-
-
-
-
-#J#: NOT edited below.
-# Fit vandemeleubroecke model in jags
-
-jagsdata <- list(nr           = nr,                     # Number of rows.                
-                 n            = n,                      # Number of persons.
-                 p            = p,                      # Number of items.
-                 K            = K,                      # Number of categories per item.
-                 nC           = nC,                     # Number of standardized covariates.
-                 Y            = simdatalong[, "X"] + 1, # Vector of responses.
-                 TP           = simdatalong[, "time"],  # Vector of time indicators.
-                 X1           = simdatalong[, "id"],    # Vector of ID.
-                 item         = simdatalong[, "item"],  # Vector of item indicator.
-                 Z            = Z,                      # Matrix of standardized covariates.
-                 m.mu.gamma1  = 0,                      # Mean of the Hyperprior gamma 1.
-                 s.mu.gamma1  = 2.5,                    # SD of the Hyperprior gamma 1.
-                 m.alpha      = 1,                      # Mean of the Hyperprior alpha.
-                 s.alpha      = 2.5,                    # SD of the Hyperprior alpha.
-                 m.kappa      = 0,                      # Mean of the Hyperprior kappa.
-                 s.kappa      = 2.5,                    # SD of the Hyperprior kappa.
-                 a.pr.gamma1  = 0.2,                    # shape of the Hyperprior gamma 1
-                 b.pr.gamma1  = 0.2                     # rate of the Hyperprior gamma 1
-)
-
-# Compile the model:
-jagscompiled <- jags.model("jags/vandemeulebroecke.txt", 
-                           data     = jagsdata, 
-                           n.chains = 3, 
-                           n.adapt  = 1000)
-
-# Warm up:
-update(jagscompiled, 1000)
-
- # Draw samples:
-vande.fit.jags <- coda.samples(jagscompiled, 
-                               data           = jagsdata, 
-                               variable.names = c("alpha", "kappa"), 
-                               n.iter         = 1000, 
-                               thin           = 1)
-
-save(vande.fit.jags, file = "Fits/fit.vande.jags.RData")
-
-load(file = "Fits/fit.vande.jags.RData")
-
+dev.off()
+rm(list = ls())

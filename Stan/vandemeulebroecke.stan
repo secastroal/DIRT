@@ -27,7 +27,7 @@ parameters {
   vector[n] gamma0;
   vector[n] gamma1s;
   vector<lower=0>[p] alpha;
-  ordered[K-1] kappa[p];
+  ordered[K-1] beta_i[p];
   vector[nC] beta;
 }
 transformed parameters {
@@ -55,11 +55,21 @@ model {
   alpha ~ normal(m_alpha, sd_alpha);
 
   for(kk in 1:p){
-    kappa[kk] ~ normal(m_kappa, sd_kappa);
+    beta_i[kk] ~ normal(m_kappa, sd_kappa);
   }
 
   for(r in 1:nr){
-    Y[r] ~ ordered_logistic(alpha[item[r]]*theta[r],alpha[item[r]]*kappa[item[r]]);
+    Y[r] ~ ordered_logistic(alpha[item[r]]*theta[r],alpha[item[r]]*beta_i[item[r]]);
   }
 }
+
+generated quantities {
+   ordered[K-1] kappa[p]; //item category difficulty
+
+ for (i in 1:p){
+                kappa[i]=beta_i[i]*alpha[i];
+ }
+}
+
+
 

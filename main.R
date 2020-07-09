@@ -1,9 +1,5 @@
-# In this document I try out some of the longitudinal IRT models.
-# The next sections are included:
-# 0. Prepare enviroment
-# 1. Vandemeulebroecke et al (2017)
-# 2. Ram et al (2005)
-
+# This document is used to fit the IRT longitudinal model proposed
+# in Vandemeulebroecke(2017).
 
 # 0. Prepare enviroment ----
 rm(list = ls())
@@ -25,6 +21,13 @@ source("R/IRT_models.R")
 # We will generate date based on the model proposed by Vandemeulebroecke et al (2017), 
 # and fit the model to the data. 
 
+## Optional ##
+# If this script is executed through a batch file. One can specify
+# additional arguments to change the number of subjects, the number
+# of time points, and the number of items.
+
+#arg <- commandArgs(trailingOnly = TRUE)
+
 # Simulating data
 # For this, we need: 
 #   The parameters of the model,
@@ -38,6 +41,11 @@ p  <- 5    # Number of items.
 K  <- 5    # Number of categories per items.
 nC <- 2    # Number of covariates.
 nt <- 10   # Number of time points. #! In the paper not all persons were measured the same number of times.
+
+## Optional ## # When batched.
+# n  <- arg[1]
+# nt <- arg[2]
+# p  <- arg[3]
 
 # Now, we generate the thetas given the longitudinal model proposed by Vandemeulebroecke
 # Priors are based on the supplementary Table 1 (Vandemeulebroecke et al., 2017).
@@ -57,10 +65,10 @@ gamma0    <- rnorm(n)                               # Random intercept, which va
 # However, this way of generating gammastar can be problematic if gammastar_sd is too big. Therefore,
 # here we generate gammastar from a normal standard distribution. Still, the priors of gammastar_mu and
 # gammastar_sd are used in the stan model.
-gammastar <- rnorm(n) # Random intercept of the random slope, which varies over persons.
+gammastar <- rnorm(n, 0, 0.01) # Random intercept of the random slope, which varies over persons.
 
 #J# Probably it won't matter, but let's draw these from N(0,1), its prior:
-beta   <- rnorm(nC) # Coefficients of the covariates.
+beta   <- runif(nC, -0.05, 0.05) # Coefficients of the covariates.
 
 #J# Z is not standardized. Better like this:
 Z      <- replicate(nC, scale(rnorm(n))[1:n, ]) # Generate nC standardized covariates.
@@ -136,191 +144,103 @@ standata <- list(nr           = nr,                     # Number of rows.
                  X1           = simdatalong[, "id"],    # Vector of ID.
                  item         = simdatalong[, "item"],  # Vector of item indicator.
                  Z            = Z,                      # Matrix of standardized covariates.
-                 m_mu_gamma1  = 0,                      # Mean of the Hyperprior gamma 1.
-                 sd_mu_gamma1 = 2.5,                    # SD of the Hyperprior gamma 1.
-                 m_alpha      = 1,                      # Mean of the Hyperprior alpha.
-                 sd_alpha     = 2.5,                    # SD of the Hyperprior alpha.
-                 m_kappa      = 0,                      # Mean of the Hyperprior kappa.
-                 sd_kappa     = 2.5,                    # SD of the Hyperprior kappa.
-                 a_pr_gamma1  = 0.2,                    # shape of the Hyperprior gamma 1
-                 b_pr_gamma1  = 0.2                     # rate of the Hyperprior gamma 1
+                 m_mu_gamma1  = 0,                      # Mean of the prior of the mean of gamma 1.
+                 sd_mu_gamma1 = 2.5,                    # SD of the prior of the mean of gamma 1.
+                 m_alpha      = 1,                      # Mean of the prior of alpha.
+                 sd_alpha     = 2.5,                    # SD of the prior of alpha.
+                 m_kappa      = 0,                      # Mean of the prior of kappa.
+                 sd_kappa     = 2.5,                    # SD of the prior of kappa.
+                 a_pr_gamma1  = 0.2,                    # shape of the prior of the sd of gamma 1
+                 b_pr_gamma1  = 0.2                     # rate of the prior of the sd of gamma 1
                  )
 t0 <- proc.time()
-fit.vande <- stan(file   = "Stan/vandemeulebroecke.stan", 
+
+# The original stan model provided in the paper use the parameterization
+# alpha_j * theta_i - kappa_j. Alternatively, one can use the following
+# parameterization: alpha_j * (theta_i - delta_j). The two parameterizations
+# are available in the following stan models: "vandemeulebroecke_original.stan"
+# and "vandemeulebroecke.stan", respectively.
+fit.vande <- stan(file   = "Stan/vandemeulebroecke_original.stan", 
                   data   = standata,
-                  iter   = 500, 
-                  chains = 3, 
-                  thin   = 1, 
-                  cores  = 3, 
-                  pars   = c("alpha", "kappa"))
+                  iter   = 5250, 
+                  chains = 10, 
+                  thin   = 5, 
+                  cores  = 10, 
+                  pars   = c("alpha", "kappa", "theta", "beta_i"))
 time.vande <- proc.time() - t0
 rm(t0)
 
+sum.vande <- list()
+
+sum.vande$alpha    <- summary(fit.vande, pars = "alpha")$summary
+sum.vande$kappa    <- summary(fit.vande, pars = "kappa")$summary
+sum.vande$beta_i   <- summary(fit.vande, pars = "beta_i")$summary
+sum.vande$theta    <- summary(fit.vande, pars = "theta")$summary
+
+betapars <- paste0("beta_i[", rep(c(1, ceiling(p / 2), p), each = 3), 
+                   ",", rep(c(1, ceiling(K / 2), K - 1), times = 3), "]")
+thetapars <- paste0("theta[", rep(c(0, ceiling(n / 2) - 1, n - 1), each = 3) * nt + 
+                      rep(c(1, ceiling(nt / 2), nt), times = 3), "]")
+
+pdf(file = paste0("Vandeplots_original_N", n, "_nT", nt, "_I", p, ".pdf"))
+if (length(warnings()) != 0) {
+  plot(NA, xlim=c(0,5), ylim=c(0,5), bty='n',
+       xaxt='n', yaxt='n', xlab='', ylab='')
+  mtext(names(warnings()), side = 3, line = (1:length(warnings())) * -5, adj = 0)
+}
+
+mcmc_rhat(rhat(fit.vande))
+
 traceplot(fit.vande, pars = "alpha", inc_warmup = TRUE)
+traceplot(fit.vande, pars = betapars, inc_warmup = TRUE)
+traceplot(fit.vande, pars = thetapars, inc_warmup = TRUE)
 
-summary(fit.vande, pars = "alpha")$summary
+fit.array <- as.array(fit.vande)
 
-saveRDS(fit.vande, file = "Fits/fit.vande.rds")
+mcmc_acf(fit.array[,c(1, 5, 10),], 
+         regex_pars = "alpha", 
+         lags = 20)
 
-detach("package:rstan")
+mcmc_acf(fit.array[,c(1, 5, 10),], 
+         pars = betapars[c(1, 5, 9)], 
+         lags = 20)
 
-# Fit vandemeleubroecke model in jags
+mcmc_acf(fit.array[,c(1, 5, 10),], 
+         pars = thetapars[c(1, 5, 9)], 
+         lags = 20)
 
-library(rjags)
+plot(IP[,5], sum.vande$alpha[,1], pch = 20,
+     xlab = "True alpha",
+     ylab = "Estimated alpha",
+     xlim = c(0.5, 2.5),
+     ylim = c(0.5, 2.5),
+     main = paste0("Discrimination; cor = ", round(cor(IP[,5], sum.vande$alpha[,1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+segments(x0 = IP[, 5], 
+         y0 = sum.vande$alpha[, 4], 
+         y1 = sum.vande$alpha[, 8],
+         col = rgb(0, 0, 0, 0.25))
 
-jagsdata <- list(nr           = nr,                     # Number of rows.                
-                 n            = n,                      # Number of persons.
-                 p            = p,                      # Number of items.
-                 K            = K,                      # Number of categories per item.
-                 nC           = nC,                     # Number of standardized covariates.
-                 Y            = simdatalong[, "X"] + 1, # Vector of responses.
-                 TP           = simdatalong[, "time"],  # Vector of time indicators.
-                 X1           = simdatalong[, "id"],    # Vector of ID.
-                 item         = simdatalong[, "item"],  # Vector of item indicator.
-                 Z            = Z,                      # Matrix of standardized covariates.
-                 m.mu.gamma1  = 0,                      # Mean of the Hyperprior gamma 1.
-                 s.mu.gamma1  = 2.5,                    # SD of the Hyperprior gamma 1.
-                 m.alpha      = 1,                      # Mean of the Hyperprior alpha.
-                 s.alpha      = 2.5,                    # SD of the Hyperprior alpha.
-                 m.kappa      = 0,                      # Mean of the Hyperprior kappa.
-                 s.kappa      = 2.5,                    # SD of the Hyperprior kappa.
-                 a.pr.gamma1  = 0.2,                    # shape of the Hyperprior gamma 1
-                 b.pr.gamma1  = 0.2                     # rate of the Hyperprior gamma 1
-)
+plot(c(t(IP[,1:4])), sum.vande$beta_i[,1], pch = 20,
+     xlab = "True Locations",
+     ylab = "Estimated Locations",
+     xlim = c(-3, 3),
+     ylim = c(-3, 3),
+     main = paste0("Locations; cor = ", 
+                   round(cor(c(t(IP[,1:4])), sum.vande$beta_i[,1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+segments(x0 = c(t(IP[, 1:4])), 
+         y0 = sum.vande$beta_i[, 4], 
+         y1 = sum.vande$beta_i[, 8],
+         col = rgb(0, 0, 0, 0.25))
 
-# Compile the model:
-jagscompiled <- jags.model("jags/vandemeulebroecke.txt", 
-                           data     = jagsdata, 
-                           n.chains = 3, 
-                           n.adapt  = 1000)
-
-# Warm up:
-update(jagscompiled, 1000)
-
- # Draw samples:
-vande.fit.jags <- coda.samples(jagscompiled, 
-                               data           = jagsdata, 
-                               variable.names = c("alpha", "kappa"), 
-                               n.iter         = 1000, 
-                               thin           = 1)
-
-saveRDS(vande.fit.jags, file = "Fits/fit.vande.jags.rds")
-
-loadRDS(file = "Fits/fit.vande.jags.rds")
-
-# 2. Ram et al (2005) ----
-# LIRT model proposed by Ram et al. (2005) is based on the rating scale model. 
-# The longitudinal aspect is modeled through spectral analysis.
-
-# Simulating data
-# We will generate data given the spectral analysis model of Ram and the GRM.
-# For this, we need: 
-#   The parameters of the spectral model,
-#   The parameters of the GRM,
-
-set.seed(123)
-# Let's define the conditions of the data
-n  <- 200 # Number of subjects.
-p  <- 8   # Number of items.
-K  <- 5   # Number of categories per items.
-nt <- 35  # Number of time points. #! not necessarily the same for all the persons
-
-# Now, we generate the thetas given spectral analysis proposed by Ram
-# We need the next random parameters:
-
-mu    <- rnorm(n, -0.5, 1)  # Random intercept.
-beta  <- rnorm(n, 0, .1)   # Random linear slope, which multiplies time_it. Detrend data.
-R     <- rnorm(n, 0.2, 0.2) # Random amplitude of the cycle.
-omega <- (2 * pi) / 7       # Period of oscillattion assumed to be 7 days.
-phi   <- rnorm(n, 0.2, 0.4) # Random phase shift.
-
-# Create matrix to store thetas over time
-theta <- matrix(NA, n, nt)
-for (i in 1:nt) {
-  theta[, i] <- mu + R * (cos((omega * i) + phi)) + rnorm(1, 0, 0.5) #+ beta * (i - 1)
-}
-rm(i)
-
-theta <- reshape(as.data.frame(theta), 
-                 varying       = list(1:nt), 
-                 new.row.names = 1:(n * nt),
-                 direction     = "long") # Turn theta matrix into long format.
-theta <- theta[order(theta[, 3]), c(3, 1, 2)]                                    # Order theta matrix by id.    
-
-# Generate RSM responses given the generated thetas.
-
-# Create item parameters
-alpha <- rep(1, p)            # Discrimination parameters.
-lambda <- sort(rnorm(p))
-taus <- runif(K - 2, -1, 1) 
-taus <- sort(c(taus, -sum(taus)))
-
-probs.array       <- array(NA, dim = c(length(theta[, 3]), p, K))
-for (y in 0:(K - 1)) 
-{
-  probs.array[, , y + 1] <- P.GPCM(y, alpha = alpha, delta = lambda, taus = taus, theta = theta[, 3], M = K - 1)
-}
-responses               <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 1, vec) == 1) - 1 })
-rm(probs.array)
-
-# Restructure data to add id, time, and item factors.
-simdata <- data.frame(theta[, 1:2], responses)
-
-simdatalong <- reshape(simdata, 
-                       idvar         = c("id", "time"),
-                       varying       = list(3:(2 + p)),
-                       new.row.names = 1:(n * nt * p),
-                       direction     = "long") 
-
-names(simdatalong) <- c("id", "item", "X")
-time               <- rep(1:nt, n * p)
-simdatalong        <- data.frame(simdatalong, time)
-rm(time, simdata, responses)
-
-simdatalong <- simdatalong[order(simdatalong[, 1], simdatalong[, 4]), c(1, 4, 2, 3)] # order data by id and time
-
-nr <- nrow(simdatalong) # Number of observed responses.
-
-# Run Ram's model
-
-# There is no information on the paper about the conditions in which the analyses were run. They only
-# mentioned that it took over 30 hours.
-
-
-standata <- list(nr           = nr,
-                 n            = n,
-                 p            = p,
-                 K            = K,
-                 Y            = simdatalong[, "X"] + 1,
-                 TP           = simdatalong[, "time"],
-                 X1           = simdatalong[, "id"],
-                 item         = simdatalong[, "item"]
-                 )
-
-t0 <- proc.time()
-fit.ram <- stan(file = "Stan/ram.stan", 
-                data = standata,
-                pars = c("lambda", 
-                         "delta",
-                         "mu_gamma0",
-                         "v_gamma0",
-                         #"mu_gamma1",
-                         #"v_gamma1",
-                         "mu_gamma2",
-                         "v_gamma2",
-                         "mu_gamma3",
-                         "v_gamma3",
-                         "sigma_2"),
-                iter   = 10000, 
-                chains = 3, 
-                thin   = 1, 
-                cores  = 3)
-time.ram <- proc.time() - t0
-rm(t0)
-
-traceplot(fit.ram, pars = "lambda", inc_warmup = TRUE)
-
-summary(fit.ram, pars = "delta")$summary
-
-saveRDS(fit.ram, file = "Fits/fit.ram.rds")
-
+plot(theta[, 3], sum.vande$theta[,1], pch = 20,
+     xlab = "True theta",
+     ylab = "Estimated theta",
+     xlim = c(-10, 10),
+     ylim = c(-10, 10),
+     main = paste0("Theta; cor = ", 
+                   round(cor(theta[,3], sum.vande$theta[,1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+dev.off()
+rm(list = ls())

@@ -44,7 +44,7 @@ parameters {
   vector[n] gamma0;
   vector[n] gamma1s;
   vector<lower=0>[p] alpha;
-  ordered[K-1] kappa[p];
+  ordered[K-1] beta_i[p];
   vector[nC] beta;
 }
 
@@ -76,7 +76,7 @@ model {
   alpha     ~ normal(m_alpha, sd_alpha);
 
   for(k in 1:p){
-    kappa[k] ~ normal(m_kappa, sd_kappa);
+    beta_i[k] ~ normal(m_kappa, sd_kappa);
   }
 
   // for(r in 1:nr){
@@ -85,9 +85,20 @@ model {
   for (i in 1:n) {
     for (t in 1:nt) {
       for (k in 1:p) {
-        Y[i, t, k] ~ ordered_logistic(alpha[k]*theta[i, t], alpha[k]*kappa[k]);
+        Y[i, t, k] ~ ordered_logistic(alpha[k]*theta[i, t], alpha[k]*beta_i[k]);
         // Read stan manual on this function and cross we data generation.
       }
     }
   }
 }
+
+generated quantities {
+   ordered[K-1] kappa[p]; //item category difficulty
+
+ for (i in 1:p){
+                kappa[i]=beta_i[i]*alpha[i];
+ }
+}
+
+
+

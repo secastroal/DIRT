@@ -75,3 +75,12 @@ model {
   }
 }
 
+generated quantities {
+   ordered[K-1] beta_i[p]; //item category difficulty
+
+ for (i in 1:p){
+                beta_i[i]=kappa[i]/alpha[i];
+ }
+}
+
+
