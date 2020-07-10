@@ -30,6 +30,7 @@ source("R/IRT_models.R")
 # of time points, and the number of items.
 
 #arg <- commandArgs(trailingOnly = TRUE)
+#arg <- as.numeric(arg)
 
 # Simulating data
 # For this, we need: 
@@ -211,8 +212,8 @@ mcmc_acf(fit.array[,c(1, 5, 10),],
 plot(IP[,5], sum.vande$alpha[,1], pch = 20,
      xlab = "True alpha",
      ylab = "Estimated alpha",
-     xlim = c(0.5, 2.5),
-     ylim = c(0.5, 2.5),
+     xlim = c(0, 2),
+     ylim = c(0, 2),
      main = paste0("Discrimination; cor = ", round(cor(IP[,5], sum.vande$alpha[,1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
 segments(x0 = IP[, 5], 
@@ -223,8 +224,8 @@ segments(x0 = IP[, 5],
 plot(c(t(IP[,1:4])), sum.vande$beta_i[,1], pch = 20,
      xlab = "True Locations",
      ylab = "Estimated Locations",
-     xlim = c(-3, 3),
-     ylim = c(-3, 3),
+     xlim = c(-4, 4),
+     ylim = c(-4, 4),
      main = paste0("Locations; cor = ", 
                    round(cor(c(t(IP[,1:4])), sum.vande$beta_i[,1]), 3)))
 abline(0, 1, col = 2, lwd = 2)

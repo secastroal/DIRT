@@ -13,6 +13,7 @@ source("R/IRT_models.R")
 # of knots, and the number of items.
 
 #arg <- commandArgs(trailingOnly = TRUE)
+#arg <- as.numeric(arg)
 
 set.seed(123)
 
