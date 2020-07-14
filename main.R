@@ -5,7 +5,7 @@
 rm(list = ls())
 library(rstan)
 rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores()-1)
+options(mc.cores = parallel::detectCores()) #JT# removed the -1
 library(bayesplot) #JT# added
 
 # rfiles <- list.files("R/", full.names = TRUE)
