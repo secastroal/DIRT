@@ -182,7 +182,86 @@ rm(list = setdiff(ls(), lsf.str()))
 
 
 # Test P.GPCM() ----
-# Not today.
+set.seed(1234)
+
+# For simplicity all items have the same number of categories.
+N             <- 1000
+I             <- 50
+K             <- 5
+M             <- K - 1
+theta         <- runif(N, -3, 3)
+
+# Generate item parameters.
+# Discrimination is equal to 1 for all items.
+alpha <- rep(1, I)
+
+# Thresholds
+thresholds <- t(apply(matrix(runif(I * M, .3, 1), I), 1, cumsum))
+thresholds <- -(thresholds - rowMeans(thresholds))
+thresholds <- thresholds + rnorm(I)
+thresholds <- thresholds * -1
+
+# Location
+delta <- rowMeans(thresholds)
+
+# Step parameters
+taus <- thresholds - delta
+
+# Generate responses
+probs.array       <- array(NA, dim = c(N, I, K))
+for (y in 0:M) 
+{
+  probs.array[, , y + 1] <- P.GPCM(y, alpha, delta, taus, theta, M)
+}
+gen.data.pcm      <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 1, vec) == 1) - 1 })
+colnames(gen.data.pcm) <- paste0("It", 1:I)
+
+# Fit PCM via ML
+mirt.pcm <- mirt(gen.data.pcm, model = 1, itemtype = "Rasch")
+mirt.pcm.items <- coef(mirt.pcm, IRTpars = TRUE, simplify = TRUE)
+mirt.pcm.theta <- fscores(mirt.pcm)
+
+# Fit PCM in Stan
+standata <- list(n_student    = N,                      # Number of persons.
+                 n_item       = I,                      # Number of time points
+                 K            = K,                      # Number of categories per item.
+                 Y            = gen.data.pcm + 1        # Array of responses.
+)
+t0 <- proc.time()
+fit.pcm <- stan(file   = "Stan/pcm.stan", 
+                data   = standata,
+                iter   = 1000, 
+                warmup = 250, # it seems enough from previous runs
+                chains = 3, 
+                thin   = 1, 
+                cores  = 3, 
+                pars   = c("beta", "theta"))
+time.vande <- proc.time() - t0
+rm(t0)
+
+sum.pcm <- list()
+
+sum.pcm$beta    <- summary(fit.pcm, pars = "beta")$summary
+sum.pcm$theta   <- summary(fit.pcm, pars = "theta")$summary
+
+plot(c(thresholds), c(mirt.pcm.items$items[, K:2]), pch = 4, 
+     main = paste0("Discrimination; cor = ", round(cor(c(thresholds), c(mirt.pcm.items$items[, K:2])), 3)))
+abline(0, 1, col = 2, lwd = 2)
+
+plot(theta, mirt.pcm.theta, pch = 4, 
+     main = paste0("Thetas; cor = ", round(cor(theta, mirt.pcm.theta), 3)))
+abline(0, 1, col = 2, lwd = 2)
+
+plot(c(t(thresholds[, M:1])), sum.pcm$beta[, 1], pch = 4, 
+     main = paste0("Discrimination; cor = ", round(cor(c(t(thresholds[, M:1])), sum.pcm$beta[, 1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+
+plot(theta, sum.pcm$theta[, 1], pch = 4, 
+     main = paste0("Thetas; cor = ", round(cor(theta, sum.pcm$theta[, 1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+
+rm(list = setdiff(ls(), lsf.str()))
+
 
 
 # Fit vandemeleubroecke but ignoring the linear trend of theta ... just N(0, 1)

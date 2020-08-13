@@ -32,7 +32,7 @@ P.GPCM <- function(y, alpha, delta, taus, theta, M)
   part      <- function(i, w) 
   {
     if ((0 <= w) && (w <= M[i])) {
-      exp(alpha[i] * (w * (theta - delta[i]) + taus.cum[i, ((max(M) - M[i])/2) + w + 1]))
+      exp(alpha[i] * (w * (theta - delta[i]) - taus.cum[i, ((max(M) - M[i])/2) + w + 1]))
     } else rep(0, N)
   }
   num       <- sapply(1:I,      function(i) part(i, y[i]), simplify = "array")
