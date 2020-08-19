@@ -164,7 +164,11 @@ fit.vande <- stan(file   = "Stan/vandemeulebroecke_mlindex.stan",
                   chains = 10, 
                   thin   = 5, 
                   cores  = 10)
-time.vande <- proc.time() - t0
+#JT# A warning was issued, needs to be fixed:
+#JT#     DIAGNOSTIC(S) FROM PARSER:
+#JT#     Info: integer division implicitly rounds to integer. Found int division: r - 1 / p
+#JT#     Positive values rounded down, negative values rounded up or down in platform-dependent way.
+#JT#     time.vande <- proc.time() - t0
 rm(t0)
 
 sum.vande <- list()
@@ -209,27 +213,27 @@ mcmc_acf(fit.array[,c(1, 5, 10),],
          pars = thetapars[c(1, 5, 9)], 
          lags = 20)
 
-plot(IP[,5], sum.vande$alpha[,1], pch = 20,
+plot(IP[,K], sum.vande$alpha[,1], pch = 20, #JT# K
      xlab = "True alpha",
      ylab = "Estimated alpha",
      xlim = c(0, 2),
      ylim = c(0, 2),
-     main = paste0("Discrimination; cor = ", round(cor(IP[,5], sum.vande$alpha[,1]), 3)))
+     main = paste0("Discrimination; cor = ", round(cor(IP[,K], sum.vande$alpha[,1]), 3))) #JT# K
 abline(0, 1, col = 2, lwd = 2)
-segments(x0 = IP[, 5], 
+segments(x0 = IP[, K], #JT# K 
          y0 = sum.vande$alpha[, 4], 
          y1 = sum.vande$alpha[, 8],
          col = rgb(0, 0, 0, 0.25))
 
-plot(c(t(IP[,1:4])), sum.vande$beta_i[,1], pch = 20,
+plot(c(t(IP[,1:(K-1)])), sum.vande$beta_i[,1], pch = 20, #JT# K-1
      xlab = "True Locations",
      ylab = "Estimated Locations",
      xlim = c(-4, 4),
      ylim = c(-4, 4),
      main = paste0("Locations; cor = ", 
-                   round(cor(c(t(IP[,1:4])), sum.vande$beta_i[,1]), 3)))
+                   round(cor(c(t(IP[,1:(K-1)])), sum.vande$beta_i[,1]), 3))) #JT# K-1
 abline(0, 1, col = 2, lwd = 2)
-segments(x0 = c(t(IP[, 1:4])), 
+segments(x0 = c(t(IP[, 1:(K-1)])),  #JT# K-1
          y0 = sum.vande$beta_i[, 4], 
          y1 = sum.vande$beta_i[, 8],
          col = rgb(0, 0, 0, 0.25))
