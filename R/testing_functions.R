@@ -236,7 +236,7 @@ fit.pcm <- stan(file   = "Stan/pcm.stan",
                 thin   = 1, 
                 cores  = 3, 
                 pars   = c("beta", "theta"))
-time.vande <- proc.time() - t0
+time.vande <- proc.time() - t0O
 rm(t0)
 
 sum.pcm <- list()
@@ -244,16 +244,16 @@ sum.pcm <- list()
 sum.pcm$beta    <- summary(fit.pcm, pars = "beta")$summary
 sum.pcm$theta   <- summary(fit.pcm, pars = "theta")$summary
 
-plot(c(thresholds), c(mirt.pcm.items$items[, K:2]), pch = 4, 
-     main = paste0("Discrimination; cor = ", round(cor(c(thresholds), c(mirt.pcm.items$items[, K:2])), 3)))
+plot(c(thresholds), c(mirt.pcm.items$items[, 2:K]), pch = 4, 
+     main = paste0("Discrimination; cor = ", round(cor(c(thresholds), c(mirt.pcm.items$items[, 2:K])), 3)))
 abline(0, 1, col = 2, lwd = 2)
 
 plot(theta, mirt.pcm.theta, pch = 4, 
      main = paste0("Thetas; cor = ", round(cor(theta, mirt.pcm.theta), 3)))
 abline(0, 1, col = 2, lwd = 2)
 
-plot(c(t(thresholds[, M:1])), sum.pcm$beta[, 1], pch = 4, 
-     main = paste0("Discrimination; cor = ", round(cor(c(t(thresholds[, M:1])), sum.pcm$beta[, 1]), 3)))
+plot(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1], pch = 4, 
+     main = paste0("Discrimination; cor = ", round(cor(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
 
 plot(theta, sum.pcm$theta[, 1], pch = 4, 
@@ -261,7 +261,5 @@ plot(theta, sum.pcm$theta[, 1], pch = 4,
 abline(0, 1, col = 2, lwd = 2)
 
 rm(list = setdiff(ls(), lsf.str()))
-
-
 
 # Fit vandemeleubroecke but ignoring the linear trend of theta ... just N(0, 1)
