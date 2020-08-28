@@ -14,7 +14,7 @@ set.seed(123)
 
 nT      <- 500 # Number of time points.  
 lambda  <- 0.5 # Autoregressive effect.
-inn_var <- 0.7 # Variance of the innovation.
+#inn_var <- 0.7 # Variance of the innovation.
 
 
 theta <- rep(NA, nT)
@@ -22,16 +22,16 @@ theta <- rep(NA, nT)
 theta[1] <- rnorm(1)
 
 for (i in 2:nT) {
-  theta[i] <- lambda * theta[i - 1] + rnorm(1, 0, sqrt(inn_var)) 
+  theta[i] <- lambda * theta[i - 1] + rnorm(1, 0, 1) 
 }
 
 # Next, we generate data based on the 2PL and the thetas we just created.
 
-I <- 10 # Number of items.
+I <- 5 # Number of items.
 
 # Create item parameters
 alpha <- rlnorm(I, 0, 0.25)   # Discrimination parameters.
-beta  <- sort(rnorm(I, 0, 1)) # Difficulty parameters.
+beta  <- sort(rnorm(I, 0, 1)) # Difficulty parameters. #They don´t need to be sorted.
 
 responses <- gen.2PL(theta = theta, alpha = alpha, beta = beta)
 
@@ -39,13 +39,18 @@ responses <- gen.2PL(theta = theta, alpha = alpha, beta = beta)
 
 standata <- list(nT = nT,
                  I = I,
-                 Y = responses)
+                 N = nT * I,
+                 tt = rep(1:nT, I),
+                 ii = rep(1:I, each = nT),
+                 y = c(responses))
 
-fit <- stan(file = "Stan/ar_irt_2pl.stan",    # Stan model. 
+# Fit either the 2pl with ar_irt_2pl.stan or the 2 parameter
+# normal ogive model with ar_irt_2pprobit.stan.
+fit <- stan(file = "Stan/ar_irt_2pprobit.stan",    # Stan model. 
             data = standata,                  # Data.
-            iter = 1250,                      # Number of iterations.
+            iter = 2000,                      # Number of iterations.
             chains  = 3,                      # Number of chains.
-            warmup  = 250,                    # Burn-in samples.
+            warmup  = 1000,                   # Burn-in samples.
             control = list(adapt_delta=0.99)) # Other parameters to control sampling behavior.
 
 sum.fit <- list()
@@ -86,11 +91,13 @@ mcmc_acf(fit.array,
          pars = thetapars[c(1, 5, 9)], 
          lags = 20)
 
+# If the probit model is used, the true item parameters have 
+# to be divided by 1.7 to match the logit parameterization.
 plot(alpha, sum.fit$alpha[, 1], pch = 20,
      xlab = "True alpha",
      ylab = "Estimated alpha",
-     xlim = c(0, 2.5),
-     ylim = c(0, 2.5),
+     xlim = c(0, 1.2),
+     ylim = c(0, 1.2),
      main = paste0("Discrimination; cor = ", round(cor(alpha, sum.fit$alpha[, 1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
 segments(x0 = alpha, 
@@ -128,6 +135,15 @@ polygon(c(1:nT, rev(1:nT)),
         border = NA,
         col = rgb(1, 0, 0, 0.25))
 lines(1:nT, sum.fit$theta[, 1], col = "red", lwd = 1)
+
+# Every 10th:
+supp <- seq(0, nT, by = 10)[-1]
+plot(supp, theta[supp], type = "l", main = "Every 10th time point")
+polygon(c(supp, rev(supp)),
+        c(sum.fit$theta[supp, 4], rev(sum.fit$theta[supp, 8])),
+        border = NA,
+        col = rgb(1, 0, 0, 0.25))
+lines(supp, sum.fit$theta[supp, 1], col = "red", lwd = 1)
 
 dev.off()
 rm(list = ls())

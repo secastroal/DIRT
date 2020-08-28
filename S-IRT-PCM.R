@@ -23,7 +23,7 @@ set.seed(123)
 # between theta and time are modeled through a b-splines regression.
 
 # First, let's assume the person was measured on 200 different occasions. Hence, our 
-# dependent variable X is actually the time at which the person was measured.
+# independent variable X is actually the time at which the person was measured.
 
 time <- 1:200
 # time <- 1:arg[1] # When batched.
@@ -91,7 +91,7 @@ responses   <- responses + 1 # To fit the GRM in stan, items should be coded sta
 rm(probs.array, y)
 
 # Fitting an IRT-splines model in stan. This first try intends to combine the splines model 
-# in example 2 with the GRM model. 
+# in example 2 with the PCM model. 
 
 standata <- list(num_data      = num_data, 
                  num_knots     = num_knots,
