@@ -2,12 +2,15 @@ data {
   int<lower=0> nT;          // number of time points
   int<lower=0> I;           // number of items
   int<lower=0> K;           // number of categories per item
-  int Y[nT, I];       // matrix with person responses
+  int<lower=1> N;           // number of observations = nT * I
+  int<lower=1, upper=nT> tt[N]; // time point index
+  int<lower=1, upper=I>  ii[N]; // item index
+  int y[N];                     // matrix with person responses
 }
 
 parameters {
   real lambda;                 // autoregressive effect
-  real<lower=0> pr_inn;        // precision of the innovation    
+  //real<lower=0> pr_inn;        // precision of the innovation    
   vector<lower=0>[I] alpha;    // Discrimination parameters
   ordered[K-1] kappa[I];       // Threshold parameters
   real theta_init;             // Theta first value
@@ -16,12 +19,12 @@ parameters {
 }
 
 transformed parameters {
-  real<lower=0> var_inn;
-  real<lower=0> sd_inn;
+  //real<lower=0> var_inn;
+  //real<lower=0> sd_inn;
   vector[nT] theta;
   
-  var_inn=1/pr_inn;
-  sd_inn=1/sqrt(pr_inn);
+  //var_inn=1/pr_inn;
+  //sd_inn=1/sqrt(pr_inn);
   theta[1]=theta_init;
   
   for (i in 2:nT) {
@@ -31,22 +34,21 @@ transformed parameters {
 }
 
 model {
+  vector[N] eta;
   // Priors
-  lambda ~ normal(0, 1);
+  lambda ~ uniform(-2, 2);
   theta_init ~ normal(0, 1);
-  pr_inn ~ gamma(1, 1);
-  inno   ~ normal(0, sd_inn);
-  alpha ~ normal(1, 1);
+  //pr_inn ~ gamma(1, 1);
+  inno   ~ normal(0, 1);
+  alpha ~ lognormal(0, 1);
 
   for(k in 1:I){
     kappa[k] ~ normal(0, 1);
   }
 
   //Likelihood
-  for (i in 1:nT) {
-    for (j in 1:I) {
-      Y[i, j] ~ ordered_logistic(alpha[j] * theta[i], kappa[j]);
-    }
+  for (n in 1:N) {
+    y[n] ~ ordered_logistic(alpha[ii[n]] * theta[tt[n]], kappa[ii[n]]); 
   }
 }
 

@@ -58,13 +58,14 @@ theta <- as.vector(a0 * time + a %*% B_true) # generating theta
 
 I <- 10 # Number of items.
 # I <- arg[3] # Number of items. When batched.
-K <- 5  # Number of categories per items.
+K <- 2  # Number of categories per items.
 M <- K - 1
 
 # Create item parameters
 
 # Thresholds
 thresholds <- t(apply(matrix(runif(I * M, .3, 1), I), 1, cumsum))
+if (M == 1) {thresholds <- t(thresholds)}
 thresholds <- -(thresholds - rowMeans(thresholds))
 thresholds <- thresholds + rnorm(I)
 thresholds <- thresholds * -1

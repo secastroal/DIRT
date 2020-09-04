@@ -38,11 +38,11 @@ responses <- gen.2PL(theta = theta, alpha = alpha, beta = beta)
 # Fitting an AR-IRT model in stan. 
 
 standata <- list(nT = nT,
-                 I = I,
-                 N = nT * I,
+                 I  = I,
+                 N  = nT * I,
                  tt = rep(1:nT, I),
                  ii = rep(1:I, each = nT),
-                 y = c(responses))
+                 y  = c(responses))
 
 # Fit either the 2pl with ar_irt_2pl.stan or the 2 parameter
 # normal ogive model with ar_irt_2pprobit.stan.

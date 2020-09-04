@@ -14,7 +14,7 @@ set.seed(123)
 
 nT      <- 200 # Number of time points.  
 lambda  <- 0.5 # Autoregressive effect.
-inn_var <- 0.7 # Variance of the innovation.
+#inn_var <- 0.7 # Variance of the innovation.
 
 
 theta <- rep(NA, nT)
@@ -22,7 +22,7 @@ theta <- rep(NA, nT)
 theta[1] <- rnorm(1)
 
 for (i in 2:nT) {
-  theta[i] <- lambda * theta[i - 1] + rnorm(1, 0, sqrt(inn_var)) 
+  theta[i] <- lambda * theta[i - 1] + rnorm(1, 0, 1) 
 }
 
 # Next, we generate data based on the GRM and the thetas we just created.
@@ -52,15 +52,18 @@ rm(probs.array, delta, alpha)
 # Fitting an AR-IRT model in stan. 
 
 standata <- list(nT = nT,
-                 I = I,
-                 K = K,
-                 Y = responses)
+                 I  = I,
+                 K  = K,
+                 N  = nT * I,
+                 tt = rep(1:nT, I),
+                 ii = rep(1:I, each = nT),
+                 y  = c(responses))
 
 fit <- stan(file = "Stan/ar_irt.stan",   # Stan model. 
             data = standata,                  # Data.
-            iter = 1250,                      # Number of iterations.
+            iter = 2000,                      # Number of iterations.
             chains  = 3,                      # Number of chains.
-            warmup  = 250,                    # Burn-in samples.
+            warmup  = 1000,                    # Burn-in samples.
             control = list(adapt_delta=0.95)) # Other parameters to control sampling behavior.
 
 sum.fit <- list()
@@ -85,8 +88,8 @@ if (length(warnings()) != 0) {
 
 mcmc_rhat(rhat(fit))
 
-traceplot(fit, pars = "alpha", inc_warmup = FALSE)
-traceplot(fit, pars = betapars, inc_warmup = FALSE)
+traceplot(fit, pars = "alpha", inc_warmup = TRUE)
+traceplot(fit, pars = betapars, inc_warmup = TRUE)
 traceplot(fit, pars = thetapars, inc_warmup = FALSE)
 
 fit.array <- as.array(fit)
@@ -145,6 +148,15 @@ polygon(c(1:nT, rev(1:nT)),
         border = NA,
         col = rgb(1, 0, 0, 0.25))
 lines(1:nT, sum.fit$theta[, 1], col = "red", lwd = 1)
+
+# Every 10th:
+supp <- seq(0, nT, by = 10)[-1]
+plot(supp, theta[supp], type = "l", main = "Every 10th time point")
+polygon(c(supp, rev(supp)),
+        c(sum.fit$theta[supp, 4], rev(sum.fit$theta[supp, 8])),
+        border = NA,
+        col = rgb(1, 0, 0, 0.25))
+lines(supp, sum.fit$theta[supp, 1], col = "red", lwd = 1)
 
 dev.off()
 rm(list = ls())
