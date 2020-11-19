@@ -56,7 +56,7 @@ theta <- as.vector(a0 * time + a %*% B_true) # generating theta
 
 # Next, we generate data based on the GRM and the thetas we just created.
 
-I <- 10 # Number of items.
+I <- 5 # Number of items.
 # I <- arg[3] # Number of items. When batched.
 K <- 5  # Number of categories per items.
 
@@ -93,9 +93,9 @@ standata <- list(num_data      = num_data,
 
 fit <- stan(file = "Stan/splines_irt.stan",   # Stan model. 
             data = standata,                  # Data.
-            iter = 2000,                      # Number of iterations.
+            iter = 1000,                      # Number of iterations.
             chains  = 3,                      # Number of chains.
-            warmup  = 1000,                    # Burn-in samples.
+            warmup  = 500,                    # Burn-in samples.
             control = list(adapt_delta=0.95)) # Other parameters to control sampling behavior.
 
 sum.fit <- list()
@@ -120,7 +120,7 @@ if (length(warnings()) != 0) {
 
 mcmc_rhat(rhat(fit))
 
-traceplot(fit, pars = "alpha", inc_warmup = FALSE)
+traceplot(fit, pars = "alpha", inc_warmup = TRUE)
 traceplot(fit, pars = betapars, inc_warmup = FALSE)
 traceplot(fit, pars = thetapars, inc_warmup = FALSE)
 
@@ -188,3 +188,23 @@ lines(time, sum.fit$theta[, 1], col = "red", lwd = 2)
 
 dev.off()
 rm(list = ls())
+
+standata <- list(num_data      = num_data, 
+                 num_knots     = num_knots,
+                 knots         = knots,
+                 spline_degree = spline_degree,
+                 I = I,
+                 K = K,
+                 N  = num_data * I,
+                 tt = rep(1:num_data, I),
+                 ii = rep(1:I, each = num_data),
+                 y  = c(responses),
+                 time = time)
+
+fit.long <- stan(file = "Stan/splines_irt_long.stan",   # Stan model. 
+                 data = standata,                  # Data.
+                 iter = 1000,                      # Number of iterations.
+                 chains  = 3,                      # Number of chains.
+                 warmup  = 500,                    # Burn-in samples.
+                 control = list(adapt_delta=0.95)) # Other parameters to control sampling behavior.
+

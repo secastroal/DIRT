@@ -92,6 +92,23 @@ model {
   }
 }
 
+generated quantities {
+   int y_rep[num_data, I];      // posterior simulation
+   vector[I] log_lik[num_data]; // pointwise loglikelihood
+   
+   for (n in 1:num_data) {
+     for (j in 1:I) {
+       vector[K] prob;
+       prob[1] = 0;
+       for (k in 2:K) {
+         prob[k] = (k - 1) * theta[n] - betasum[j, k - 1];
+         }
+     y_rep[n, j] = categorical_logit_rng(prob);      
+     log_lik[n, j] = categorical_logit_lpmf(Y[n, j] | prob);
+     }
+   }
+
+}
 
 
 

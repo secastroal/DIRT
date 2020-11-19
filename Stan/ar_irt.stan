@@ -10,35 +10,26 @@ data {
 
 parameters {
   real lambda;                 // autoregressive effect
-  //real<lower=0> pr_inn;        // precision of the innovation    
   vector<lower=0>[I] alpha;    // Discrimination parameters
   ordered[K-1] kappa[I];       // Threshold parameters
-  real theta_init;             // Theta first value
-  vector[nT-1] inno;           // innovations
+  vector[nT] inno;             // innovations
   
 }
 
 transformed parameters {
-  //real<lower=0> var_inn;
-  //real<lower=0> sd_inn;
   vector[nT] theta;
   
-  //var_inn=1/pr_inn;
-  //sd_inn=1/sqrt(pr_inn);
-  theta[1]=theta_init;
+  theta[1]=inno[1];
   
   for (i in 2:nT) {
-     theta[i] = lambda * theta[i-1] + inno[i-1]; 
+     theta[i] = lambda * theta[i-1] + inno[i]; 
   }  
 
 }
 
 model {
-  vector[N] eta;
   // Priors
-  lambda ~ uniform(-2, 2);
-  theta_init ~ normal(0, 1);
-  //pr_inn ~ gamma(1, 1);
+  lambda ~ uniform(-1, 1);
   inno   ~ normal(0, 1);
   alpha ~ lognormal(0, 1);
 
@@ -54,10 +45,17 @@ model {
 
 generated quantities {
    ordered[K-1] beta[I]; //item category difficulty
+   int rep_y[N];         //posterior simulations 
+   vector[N] log_lik;    //pointwise loglikelihood 
 
  for (i in 1:I){
                 beta[i]=kappa[i]/alpha[i];
  }
+   
+ for (n in 1:N) {
+   rep_y[n] = ordered_logistic_rng(alpha[ii[n]] * theta[tt[n]], kappa[ii[n]]);
+   log_lik[n] = ordered_logistic_lpmf(y[n] | alpha[ii[n]] * theta[tt[n]], kappa[ii[n]]);
+ }   
 }
 
 

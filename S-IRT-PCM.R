@@ -56,9 +56,9 @@ theta <- as.vector(a0 * time + a %*% B_true) # generating theta
 
 # Next, we generate data based on the PCM and the thetas we just created.
 
-I <- 10 # Number of items.
+I <- 5 # Number of items.
 # I <- arg[3] # Number of items. When batched.
-K <- 2  # Number of categories per items.
+K <- 5  # Number of categories per items.
 M <- K - 1
 
 # Create item parameters
@@ -88,7 +88,7 @@ for (y in 0:M) {
                                    M     = M)
 }
 responses   <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 1, vec) == 1) - 1 })
-responses   <- responses + 1 # To fit the GRM in stan, items should be coded starting from 1. 
+responses   <- responses + 1 # To fit the PCM in stan, items should be coded starting from 1. 
 rm(probs.array, y)
 
 # Fitting an IRT-splines model in stan. This first try intends to combine the splines model 
@@ -105,9 +105,9 @@ standata <- list(num_data      = num_data,
 
 fit <- stan(file = "Stan/splines_irt_pcm.stan",   # Stan model. 
             data = standata,                  # Data.
-            iter = 2000,                      # Number of iterations.
+            iter = 1000,                      # Number of iterations.
             chains  = 3,                      # Number of chains.
-            warmup  = 1000,                    # Burn-in samples.
+            warmup  = 500,                    # Burn-in samples.
             control = list(adapt_delta=0.95)) # Other parameters to control sampling behavior.
 
 sum.fit <- list()
@@ -137,7 +137,7 @@ traceplot(fit, pars = thetapars, inc_warmup = FALSE)
 fit.array <- as.array(fit)
 
 mcmc_acf(fit.array, 
-         pars = betapars, 
+         pars = betapars[c(1, 5, 9)], 
          lags = 20)
 
 mcmc_acf(fit.array, 
@@ -182,3 +182,25 @@ lines(time, sum.fit$theta[, 1], col = "red", lwd = 2)
 
 dev.off()
 rm(list = ls())
+
+# Splines PCM model in long format
+
+standata <- list(num_data      = num_data, 
+                 num_knots     = num_knots,
+                 knots         = knots,
+                 spline_degree = spline_degree,
+                 I = I,
+                 K = K,
+                 N  = num_data * I,
+                 tt = rep(1:num_data, I),
+                 ii = rep(1:I, each = num_data),
+                 y  = c(responses),
+                 time = time)
+
+fit.long <- stan(file = "Stan/splines_irt_pcm_long.stan",   # Stan model. 
+                 data = standata,                  # Data.
+                 iter = 1000,                      # Number of iterations.
+                 chains  = 3,                      # Number of chains.
+                 warmup  = 500,                    # Burn-in samples.
+                 control = list(adapt_delta=0.95)) # Other parameters to control sampling behavior.
+

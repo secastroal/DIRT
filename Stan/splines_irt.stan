@@ -87,10 +87,20 @@ model {
 
 generated quantities {
    ordered[K-1] beta[I]; //item category difficulty
+   int rep_y[num_data, I]; //posterior simulation
+   vector[I] log_lik[num_data]; //point-wise loglikelihood
 
  for (i in 1:I){
                 beta[i]=kappa[i]/alpha[i];
  }
+ 
+ for (n in 1:num_data) {
+    for (j in 1:I) {
+      rep_y[n, j] = ordered_logistic_rng(alpha[j] * theta[n], kappa[j]);
+      log_lik[n, j] = ordered_logistic_lpmf(Y[n, j] | alpha[j] * theta[n], kappa[j]);
+    }
+  }
+ 
 }
 
 
