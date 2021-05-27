@@ -12,7 +12,7 @@ set.seed(123)
 # The Thetas over time are described by a lag 1 autoregressive model.
 # The relation between the items and the person are modeled through a PCM model.
 
-nT      <- 200 # Number of time points.  
+nT      <- 120 # Number of time points.  
 lambda  <- 0.5 # Autoregressive effect.
 #inn_var <- 0.7 # Variance of the innovation.
 
@@ -27,7 +27,7 @@ for (i in 2:nT) {
 
 # Next, we generate data based on the GRM and the thetas we just created.
 
-I <- 10 # Number of items.
+I <- 6 # Number of items.
 K <- 5  # Number of categories per items.
 M <- K - 1
 

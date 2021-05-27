@@ -111,9 +111,9 @@ plot(IP[, K], sum.fit$alpha[, 1], pch = 20,
      ylab = "Estimated alpha",
      xlim = c(0, 2.5),
      ylim = c(0, 2.5),
-     main = paste0("Discrimination; cor = ", round(cor(IP[, 5], sum.fit$alpha[, 1]), 3)))
+     main = paste0("Discrimination; cor = ", round(cor(IP[, K], sum.fit$alpha[, 1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
-segments(x0 = IP[, 5], 
+segments(x0 = IP[, K], 
          y0 = sum.fit$alpha[, 4], 
          y1 = sum.fit$alpha[, 8],
          col = rgb(0, 0, 0, 0.25))
@@ -145,7 +145,7 @@ abline(0, 1, col = 2, lwd = 2)
 plot(1:nT, theta, type = "l")
 polygon(c(1:nT, rev(1:nT)),
         c(sum.fit$theta[, 4], rev(sum.fit$theta[, 8])),
-        border = NA,
+        border = NA, 
         col = rgb(1, 0, 0, 0.25))
 lines(1:nT, sum.fit$theta[, 1], col = "red", lwd = 1)
 

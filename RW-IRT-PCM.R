@@ -19,8 +19,14 @@ theta <- rep(NA, nT)
 theta[1] <- rnorm(1)
 
 for (i in 2:nT) {
-  theta[i] <- theta[i - 1] + rnorm(1, 0, 0.25) 
+  step <- rnorm(1, 0, 1)
+  if (abs(theta[i - 1] + step) > 3) {
+    theta[i] <- theta[i - 1]
+  }else{
+    theta[i] <- theta[i - 1] + step 
+  } 
 }
+
 
 # Next, we generate data based on the GRM and the thetas we just created.
 

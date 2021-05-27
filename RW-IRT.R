@@ -19,7 +19,12 @@ theta <- rep(NA, nT)
 theta[1] <- rnorm(1)
 
 for (i in 2:nT) {
-  theta[i] <- theta[i - 1] + rnorm(1, 0, 0.25) 
+  step <- rnorm(1, 0, 1)
+  if (abs(theta[i - 1] + step) > 3) {
+    theta[i] <- theta[i - 1]
+  }else{
+      theta[i] <- theta[i - 1] + step 
+    } 
 }
 
 # Next, we generate data based on the GRM and the thetas we just created.
@@ -56,11 +61,11 @@ standata <- list(nT = nT,
                  ii = rep(1:I, each = nT),
                  y  = c(responses))
 
-fit <- stan(file = "Stan/rw_irt.stan",   # Stan model. 
+fit <- stan(file = "Stan/rw_irt_fixvar.stan",   # Stan model. 
             data = standata,                  # Data.
-            iter = 1000,                      # Number of iterations.
+            iter = 2000,                      # Number of iterations.
             chains  = 3,                      # Number of chains.
-            warmup  = 500,                    # Burn-in samples.
+            warmup  = 1000,                    # Burn-in samples.
             control = list(adapt_delta=0.95)) # Other parameters to control sampling behavior.
 
 sum.fit <- list()
