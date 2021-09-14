@@ -5,14 +5,14 @@ options(mc.cores = parallel::detectCores())
 library(bayesplot)
 
 source("R/IRT_models.R")
-seed <- 123
+seed <- 456
 set.seed(seed)
 
 # This files simulates a simple AR-IRT model for a single individual.
 # The Thetas over time are described by a lag 1 autoregressive model.
 # The relation between the items and the person are modeled through a PCM model.
 
-nT      <- 120 # Number of time points.  
+nT      <- 200 # Number of time points.  
 lambda  <- 0.5 # Autoregressive effect.
 #inn_var <- 0.7 # Variance of the innovation.
 
