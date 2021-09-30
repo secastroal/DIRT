@@ -1,43 +1,31 @@
-# Summary Simulations Results
+# Summary Simulations
+# This file summarizes and plots the results from the final simulations in which
+# the AR-PCM and the AR-GRM were tested.
 
+# 0.0 Prepare environment ----
 library(plyr)
 
-grm_files <- paste0(getwd(), "/Simulation/Results_Poster_presentation_01_01_2021/Sim_AR_GRM_cond_", 1:20, ".txt")
-grmf_files <- paste0(getwd(), "/Simulation/Results_Poster_presentation_01_01_2021/Sim_AR_GRM_fix_cond_", 1:20, ".txt")
-pcm_files <- paste0(getwd(), "/Simulation/Results_Poster_presentation_01_01_2021/Sim_AR_PCM_cond_", 1:20, ".txt")
-sgrm_files <- paste0(getwd(), "/Simulation/Results_Poster_presentation_03_12_20/Sim_S_GRM_cond_", 1:20, ".txt")
-spcm_files <- paste0(getwd(), "/Simulation/Results_Poster_presentation_03_12_20/Sim_S_PCM_cond_", 1:20, ".txt")
+# 1.0 Read output files ----
+
+# Read output files into R
+grm_files <- paste0(getwd(), "/Simulation/Sim_AR_GRM_cond_", 1:72, ".txt")
+pcm_files <- paste0(getwd(), "/Simulation/Sim_AR_PCM_cond_", 1:72, ".txt")
 
 data_grm <- lapply(grm_files, function(x) read.table(file = x, header = TRUE))
-data_grmf <- lapply(grmf_files, function(x) read.table(file = x, header = TRUE))
 data_pcm <- lapply(pcm_files, function(x) read.table(file = x, header = TRUE))
-data_sgrm <- lapply(sgrm_files, function(x) read.table(file = x, header = TRUE))
-data_spcm <- lapply(spcm_files, function(x) read.table(file = x, header = TRUE))
 
+# Merge output into one data.frame for each model
 results_grm <- ldply(data_grm, data.frame)
-results_grmf <- ldply(data_grmf, data.frame)
 results_pcm <- ldply(data_pcm, data.frame)
-results_sgrm <- ldply(data_sgrm, data.frame)
-results_spcm <- ldply(data_spcm, data.frame)
 
-check_grm <- ifelse(results_grm$nRhat != 0 | results_grm$alpha.cor < 0.9 |
-                      results_grm$beta.cor < 0.9 | results_grm$theta.cor < 0.9 |
-                      results_grm$alpha.CI > 10.5 | results_grm$beta.CI > 20.5, 1, 0)
-check_pcm <- ifelse(results_pcm$nRhat != 0 | results_pcm$beta.cor < 0.9 |
-                      results_pcm$theta.cor < 0.9 | results_pcm$beta.CI > 20.5, 1, 0)
-check_sgrm <- ifelse(results_sgrm$nRhat != 0 | results_sgrm$alpha.cor < 0.6 |
-                            results_sgrm$beta.cor < 0.6 | results_sgrm$theta.cor < 0.6 |
-                            results_sgrm$alpha.CI > 10.5 | results_sgrm$beta.CI > 20.5, 1, 0)
-check_spcm <- ifelse(results_spcm$nRhat != 0 | results_spcm$beta.cor < 0.6 |
-                            results_spcm$theta.cor < 0.6 | results_spcm$beta.CI > 20.5, 1, 0)
+rm(data_grm, data_pcm, grm_files, pcm_files)
+
+# 2.0 ----
 
 bad_grm <- tapply(results_grm$corrupt, results_grm$cond, sum)
-bad_grmf <- tapply(results_grmf$corrupt, results_grmf$cond, sum)
 bad_pcm <- tapply(results_pcm$corrupt, results_pcm$cond, sum)
 
-bad_sgrm <- tapply(check_sgrm, results_sgrm$cond, sum)
-bad_spcm <- tapply(check_spcm, results_spcm$cond, sum)
-
+# continue here!
 tapply(results_grm$alpha.cor > 0.9, results_grm$cond, sum)
 
 pdf(file = "Figures/Sim_results.pdf", width = 16.5, height = 8)
