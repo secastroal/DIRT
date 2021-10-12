@@ -5,6 +5,33 @@
 # 0.0 Prepare environment ----
 library(plyr)
 
+# String vestor to use in the names of the plot files
+plot_name <- c("pcm", "grm")
+
+# Recreate matrix of conditions
+
+N_timepoints <- c(100, 200, 350, 500) # Number of timepoints
+N_items      <- c(3, 6)               # Number of items 
+S_lambda     <- c(0, 0.25, 0.5)       # Size of the autoregressive effect
+M_prop       <- c(0, 0.15, 0.25)      # Proportion of missing values
+
+Cond        <- expand.grid(N_timepoints, N_items, S_lambda, M_prop)
+names(Cond) <- c("nT", "I", "lambda", "NAprop")
+
+# Colors for plots
+bnw = TRUE #black and white
+if (bnw) {
+        color_plot <- gray((0:2)/3)
+}else{
+        color_plot <- rainbow(3)
+}
+
+# Axis and legend statements
+yaxis <- matrix(rep(c(TRUE, FALSE), times = c(2, 4)), ncol = 3)
+xaxis <- matrix(rep(c(FALSE, TRUE), each = 3), ncol = 3, byrow = TRUE)
+laxis <- matrix(FALSE, ncol = 3, nrow = 2)
+laxis[1, 3] <- TRUE
+
 # 1.0 Read output files ----
 
 # Read output files into R
@@ -18,335 +45,340 @@ data_pcm <- lapply(pcm_files, function(x) read.table(file = x, header = TRUE))
 results_grm <- ldply(data_grm, data.frame)
 results_pcm <- ldply(data_pcm, data.frame)
 
-rm(data_grm, data_pcm, grm_files, pcm_files)
+# Store results in a list
+results <- list(pcm = results_pcm, grm = results_grm)
 
-# 2.0 ----
+rm(data_grm, data_pcm, grm_files, pcm_files, results_pcm, results_grm)
 
-bad_grm <- tapply(results_grm$corrupt, results_grm$cond, sum)
-bad_pcm <- tapply(results_pcm$corrupt, results_pcm$cond, sum)
+# 2.0 Analyses that failed ----
+# To check for convergence issues in the analyses, we looked at the warning messages from stan.
+# A summary of the warnings in Stan can be found here: https://mc-stan.org/misc/warnings.html
+# We considered that an analysis did not converge or the estimation is not reliable enough if
+# there were any rhat larger than 1.05, any divergent transition after warmup, or any BMFI was 
+# too low. These analyses are identified with a 1 in the variable "corrupt" (e.g., results_pcm$corrupt).
+# There are other warning messages that do not necessarily imply that the analyses failed or is 
+# unreliable but they indicate that the estimation was inefficient. These warning messages 
+# indicate that the maximum treedepth was exceeded or that the bulk or tail effective sample
+# sizes were too low. These warning messages are not as serious as having divergent transitions
+# and they are usually solved by increasing the number of iteration or the maximum treedepth 
+# of the algorithm. Analyses that showed any of these warnings are identified with a 1 in the 
+# variable "efficiency".
+
+n_failed <- lapply(results, function(x) tapply(x$corrupt, x$cond, sum))
+
+for (m in 1:2) {
+  # Save plot to pdf
+  pdf(file = paste0("Figures/FailedAnalyses_", plot_name[m], ".pdf"), width = 15)
+  # Define plotting parameters.
+  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+
+  for (i in 1:2) {
+    for(l in 1:3) {
+      plot(1:4, 
+           n_failed[[m]][which(Cond$I == N_items[i] & Cond$lambda == S_lambda[l] &
+                                 Cond$NAprop == M_prop[1])] / 5, 
+           type = "l", col = color_plot[1], ylim = c(-0.5, 100.5), xlab = "", 
+           ylab = "", xaxt = "n", yaxt = "n", lwd = 2)
+      lines(1:4, 
+            n_failed[[m]][which(Cond$I == N_items[i] & Cond$lambda == S_lambda[l] & 
+                                  Cond$NAprop == M_prop[2])] / 5,
+            col = color_plot[2], lwd = 2)
+      lines(1:4, 
+            n_failed[[m]][which(Cond$I == N_items[i] & Cond$lambda == S_lambda[l] & 
+                                  Cond$NAprop == M_prop[3])] / 5,
+            col = color_plot[3], lwd = 2)
+      if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
+      if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
+      if (laxis[i, l]) {legend("topright", legend = c("0%", "0.15%", "0.25%"),
+                               col = color_plot, lty = 1, lwd = 2, cex = 1.5,
+                               seg.len = 3, title = "% of NA")}
+    }
+  }
+  mtext("Percentage of Divergent Analyses", 2, outer = TRUE, line = 4, cex = 1.8)
+  mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
+  mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3/4, las = 1)
+  mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1/4, las = 1)
+  mtext("AR = 0",    3, outer = TRUE, line = 1, cex = 1.5, at = 1/6)
+  mtext("AR = 0.25", 3, outer = TRUE, line = 1, cex = 1.5, at = 3/6)
+  mtext("AR = 0.5",  3, outer = TRUE, line = 1, cex = 1.5, at = 5/6)
+  
+  dev.off()
+}
+rm(i, l, m)
+
+# 3.1 Analyses that converged ----
+
+# To plot the average bias, average rmse, and other statistics across conditions,
+# we filter the data to only include the analyses that converged.
+results_conv <- lapply(results, function(x) x[x$corrupt == 0, ])
+# From the analyses that converged, there was still one analysis that had warning
+# messages. The 9th replication of the AR-GRM in condition 64 (nT = 500, I = 6,
+# lambda = 0.25, and NAprop = 0.25) had 9 transitions that exceeded the maximum 
+# treedepth after warm-up. Given that this problem is mainly an efficiency concern,
+# this analysis is not excluded from the following summaries.
+lapply(results_conv, function (x) tapply(x$efficiency, x$cond, sum))
+results_conv$grm[results_conv$grm$cond == 64 & results_conv$grm$efficiency == 1, 1:10]
+
+# 3.2 True vs Estimates Correlations ----
+
+# In the following plots, the average correlations between the true and the estimated
+# values for the alpha, beta, and theta parameters are displayed. The dots represent 
+# the average correlation across replications per conditions and the lines represent
+# the spread of the correlation given the 2.5 and 97.5 percentiles.
+
+# Beta parameters
+for (m in 1:2) {
+  # Save plot to pdf
+  pdf(file = paste0("Figures/BetaCor_", plot_name[m], ".pdf"), width = 15)
+  # Define plotting parameters.
+  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+  
+  for (i in 1:2) {
+    for (l in 1:3) {
+      tmp <- lapply(results_conv, function(x)
+        x[which(x$cond %in% which(Cond$I == N_items[i] & Cond$lambda == S_lambda[l])),])
+      
+      tmp_up   <- lapply(tmp, function(x) tapply(x$beta.cor, x$cond, quantile, probs = 0.975))
+      tmp_down <- lapply(tmp, function(x) tapply(x$beta.cor, x$cond, quantile, probs = 0.025))
+      
+      plot(rep(1:4, 3) + rep((0:2) / 10, each = 4),
+           tapply(tmp[[m]]$beta.cor, tmp[[m]]$cond, mean), 
+           ylim = c(0.5, 1), type = "p", pch = 19, 
+           col = rep(color_plot, each = 4), xaxt = "n", yaxt = "n",
+           xlab = "", ylab = "")
+      segments(x0 = rep(1:4, 3) + rep((0:2) / 10, each = 4),
+               y0 = tmp_down[[m]],
+               y1 = tmp_up[[m]],
+               lwd = 2, col = rep(color_plot, each = 4))
+      if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
+      if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
+      if (laxis[2:1, ][i, l]) {legend("bottomright", legend = c("0%", "0.15%", "0.25%"),
+                                      col = color_plot, lty = 1, lwd = 2, cex = 1.5,
+                                      seg.len = 3, title = "% of NA")}
+    }
+  }
+  
+  mtext("Average Beta Correlation", 2, outer = TRUE, line = 4, cex = 1.8)
+  mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
+  mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
+  mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
+  mtext("AR = 0",    3, outer = TRUE, line = 1, cex = 1.5, at = 1 / 6)
+  mtext("AR = 0.25", 3, outer = TRUE, line = 1, cex = 1.5, at = 3 / 6)
+  mtext("AR = 0.5",  3, outer = TRUE, line = 1, cex = 1.5, at = 5 / 6)
+  
+  dev.off()
+}
+rm(tmp, tmp_down, tmp_up, i, m , l)
+
+# Theta parameters
+for (m in 1:2) {
+  # Save plot to pdf
+  pdf(file = paste0("Figures/ThetaCor_", plot_name[m], ".pdf"), width = 15)
+  # Define plotting parameters.
+  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+  
+  for (i in 1:2) {
+    for (l in 1:3) {
+      tmp <- lapply(results_conv, function(x)
+        x[which(x$cond %in% which(Cond$I == N_items[i] & Cond$lambda == S_lambda[l])),])
+      
+      tmp_up   <- lapply(tmp, function(x) tapply(x$theta.cor, x$cond, quantile, probs = 0.975))
+      tmp_down <- lapply(tmp, function(x) tapply(x$theta.cor, x$cond, quantile, probs = 0.025))
+      
+      plot(rep(1:4, 3) + rep((0:2) / 10, each = 4),
+           tapply(tmp[[m]]$theta.cor, tmp[[m]]$cond, mean), 
+           ylim = c(0, 1), type = "p", pch = 19, 
+           col = rep(color_plot, each = 4), xaxt = "n", yaxt = "n",
+           xlab = "", ylab = "")
+      segments(x0 = rep(1:4, 3) + rep((0:2) / 10, each = 4),
+               y0 = tmp_down[[m]],
+               y1 = tmp_up[[m]],
+               lwd = 2, col = rep(color_plot, each = 4))
+      if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
+      if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
+      if (laxis[2:1, ][i, l]) {legend("bottomright", legend = c("0%", "0.15%", "0.25%"),
+                                      col = color_plot, lty = 1, lwd = 2, cex = 1.5,
+                                      seg.len = 3, title = "% of NA")}
+    }
+  }
+  
+  mtext("Average Theta Correlation", 2, outer = TRUE, line = 4, cex = 1.8)
+  mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
+  mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
+  mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
+  mtext("AR = 0",    3, outer = TRUE, line = 1, cex = 1.5, at = 1 / 6)
+  mtext("AR = 0.25", 3, outer = TRUE, line = 1, cex = 1.5, at = 3 / 6)
+  mtext("AR = 0.5",  3, outer = TRUE, line = 1, cex = 1.5, at = 5 / 6)
+  
+  dev.off()
+}
+rm(tmp, tmp_down, tmp_up, i, m , l)
+
+# Alpha parameters
+# Save plot to pdf
+pdf(file = paste0("Figures/AlphaCor_grm.pdf"), width = 15)
+# Define plotting parameters.
+par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+
+for (i in 1:2) {
+  for (l in 1:3) {
+    tmp <- results_conv$grm[which(results_conv$grm$cond %in% 
+                                    which(Cond$I == N_items[i] & Cond$lambda == S_lambda[l])),]
+    
+    tmp_up   <- tapply(tmp$alpha.cor, tmp$cond, quantile, probs = 0.975)
+    tmp_down <- tapply(tmp$alpha.cor, tmp$cond, quantile, probs = 0.025)
+    
+    plot(rep(1:4, 3) + rep((0:2) / 10, each = 4),
+         tapply(tmp$alpha.cor, tmp$cond, mean), 
+         ylim = c(-1, 1), type = "p", pch = 19, 
+         col = rep(color_plot, each = 4), xaxt = "n", yaxt = "n",
+         xlab = "", ylab = "")
+    segments(x0 = rep(1:4, 3) + rep((0:2) / 10, each = 4),
+             y0 = tmp_down,
+             y1 = tmp_up,
+             lwd = 2, col = rep(color_plot, each = 4))
+    if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
+    if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
+    if (laxis[2:1, ][i, l]) {legend("bottomright", legend = c("0%", "0.15%", "0.25%"),
+                                    col = color_plot, lty = 1, lwd = 2, cex = 1.5,
+                                    seg.len = 3, title = "% of NA")}
+  }
+}
+
+mtext("Average Alpha Correlation", 2, outer = TRUE, line = 4, cex = 1.8)
+mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
+mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
+mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
+mtext("AR = 0",    3, outer = TRUE, line = 1, cex = 1.5, at = 1 / 6)
+mtext("AR = 0.25", 3, outer = TRUE, line = 1, cex = 1.5, at = 3 / 6)
+mtext("AR = 0.5",  3, outer = TRUE, line = 1, cex = 1.5, at = 5 / 6)
+
+dev.off()
+
+rm(i, l, tmp, tmp_up, tmp_down)
+
+# 3.3 True vs. Estimates Statistics ----
+
+# To assess how close or distant were the estimates from the true parameters,
+# we computed the average bias, absolute bias, and root mean squared error for 
+# each set of parameters.  
+
+# Plots: Beta, theta, and lambda.
+col_index <- sapply(results_conv, function(x) {
+  c(grep("beta",   names(x))[-c(1, 5)],
+    grep("theta",  names(x))[-c(1, 5)],
+    grep("lambda", names(x))[-3])
+  })
+
+par_name <- rep(c("Beta", "Theta", "Lambda"), times = c(3, 3, 2))
+sta_name <- rep(c("Bias", "Abbias", "RMSE"), length.out = length(par_name))
+
+lylim <- c(-1, 0, 0,  -0.65, 0, 0, -0.65, 0)
+uylim <- c(1, 1.5, 2, 0.65,  1, 1, 0.65,  0.75)
+
+for (m in 1:2) {
+  for (v in 1:length(par_name)) {
+    # Save plot to pdf
+    pdf(file = paste0("Figures/", par_name[v], "_", sta_name[v], "_", plot_name[m], ".pdf"), width = 15)
+    # Define plotting parameters.
+    par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+    
+    for (i in 1:2) {
+      for (l in 1:3) {
+        tmp <- results_conv[[m]][which(results_conv[[m]]$cond %in% 
+                                         which(Cond$I == N_items[i] & 
+                                                 Cond$lambda == S_lambda[l])),]
+        
+        tmp_up   <- tapply(tmp[, col_index[v, m]], tmp$cond, quantile, probs = 0.975)
+        tmp_down <- tapply(tmp[, col_index[v, m]], tmp$cond, quantile, probs = 0.025)
+        
+        plot(rep(1:4, 3) + rep((0:2) / 10, each = 4),
+             tapply(tmp[, col_index[v, m]], tmp$cond, mean), 
+             ylim = c(lylim[v], uylim[v]), type = "p", pch = 19, 
+             col = rep(color_plot, each = 4), xaxt = "n", yaxt = "n",
+             xlab = "", ylab = "")
+        abline(h = 0, lty = 2, col = gray(0.9), xpd = FALSE)
+        segments(x0 = rep(1:4, 3) + rep((0:2) / 10, each = 4),
+                 y0 = tmp_down,
+                 y1 = tmp_up,
+                 lwd = 2, col = rep(color_plot, each = 4))
+        if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
+        if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
+        if (laxis[i, l]) {legend("topright", legend = c("0%", "0.15%", "0.25%"),
+                                 col = color_plot, lty = 1, lwd = 2, cex = 1.2,
+                                 seg.len = 3, title = "% of NA")}
+      }
+    }
+    
+    mtext(paste("Average", sta_name[v], par_name[v]), 2, outer = TRUE, line = 4, cex = 1.8)
+    mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
+    mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
+    mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
+    mtext("AR = 0",    3, outer = TRUE, line = 1, cex = 1.5, at = 1 / 6)
+    mtext("AR = 0.25", 3, outer = TRUE, line = 1, cex = 1.5, at = 3 / 6)
+    mtext("AR = 0.5",  3, outer = TRUE, line = 1, cex = 1.5, at = 5 / 6)
+    
+    dev.off()
+  }
+  }
+rm(tmp, tmp_down, tmp_up, i, m, l, v, lylim, uylim,
+   par_name, sta_name, col_index)
+
+# Plots: Alpha.
+
+col_index <- grep("alpha", names(results_conv$grm))[-c(1, 5)]
+par_name  <- "Alpha"
+sta_name  <- c("Bias", "Abbias", "RMSE")
+lylim <- c(-1, 0, 0)
+uylim <- c(1, 1.5, 2)
+
+for (v in 1:length(col_index)) {
+  # Save plot to pdf
+  pdf(file = paste0("Figures/Alpha_", sta_name[v], "_grm.pdf"), width = 15)
+  # Define plotting parameters.
+  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+  
+  for (i in 1:2) {
+    for (l in 1:3) {
+      tmp <- results_conv$grm[which(results_conv$grm$cond %in% 
+                                       which(Cond$I == N_items[i] & 
+                                               Cond$lambda == S_lambda[l])),]
+      
+      tmp_up   <- tapply(tmp[, col_index[v]], tmp$cond, quantile, probs = 0.975)
+      tmp_down <- tapply(tmp[, col_index[v]], tmp$cond, quantile, probs = 0.025)
+      
+      plot(rep(1:4, 3) + rep((0:2) / 10, each = 4),
+           tapply(tmp[, col_index[v]], tmp$cond, mean), 
+           ylim = c(lylim[v], uylim[v]), type = "p", pch = 19, 
+           col = rep(color_plot, each = 4), xaxt = "n", yaxt = "n",
+           xlab = "", ylab = "")
+      abline(h = 0, lty = 2, col = gray(0.9), xpd = FALSE)
+      segments(x0 = rep(1:4, 3) + rep((0:2) / 10, each = 4),
+               y0 = tmp_down,
+               y1 = tmp_up,
+               lwd = 2, col = rep(color_plot, each = 4))
+      if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
+      if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
+      if (laxis[i, l]) {legend("topright", legend = c("0%", "0.15%", "0.25%"),
+                               col = color_plot, lty = 1, lwd = 2, cex = 1.2,
+                               seg.len = 3, title = "% of NA")}
+    }
+  }
+  
+  mtext(paste("Average", sta_name[v], "Alpha"), 2, outer = TRUE, line = 4, cex = 1.8)
+  mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
+  mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
+  mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
+  mtext("AR = 0",    3, outer = TRUE, line = 1, cex = 1.5, at = 1 / 6)
+  mtext("AR = 0.25", 3, outer = TRUE, line = 1, cex = 1.5, at = 3 / 6)
+  mtext("AR = 0.5",  3, outer = TRUE, line = 1, cex = 1.5, at = 5 / 6)
+  
+  dev.off()
+}
+rm(tmp, tmp_down, tmp_up, i, l, v, lylim, uylim,
+   par_name, sta_name, col_index)
 
 # continue here!
-tapply(results_grm$alpha.cor > 0.9, results_grm$cond, sum)
-
-pdf(file = "Figures/Sim_results.pdf", width = 16.5, height = 8)
-par(mfrow = c(2, 2), mar = c(0.2, 0.2, 0.2, 0.2), oma = c(6, 7, 2, 10), xpd = NA)
-plot(1:5, bad_grm[1:5], type = "l", col = "blue", ylim = c(-0.5, 25.5), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:5, bad_pcm[1:5], col = "red", lwd = 2)
-lines(1:5, bad_grmf[1:5], col = "darkgreen", lwd = 2)
-mtext("I = 3", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:5, bad_grm[6:10], type = "l", col = "blue", ylim = c(-0.5, 25.5), 
-     xlab = "", ylab = "", xaxt = "n", yaxt = "n", las = 1, lwd = 2)
-lines(1:5, bad_pcm[6:10], col = "red", lwd = 2)
-lines(1:5, bad_grmf[6:10], col = "darkgreen", lwd = 2)
-mtext("I = 6", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:5, bad_grm[11:15], type = "l", col = "blue", ylim = c(-0.5, 25.5), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:5, bad_pcm[11:15], col = "red", lwd = 2)
-lines(1:5, bad_grmf[11:15], col = "darkgreen", lwd = 2)
-axis(1, at=1:5, labels=c(60, 120, 200, 350, 500), cex.axis = 2)
-mtext("I = 9", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:5, bad_grm[16:20], type = "l", col = "blue", ylim = c(-0.5, 25.5), 
-     xlab = "", ylab = "", xaxt="n", yaxt = "n", las = 1, lwd = 2)
-lines(1:5, bad_pcm[16:20], col = "red", lwd = 2)
-lines(1:5, bad_grmf[16:20], col = "darkgreen", lwd = 2)
-axis(1, at=1:5, labels=c(60, 120, 200, 350, 500), cex.axis = 2)
-mtext("I = 12", 3, outer = FALSE, line = -2.3, cex = 2.5)
-legend("topright",c("AR-GRM","AR-PCM"), col = c("blue", "red"), lty = 1,
-       seg.len = 2, pt.cex = 4, inset = 0)
-
-mtext("Number of Non-Covergent Analyses", 2, outer=TRUE, line=4, cex = 2.5)
-mtext("Number of Time Points", 1, outer=TRUE, line=4, cex=2.5)
-dev.off()
-
-pdf(file = "theta.pdf", width = 17.2, height = 6)
-par(mar = c(5, 5, 4, 2) + 0.1)
-plot(1:nT, theta, type = "l", xlab = "Time Points", ylab = "Theta", ylim = c(-4, 4), 
-     las  = 1, cex.axis = 2, cex.lab = 2.5, lwd = 2)
-polygon(c(1:nT, rev(1:nT)),
-        c(sum.fit$theta[, 4], rev(sum.fit$theta[, 8])),
-        border = NA,
-        col = rgb(1, 0, 0, 0.15))
-lines(1:nT, sum.fit$theta[, 1], col = "red", lwd = 2)
-legend("bottomright", legend = c("True", "Estimated"), col = c("black", "red"), lty = 1, cex = 2)
-dev.off()
-
-results_grm_good <- results_grm[results_grm$corrupt == 0, ]
-results_grmf_good <- results_grmf[results_grmf$corrupt == 0, ]
-results_pcm_good <- results_pcm[results_pcm$corrupt == 0, ]
-
-results_grm_good <- results_grm_good[results_grm_good$cond %in% (1:20)[-(seq(1, 20, by = 5))],]
-results_grmf_good <- results_grmf_good[results_grmf_good$cond %in% (1:20)[-(seq(1, 20, by = 5))],]
-results_pcm_good <- results_pcm_good[results_pcm_good$cond %in% (1:20)[-(seq(1, 20, by = 5))],]
-
-# Discrimination plots ----
-summary_grm <- tapply(results_grm_good$alpha.cor, results_grm_good$cond, mean)
-
-pdf(file = "Figures/alpha_cor.pdf", width = 16.5, height = 8)
-par(mfrow = c(2, 2), mar = c(0.2, 0.2, 0.2, 0.2), oma = c(6, 7, 2, 10), xpd = NA)
-plot(1:4, summary_grm[1:4], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-mtext("I = 3", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[5:8], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt = "n", yaxt = "n", las = 1, lwd = 2)
-mtext("I = 6", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[9:12], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-mtext("I = 9", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[13:16], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", yaxt = "n", las = 1, lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-mtext("I = 12", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-mtext("Mean Correlation Discrimination", 2, outer=TRUE, line=4, cex = 2.5)
-mtext("Number of Time Points", 1, outer=TRUE, line=4, cex=2.5)
-dev.off()
-
-summary_grm <- tapply(results_grm_good$alpha.rmse, results_grm_good$cond, mean)
-
-pdf(file = "Figures/alpha_rmse.pdf", width = 16.5, height = 8)
-par(mfrow = c(2, 2), mar = c(0.2, 0.2, 0.2, 0.2), oma = c(6, 7, 2, 10), xpd = NA)
-plot(1:4, summary_grm[1:4], type = "l", col = "blue", ylim = c(-0.05, 0.5), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 3", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[5:8], type = "l", col = "blue", ylim = c(-0.05, 0.5), 
-     xlab = "", ylab = "", xaxt = "n", yaxt = "n", las = 1, lwd = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 6", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[9:12], type = "l", col = "blue", ylim = c(-0.05, 0.5), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 9", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[13:16], type = "l", col = "blue", ylim = c(-0.05, 0.5), 
-     xlab = "", ylab = "", xaxt="n", yaxt = "n", las = 1, lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 12", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-mtext("Mean RMSE Discrimination", 2, outer=TRUE, line=4, cex = 2.5)
-mtext("Number of Time Points", 1, outer=TRUE, line=4, cex=2.5)
-dev.off()
-
-# Thresholds plots ----
-
-summary_grm <- tapply(results_grm_good$beta.cor, results_grm_good$cond, mean)
-summary_grmf <- tapply(results_grmf_good$beta.cor, results_grmf_good$cond, mean)
-summary_pcm <- tapply(results_pcm_good$beta.cor, results_pcm_good$cond, mean)
-
-pdf(file = "Figures/beta_cor.pdf", width = 16.5, height = 8)
-par(mfrow = c(2, 2), mar = c(0.2, 0.2, 0.2, 0.2), oma = c(6, 7, 2, 10), xpd = NA)
-plot(1:4, summary_grm[1:4], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:4, summary_pcm[1:4], col = "red", lwd = 2)
-lines(1:4, summary_grmf[1:4], col = "darkgreen", lwd = 2)
-mtext("I = 3", 1, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[5:8], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt = "n", yaxt = "n", las = 1, lwd = 2)
-lines(1:4, summary_pcm[5:8], col = "red", lwd = 2)
-lines(1:4, summary_grmf[5:8], col = "darkgreen", lwd = 2)
-mtext("I = 6", 1, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[9:12], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:4, summary_pcm[9:12], col = "red", lwd = 2)
-lines(1:4, summary_grmf[9:12], col = "darkgreen", lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-mtext("I = 9", 1, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[13:16], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", yaxt = "n", las = 1, lwd = 2)
-lines(1:4, summary_pcm[13:16], col = "red", lwd = 2)
-lines(1:4, summary_grmf[13:16], col = "darkgreen", lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-mtext("I = 12", 1, outer = FALSE, line = -2.3, cex = 2.5)
-legend("bottomright",c("AR-GRM","AR-PCM"), col = c("blue", "red"), lty = 1,
-       seg.len = 2, pt.cex = 4, inset = 0)
-
-mtext("Mean Correlation Thresholds", 2, outer=TRUE, line=4, cex = 2.5)
-mtext("Number of Time Points", 1, outer=TRUE, line=4, cex=2.5)
-dev.off()
-
-summary_grm <- tapply(results_grm_good$beta.rmse, results_grm_good$cond, mean)
-summary_grmf <- tapply(results_grmf_good$beta.rmse, results_grmf_good$cond, mean)
-summary_pcm <- tapply(results_pcm_good$beta.rmse, results_pcm_good$cond, mean)
-
-pdf(file = "Figures/beta_rmse.pdf", width = 16.5, height = 8)
-par(mfrow = c(2, 2), mar = c(0.2, 0.2, 0.2, 0.2), oma = c(6, 7, 2, 10), xpd = NA)
-plot(1:4, summary_grm[1:4], type = "l", col = "blue", ylim = c(-0.05, 0.5), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:4, summary_pcm[1:4], col = "red", lwd = 2)
-lines(1:4, summary_grmf[1:4], col = "darkgreen", lwd = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 3", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[5:8], type = "l", col = "blue", ylim = c(-0.05, 0.5), 
-     xlab = "", ylab = "", xaxt = "n", yaxt = "n", las = 1, lwd = 2)
-lines(1:4, summary_pcm[5:8], col = "red", lwd = 2)
-lines(1:4, summary_grmf[5:8], col = "darkgreen", lwd = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 6", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[9:12], type = "l", col = "blue", ylim = c(-0.05, 0.5), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:4, summary_pcm[9:12], col = "red", lwd = 2)
-lines(1:4, summary_grmf[9:12], col = "darkgreen", lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 9", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[13:16], type = "l", col = "blue", ylim = c(-0.05, 0.5), 
-     xlab = "", ylab = "", xaxt="n", yaxt = "n", las = 1, lwd = 2)
-lines(1:4, summary_pcm[13:16], col = "red", lwd = 2)
-lines(1:4, summary_grmf[13:16], col = "darkgreen", lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 12", 3, outer = FALSE, line = -2.3, cex = 2.5)
-legend("topright",c("AR-GRM","AR-PCM"), col = c("blue", "red"), lty = 1,
-       seg.len = 2, pt.cex = 4, inset = 0)
-
-mtext("Mean RMSE Thresholds", 2, outer=TRUE, line=4, cex = 2.5)
-mtext("Number of Time Points", 1, outer=TRUE, line=4, cex=2.5)
-dev.off()
-
-# Thetas plots ----
-
-summary_grm <- tapply(results_grm_good$theta.cor, results_grm_good$cond, mean)
-summary_grmf <- tapply(results_grmf_good$theta.cor, results_grmf_good$cond, mean)
-summary_pcm <- tapply(results_pcm_good$theta.cor, results_pcm_good$cond, mean)
-
-pdf(file = "Figures/theta_cor.pdf", width = 16.5, height = 8)
-par(mfrow = c(2, 2), mar = c(0.2, 0.2, 0.2, 0.2), oma = c(6, 7, 2, 10), xpd = NA)
-plot(1:4, summary_grm[1:4], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:4, summary_pcm[1:4], col = "red", lwd = 2)
-lines(1:4, summary_grmf[1:4], col = "darkgreen", lwd = 2)
-mtext("I = 3", 1, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[5:8], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt = "n", yaxt = "n", las = 1, lwd = 2)
-lines(1:4, summary_pcm[5:8], col = "red", lwd = 2)
-lines(1:4, summary_grmf[5:8], col = "darkgreen", lwd = 2)
-mtext("I = 6", 1, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[9:12], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:4, summary_pcm[9:12], col = "red", lwd = 2)
-lines(1:4, summary_grmf[9:12], col = "darkgreen", lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-mtext("I = 9", 1, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[13:16], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", yaxt = "n", las = 1, lwd = 2)
-lines(1:4, summary_pcm[13:16], col = "red", lwd = 2)
-lines(1:4, summary_grmf[13:16], col = "darkgreen", lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-mtext("I = 12", 1, outer = FALSE, line = -2.3, cex = 2.5)
-legend("bottomright",c("AR-GRM","AR-PCM"), col = c("blue", "red"), lty = 1,
-       seg.len = 2, pt.cex = 4, inset = 0)
-
-mtext("Mean Correlation Theta", 2, outer=TRUE, line=4, cex = 2.5)
-mtext("Number of Time Points", 1, outer=TRUE, line=4, cex=2.5)
-dev.off()
-
-summary_grm <- tapply(results_grm_good$theta.rmse, results_grm_good$cond, mean)
-summary_grmf <- tapply(results_grmf_good$theta.rmse, results_grmf_good$cond, mean)
-summary_pcm <- tapply(results_pcm_good$theta.rmse, results_pcm_good$cond, mean)
-
-pdf(file = "Figures/theta_rmse.pdf", width = 16.5, height = 8)
-par(mfrow = c(2, 2), mar = c(0.2, 0.2, 0.2, 0.2), oma = c(6, 7, 2, 10), xpd = NA)
-plot(1:4, summary_grm[1:4], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:4, summary_pcm[1:4], col = "red", lwd = 2)
-lines(1:4, summary_grmf[1:4], col = "darkgreen", lwd = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 3", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[5:8], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt = "n", yaxt = "n", las = 1, lwd = 2)
-lines(1:4, summary_pcm[5:8], col = "red", lwd = 2)
-lines(1:4, summary_grmf[5:8], col = "darkgreen", lwd = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 6", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[9:12], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:4, summary_pcm[9:12], col = "red", lwd = 2)
-lines(1:4, summary_grmf[9:12], col = "darkgreen", lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 9", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[13:16], type = "l", col = "blue", ylim = c(-0.05, 1), 
-     xlab = "", ylab = "", xaxt="n", yaxt = "n", las = 1, lwd = 2)
-lines(1:4, summary_pcm[13:16], col = "red", lwd = 2)
-lines(1:4, summary_grmf[13:16], col = "darkgreen", lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 12", 3, outer = FALSE, line = -2.3, cex = 2.5)
-legend("topright",c("AR-GRM","AR-PCM"), col = c("blue", "red"), lty = 1,
-       seg.len = 2, pt.cex = 4, inset = 0)
-
-mtext("Mean RMSE Theta", 2, outer=TRUE, line=4, cex = 2.5)
-mtext("Number of Time Points", 1, outer=TRUE, line=4, cex=2.5)
-dev.off()
-
-# Lambda plot ----
-summary_grm <- tapply(results_grm_good$lambda.abbias, results_grm_good$cond, mean)
-summary_grmf <- tapply(results_grmf_good$lambda.abbias, results_grmf_good$cond, mean)
-summary_pcm <- tapply(results_pcm_good$lambda.abbias, results_pcm_good$cond, mean)
-
-pdf(file = "Figures/lambda_abbias.pdf", width = 16.5, height = 8)
-par(mfrow = c(2, 2), mar = c(0.2, 0.2, 0.2, 0.2), oma = c(6, 7, 2, 10), xpd = NA)
-plot(1:4, summary_grm[1:4], type = "l", col = "blue", ylim = c(-0.05, 0.25), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:4, summary_pcm[1:4], col = "red", lwd = 2)
-lines(1:4, summary_grmf[1:4], col = "darkgreen", lwd = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 3", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[5:8], type = "l", col = "blue", ylim = c(-0.05, 0.25), 
-     xlab = "", ylab = "", xaxt = "n", yaxt = "n", las = 1, lwd = 2)
-lines(1:4, summary_pcm[5:8], col = "red", lwd = 2)
-lines(1:4, summary_grmf[5:8], col = "darkgreen", lwd = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 6", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[9:12], type = "l", col = "blue", ylim = c(-0.05, 0.25), 
-     xlab = "", ylab = "", xaxt="n", las = 1, cex.axis = 2, lwd = 2)
-lines(1:4, summary_pcm[9:12], col = "red", lwd = 2)
-lines(1:4, summary_grmf[9:12], col = "darkgreen", lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 9", 3, outer = FALSE, line = -2.3, cex = 2.5)
-
-plot(1:4, summary_grm[13:16], type = "l", col = "blue", ylim = c(-0.05, 0.25), 
-     xlab = "", ylab = "", xaxt="n", yaxt = "n", las = 1, lwd = 2)
-lines(1:4, summary_pcm[13:16], col = "red", lwd = 2)
-lines(1:4, summary_grmf[13:16], col = "darkgreen", lwd = 2)
-axis(1, at=1:4, labels=c(120, 200, 350, 500), cex.axis = 2)
-abline(h = 0, lty = 2, col = gray(0.5), xpd = FALSE)
-mtext("I = 12", 3, outer = FALSE, line = -2.3, cex = 2.5)
-legend("topright",c("AR-GRM","AR-PCM"), col = c("blue", "red"), lty = 1,
-       seg.len = 2, pt.cex = 4, inset = 0)
-
-mtext("Mean Abbias Autoregressive", 2, outer=TRUE, line=4, cex = 2.5)
-mtext("Number of Time Points", 1, outer=TRUE, line=4, cex=2.5)
-dev.off()
-
-
 summary_grm <- tapply(results_grm$run.time, results_grm$cond, mean)
 summary_grmf <- tapply(results_grmf$run.time, results_grmf$cond, mean)
 summary_pcm <- tapply(results_pcm$run.time, results_pcm$cond, mean)
