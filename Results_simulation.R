@@ -68,7 +68,7 @@ n_failed <- lapply(results, function(x) tapply(x$corrupt, x$cond, sum))
 
 for (m in 1:2) {
   # Save plot to pdf
-  pdf(file = paste0("Figures/FailedAnalyses_", plot_name[m], ".pdf"), width = 15)
+  pdf(file = paste0("Figures/Divergent_", plot_name[m], ".pdf"), width = 15)
   # Define plotting parameters.
   par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
 
@@ -129,7 +129,7 @@ results_conv$grm[results_conv$grm$cond == 64 & results_conv$grm$efficiency == 1,
 # Beta parameters
 for (m in 1:2) {
   # Save plot to pdf
-  pdf(file = paste0("Figures/BetaCor_", plot_name[m], ".pdf"), width = 15)
+  pdf(file = paste0("Figures/Beta_Cor_", plot_name[m], ".pdf"), width = 15)
   # Define plotting parameters.
   par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
   
@@ -173,7 +173,7 @@ rm(tmp, tmp_down, tmp_up, i, m , l)
 # Theta parameters
 for (m in 1:2) {
   # Save plot to pdf
-  pdf(file = paste0("Figures/ThetaCor_", plot_name[m], ".pdf"), width = 15)
+  pdf(file = paste0("Figures/Theta_Cor_", plot_name[m], ".pdf"), width = 15)
   # Define plotting parameters.
   par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
   
@@ -216,7 +216,7 @@ rm(tmp, tmp_down, tmp_up, i, m , l)
 
 # Alpha parameters
 # Save plot to pdf
-pdf(file = paste0("Figures/AlphaCor_grm.pdf"), width = 15)
+pdf(file = paste0("Figures/Alpha_Cor_grm.pdf"), width = 15)
 # Define plotting parameters.
 par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
 
