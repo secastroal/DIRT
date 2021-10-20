@@ -70,7 +70,7 @@ for (m in 1:2) {
   # Save plot to pdf
   pdf(file = paste0("Figures/Divergent_", plot_name[m], ".pdf"), width = 15)
   # Define plotting parameters.
-  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 10), xpd = NA)
 
   for (i in 1:2) {
     for(l in 1:3) {
@@ -89,9 +89,9 @@ for (m in 1:2) {
             col = color_plot[3], lwd = 2)
       if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
       if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
-      if (laxis[i, l]) {legend("topright", legend = c("0%", "0.15%", "0.25%"),
+      if (laxis[i, l]) {legend("topright", legend = c("0%", "15%", "25%"),
                                col = color_plot, lty = 1, lwd = 2, cex = 1.5,
-                               seg.len = 3, title = "% of NA")}
+                               seg.len = 3, title = "% of NA", inset = c(-1/3, 0))}
     }
   }
   mtext("Percentage of Divergent Analyses", 2, outer = TRUE, line = 4, cex = 1.8)
@@ -115,7 +115,7 @@ results_conv <- lapply(results, function(x) x[x$corrupt == 0, ])
 # messages. The 9th replication of the AR-GRM in condition 64 (nT = 500, I = 6,
 # lambda = 0.25, and NAprop = 0.25) had 9 transitions that exceeded the maximum 
 # treedepth after warm-up. Given that this problem is mainly an efficiency concern,
-# this analysis is not excluded from the following summaries.
+# this analysis is still included in the following summaries.
 lapply(results_conv, function (x) tapply(x$efficiency, x$cond, sum))
 results_conv$grm[results_conv$grm$cond == 64 & results_conv$grm$efficiency == 1, 1:10]
 
@@ -131,34 +131,34 @@ for (m in 1:2) {
   # Save plot to pdf
   pdf(file = paste0("Figures/Beta_Cor_", plot_name[m], ".pdf"), width = 15)
   # Define plotting parameters.
-  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 10), xpd = NA)
   
   for (i in 1:2) {
     for (l in 1:3) {
-      tmp <- lapply(results_conv, function(x)
-        x[which(x$cond %in% which(Cond$I == N_items[i] & Cond$lambda == S_lambda[l])),])
+      tmp <- results_conv[[m]][which(results_conv[[m]]$cond %in% 
+                                       which(Cond$I == N_items[i] & Cond$lambda == S_lambda[l])),]
       
-      tmp_up   <- lapply(tmp, function(x) tapply(x$beta.cor, x$cond, quantile, probs = 0.975))
-      tmp_down <- lapply(tmp, function(x) tapply(x$beta.cor, x$cond, quantile, probs = 0.025))
+      tmp_up   <- tapply(tmp$beta.cor, tmp$cond, quantile, probs = 0.975)
+      tmp_down <- tapply(tmp$beta.cor, tmp$cond, quantile, probs = 0.025)
       
       plot(rep(1:4, 3) + rep((0:2) / 10, each = 4),
-           tapply(tmp[[m]]$beta.cor, tmp[[m]]$cond, mean), 
+           tapply(tmp$beta.cor, tmp$cond, mean), 
            ylim = c(0.5, 1), type = "p", pch = 19, 
            col = rep(color_plot, each = 4), xaxt = "n", yaxt = "n",
            xlab = "", ylab = "")
       segments(x0 = rep(1:4, 3) + rep((0:2) / 10, each = 4),
-               y0 = tmp_down[[m]],
-               y1 = tmp_up[[m]],
+               y0 = tmp_down,
+               y1 = tmp_up,
                lwd = 2, col = rep(color_plot, each = 4))
       if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
       if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
-      if (laxis[2:1, ][i, l]) {legend("bottomright", legend = c("0%", "0.15%", "0.25%"),
-                                      col = color_plot, lty = 1, lwd = 2, cex = 1.5,
-                                      seg.len = 3, title = "% of NA")}
+      if (laxis[i, l]) {legend("topright", legend = c("0%", "15%", "25%"),
+                               col = color_plot, lty = 1, lwd = 2, cex = 1.5,
+                               seg.len = 3, title = "% of NA", inset = c(-1/3, 0))}
     }
   }
   
-  mtext("Average Beta Correlation", 2, outer = TRUE, line = 4, cex = 1.8)
+  mtext("Average Thresholds Correlation", 2, outer = TRUE, line = 4, cex = 1.8)
   mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
   mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
   mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
@@ -175,34 +175,34 @@ for (m in 1:2) {
   # Save plot to pdf
   pdf(file = paste0("Figures/Theta_Cor_", plot_name[m], ".pdf"), width = 15)
   # Define plotting parameters.
-  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 10), xpd = NA)
   
   for (i in 1:2) {
     for (l in 1:3) {
-      tmp <- lapply(results_conv, function(x)
-        x[which(x$cond %in% which(Cond$I == N_items[i] & Cond$lambda == S_lambda[l])),])
+      tmp <- results_conv[[m]][which(results_conv[[m]]$cond %in% 
+                                       which(Cond$I == N_items[i] & Cond$lambda == S_lambda[l])),]
       
-      tmp_up   <- lapply(tmp, function(x) tapply(x$theta.cor, x$cond, quantile, probs = 0.975))
-      tmp_down <- lapply(tmp, function(x) tapply(x$theta.cor, x$cond, quantile, probs = 0.025))
+      tmp_up   <- tapply(tmp$theta.cor, tmp$cond, quantile, probs = 0.975)
+      tmp_down <- tapply(tmp$theta.cor, tmp$cond, quantile, probs = 0.025)
       
       plot(rep(1:4, 3) + rep((0:2) / 10, each = 4),
-           tapply(tmp[[m]]$theta.cor, tmp[[m]]$cond, mean), 
+           tapply(tmp$theta.cor, tmp$cond, mean), 
            ylim = c(0, 1), type = "p", pch = 19, 
            col = rep(color_plot, each = 4), xaxt = "n", yaxt = "n",
            xlab = "", ylab = "")
       segments(x0 = rep(1:4, 3) + rep((0:2) / 10, each = 4),
-               y0 = tmp_down[[m]],
-               y1 = tmp_up[[m]],
+               y0 = tmp_down,
+               y1 = tmp_up,
                lwd = 2, col = rep(color_plot, each = 4))
       if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
       if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
-      if (laxis[2:1, ][i, l]) {legend("bottomright", legend = c("0%", "0.15%", "0.25%"),
-                                      col = color_plot, lty = 1, lwd = 2, cex = 1.5,
-                                      seg.len = 3, title = "% of NA")}
+      if (laxis[i, l]) {legend("topright", legend = c("0%", "15%", "25%"),
+                               col = color_plot, lty = 1, lwd = 2, cex = 1.5,
+                               seg.len = 3, title = "% of NA", inset = c(-1/3, 0))}
     }
   }
   
-  mtext("Average Theta Correlation", 2, outer = TRUE, line = 4, cex = 1.8)
+  mtext("Average State Disposition Correlation", 2, outer = TRUE, line = 4, cex = 1.8)
   mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
   mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
   mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
@@ -218,7 +218,7 @@ rm(tmp, tmp_down, tmp_up, i, m , l)
 # Save plot to pdf
 pdf(file = paste0("Figures/Alpha_Cor_grm.pdf"), width = 15)
 # Define plotting parameters.
-par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 10), xpd = NA)
 
 for (i in 1:2) {
   for (l in 1:3) {
@@ -239,13 +239,13 @@ for (i in 1:2) {
              lwd = 2, col = rep(color_plot, each = 4))
     if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
     if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
-    if (laxis[2:1, ][i, l]) {legend("bottomright", legend = c("0%", "0.15%", "0.25%"),
-                                    col = color_plot, lty = 1, lwd = 2, cex = 1.5,
-                                    seg.len = 3, title = "% of NA")}
+    if (laxis[i, l]) {legend("topright", legend = c("0%", "15%", "25%"),
+                             col = color_plot, lty = 1, lwd = 2, cex = 1.5,
+                             seg.len = 3, title = "% of NA", inset = c(-1/3, 0))}
   }
 }
 
-mtext("Average Alpha Correlation", 2, outer = TRUE, line = 4, cex = 1.8)
+mtext("Average Discrimination Correlation", 2, outer = TRUE, line = 4, cex = 1.8)
 mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
 mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
 mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
@@ -271,17 +271,22 @@ col_index <- sapply(results_conv, function(x) {
   })
 
 par_name <- rep(c("Beta", "Theta", "Lambda"), times = c(3, 3, 2))
+lab_name <- rep(c("Thresholds", "State Disposition", "Autoregression"), times = c(3, 3, 2))
 sta_name <- rep(c("Bias", "Abbias", "RMSE"), length.out = length(par_name))
-
-lylim <- c(-1, 0, 0,  -0.65, 0, 0, -0.65, 0)
-uylim <- c(1, 1.5, 2, 0.65,  1, 1, 0.65,  0.75)
 
 for (m in 1:2) {
   for (v in 1:length(par_name)) {
     # Save plot to pdf
     pdf(file = paste0("Figures/", par_name[v], "_", sta_name[v], "_", plot_name[m], ".pdf"), width = 15)
     # Define plotting parameters.
-    par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+    par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 10), xpd = NA)
+    
+    lylim <- min(tapply(results_conv[[m]][, col_index[v, m]], 
+                        results_conv[[m]]$cond, quantile, probs = 0.025))
+    lylim <- round(lylim - 0.05, 2)
+    uylim <- max(tapply(results_conv[[m]][, col_index[v, m]], 
+                        results_conv[[m]]$cond, quantile, probs = 0.975))
+    uylim <- round(uylim + 0.05, 2)
     
     for (i in 1:2) {
       for (l in 1:3) {
@@ -294,7 +299,7 @@ for (m in 1:2) {
         
         plot(rep(1:4, 3) + rep((0:2) / 10, each = 4),
              tapply(tmp[, col_index[v, m]], tmp$cond, mean), 
-             ylim = c(lylim[v], uylim[v]), type = "p", pch = 19, 
+             ylim = c(lylim, uylim), type = "p", pch = 19, 
              col = rep(color_plot, each = 4), xaxt = "n", yaxt = "n",
              xlab = "", ylab = "")
         abline(h = 0, lty = 2, col = gray(0.9), xpd = FALSE)
@@ -304,13 +309,13 @@ for (m in 1:2) {
                  lwd = 2, col = rep(color_plot, each = 4))
         if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
         if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
-        if (laxis[i, l]) {legend("topright", legend = c("0%", "0.15%", "0.25%"),
-                                 col = color_plot, lty = 1, lwd = 2, cex = 1.2,
-                                 seg.len = 3, title = "% of NA")}
+        if (laxis[i, l]) {legend("topright", legend = c("0%", "15%", "25%"),
+                                 col = color_plot, lty = 1, lwd = 2, cex = 1.5,
+                                 seg.len = 3, title = "% of NA", inset = c(-1/3, 0))}
       }
     }
     
-    mtext(paste("Average", sta_name[v], par_name[v]), 2, outer = TRUE, line = 4, cex = 1.8)
+    mtext(paste("Average", lab_name[v], sta_name[v]), 2, outer = TRUE, line = 4, cex = 1.8)
     mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
     mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
     mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
@@ -322,21 +327,25 @@ for (m in 1:2) {
   }
   }
 rm(tmp, tmp_down, tmp_up, i, m, l, v, lylim, uylim,
-   par_name, sta_name, col_index)
+   par_name, lab_name, sta_name, col_index)
 
 # Plots: Alpha.
 
 col_index <- grep("alpha", names(results_conv$grm))[-c(1, 5)]
-par_name  <- "Alpha"
 sta_name  <- c("Bias", "Abbias", "RMSE")
-lylim <- c(-1, 0, 0)
-uylim <- c(1, 1.5, 2)
 
 for (v in 1:length(col_index)) {
   # Save plot to pdf
   pdf(file = paste0("Figures/Alpha_", sta_name[v], "_grm.pdf"), width = 15)
   # Define plotting parameters.
-  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 7), xpd = NA)
+  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 10), xpd = NA)
+  
+  lylim <- min(tapply(results_conv[[2]][, col_index[v]], 
+                      results_conv[[2]]$cond, quantile, probs = 0.025))
+  lylim <- round(lylim - 0.05, 2)
+  uylim <- max(tapply(results_conv[[2]][, col_index[v]], 
+                      results_conv[[2]]$cond, quantile, probs = 0.975))
+  uylim <- round(uylim + 0.05, 2)
   
   for (i in 1:2) {
     for (l in 1:3) {
@@ -349,7 +358,7 @@ for (v in 1:length(col_index)) {
       
       plot(rep(1:4, 3) + rep((0:2) / 10, each = 4),
            tapply(tmp[, col_index[v]], tmp$cond, mean), 
-           ylim = c(lylim[v], uylim[v]), type = "p", pch = 19, 
+           ylim = c(lylim, uylim), type = "p", pch = 19, 
            col = rep(color_plot, each = 4), xaxt = "n", yaxt = "n",
            xlab = "", ylab = "")
       abline(h = 0, lty = 2, col = gray(0.9), xpd = FALSE)
@@ -359,13 +368,13 @@ for (v in 1:length(col_index)) {
                lwd = 2, col = rep(color_plot, each = 4))
       if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
       if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
-      if (laxis[i, l]) {legend("topright", legend = c("0%", "0.15%", "0.25%"),
-                               col = color_plot, lty = 1, lwd = 2, cex = 1.2,
-                               seg.len = 3, title = "% of NA")}
+      if (laxis[i, l]) {legend("topright", legend = c("0%", "15%", "25%"),
+                               col = color_plot, lty = 1, lwd = 2, cex = 1.5,
+                               seg.len = 3, title = "% of NA", inset = c(-1/3, 0))}
     }
   }
   
-  mtext(paste("Average", sta_name[v], "Alpha"), 2, outer = TRUE, line = 4, cex = 1.8)
+  mtext(paste("Average", "Discrimination", sta_name[v]), 2, outer = TRUE, line = 4, cex = 1.8)
   mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
   mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
   mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
@@ -376,7 +385,7 @@ for (v in 1:length(col_index)) {
   dev.off()
 }
 rm(tmp, tmp_down, tmp_up, i, l, v, lylim, uylim,
-   par_name, sta_name, col_index)
+   sta_name, col_index)
 
 # continue here!
 summary_grm <- tapply(results_grm$run.time, results_grm$cond, mean)

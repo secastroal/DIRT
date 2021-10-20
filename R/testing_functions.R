@@ -93,10 +93,11 @@ rm(list = setdiff(ls(), lsf.str()))
 
 # Test P.GRM() ----
 set.seed(4)
-N             <- 1000
-I             <- 50
+N             <- 500
+I             <- 6
 K             <- 5
-theta         <- runif(N, -3, 3)
+#theta         <- runif(N, -3, 3)
+theta         <- rnorm(N, 0, 1)
 # I use Sebastian's code here, with some edits:
 alpha         <- rlnorm(I, 0, 0.25)    # Discrimination parameters.
 delta         <- matrix(NA, I, K - 1)  # Matrix to store difficulty parameters.
@@ -127,8 +128,8 @@ standata <- list(n_student    = N,                      # Number of persons.
 t0 <- proc.time()
 fit.grm <- stan(file   = "Stan/grm_2.stan", 
                 data   = standata,
-                iter   = 500, 
-                warmup = 250, # it seems enough from previous runs
+                iter   = 2000, 
+                warmup = 1000, # it seems enough from previous runs
                 chains = 3, 
                 thin   = 1, 
                 cores  = 3, 
@@ -186,7 +187,7 @@ set.seed(1234)
 
 # For simplicity all items have the same number of categories.
 N             <- 1000
-I             <- 50
+I             <- 10
 K             <- 5
 M             <- K - 1
 theta         <- runif(N, -3, 3)
@@ -217,8 +218,10 @@ gen.data.pcm      <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 
 colnames(gen.data.pcm) <- paste0("It", 1:I)
 
 # Fit PCM via ML
-mirt.pcm <- mirt(gen.data.pcm, model = 1, itemtype = "Rasch")
+mirt.pcm <- mirt(gen.data.pcm, model = 1, itemtype = "Rasch", SE = TRUE)
 mirt.pcm.items <- coef(mirt.pcm, IRTpars = TRUE, simplify = TRUE)
+items.low <- unlist(lapply(coef(mirt.pcm, IRTpars = TRUE), function(x) x[2, -1]))[-41]
+items.up  <- unlist(lapply(coef(mirt.pcm, IRTpars = TRUE), function(x) x[3, -1]))[-41]
 mirt.pcm.theta <- fscores(mirt.pcm)
 
 # Fit PCM in Stan
@@ -236,7 +239,7 @@ fit.pcm <- stan(file   = "Stan/pcm.stan",
                 thin   = 1, 
                 cores  = 3, 
                 pars   = c("beta", "theta"))
-time.vande <- proc.time() - t0O
+time.vande <- proc.time() - t0
 rm(t0)
 
 sum.pcm <- list()
@@ -244,17 +247,24 @@ sum.pcm <- list()
 sum.pcm$beta    <- summary(fit.pcm, pars = "beta")$summary
 sum.pcm$theta   <- summary(fit.pcm, pars = "theta")$summary
 
-plot(c(thresholds), c(mirt.pcm.items$items[, 2:K]), pch = 4, 
+plot(c(thresholds), c(mirt.pcm.items$items[, 2:K]), pch = 4, ylim = c(-2.3, 1.7), xlim = c(-2.3, 1.7), 
      main = paste0("Discrimination; cor = ", round(cor(c(thresholds), c(mirt.pcm.items$items[, 2:K])), 3)))
 abline(0, 1, col = 2, lwd = 2)
+segments(x0 = c(t(thresholds)),
+         y0 = items.low,
+         y1 = items.up)
 
 plot(theta, mirt.pcm.theta, pch = 4, 
      main = paste0("Thetas; cor = ", round(cor(theta, mirt.pcm.theta), 3)))
 abline(0, 1, col = 2, lwd = 2)
 
-plot(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1], pch = 4, 
+plot(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1], pch = 4, ylim = c(-2.3, 1.7), xlim = c(-2.3, 1.7),
      main = paste0("Discrimination; cor = ", round(cor(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
+segments(x0 = c(t(thresholds[, 1:M])),
+         y0 = sum.pcm$beta[, 4],
+         y1 = sum.pcm$beta[, 8])
+
 
 plot(theta, sum.pcm$theta[, 1], pch = 4, 
      main = paste0("Thetas; cor = ", round(cor(theta, sum.pcm$theta[, 1]), 3)))
