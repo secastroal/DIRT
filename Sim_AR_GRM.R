@@ -49,13 +49,15 @@ names(Cond) <- c("nT", "I", "lambda", "NAprop")
 rm(N.timepoints, N.items, S.lambda, M.prop)
 
 # Compile the model
+# To run the simulation, we commented out part of the generated quantities block
+# to reduce memory usage.
 model <- stan_model(file = "Stan/ar_irt_na.stan", verbose = TRUE)
 
 # 2.0 Run simulation ----
 
 # Setup parallel backend to use parallel tasks
-cl <- makeCluster(2)
-registerDoParallel(cl, cores = 2)
+cl <- makeCluster(24)
+registerDoParallel(cl, cores = 24)
 
 # Get conditions and replications from the batch file
 args <- commandArgs(trailingOnly = TRUE)
@@ -126,7 +128,7 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
             begin.time <- proc.time()
             fit <- sampling(model,                            # Stan model. 
                             data = standata,                  # Data.
-                            iter = 2000,                      # Number of iterations.
+                            iter = 10000,                      # Number of iterations.
                             chains  = 3,                      # Number of chains.
                             warmup  = 1000,                    # Burn-in samples.
                             pars = c("alpha", "beta", "theta", "lambda"),

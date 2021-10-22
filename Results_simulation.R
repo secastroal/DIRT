@@ -3,12 +3,15 @@
 # the AR-PCM and the AR-GRM were tested.
 
 # 0.0 Prepare environment ----
-library(plyr)
+library(plyr) 
 
-# String vestor to use in the names of the plot files
+# Next, we create some vector and matrices that are used to create the plots 
+# within the for loops.
+
+# String vector to use in the names of the plot files
 plot_name <- c("pcm", "grm")
 
-# Recreate matrix of conditions
+# Recreate matrix of conditions to filter the results
 
 N_timepoints <- c(100, 200, 350, 500) # Number of timepoints
 N_items      <- c(3, 6)               # Number of items 
@@ -19,6 +22,7 @@ Cond        <- expand.grid(N_timepoints, N_items, S_lambda, M_prop)
 names(Cond) <- c("nT", "I", "lambda", "NAprop")
 
 # Colors for plots
+# If bnw = TRUE, plots are printed in grayscale.
 bnw = TRUE #black and white
 if (bnw) {
         color_plot <- gray((0:2)/3)
@@ -27,6 +31,8 @@ if (bnw) {
 }
 
 # Axis and legend statements
+# As we are plotting 6 plots in one figure, these matrices indicate for which of 
+# these plots the y axis, the x axis, or the legend must be printed. 
 yaxis <- matrix(rep(c(TRUE, FALSE), times = c(2, 4)), ncol = 3)
 xaxis <- matrix(rep(c(FALSE, TRUE), each = 3), ncol = 3, byrow = TRUE)
 laxis <- matrix(FALSE, ncol = 3, nrow = 2)
@@ -45,7 +51,7 @@ data_pcm <- lapply(pcm_files, function(x) read.table(file = x, header = TRUE))
 results_grm <- ldply(data_grm, data.frame)
 results_pcm <- ldply(data_pcm, data.frame)
 
-# Store results in a list
+# Store results in a list to loop through it and use lapply()
 results <- list(pcm = results_pcm, grm = results_grm)
 
 rm(data_grm, data_pcm, grm_files, pcm_files, results_pcm, results_grm)
@@ -143,7 +149,7 @@ for (m in 1:2) {
       
       plot(rep(1:4, 3) + rep((0:2) / 10, each = 4),
            tapply(tmp$beta.cor, tmp$cond, mean), 
-           ylim = c(0.5, 1), type = "p", pch = 19, 
+           ylim = c(0.75, 1), type = "p", pch = 19, 
            col = rep(color_plot, each = 4), xaxt = "n", yaxt = "n",
            xlab = "", ylab = "")
       segments(x0 = rep(1:4, 3) + rep((0:2) / 10, each = 4),
@@ -171,6 +177,8 @@ for (m in 1:2) {
 rm(tmp, tmp_down, tmp_up, i, m , l)
 
 # Theta parameters
+lylim <- c(0.6, 0.4)
+  
 for (m in 1:2) {
   # Save plot to pdf
   pdf(file = paste0("Figures/Theta_Cor_", plot_name[m], ".pdf"), width = 15)
@@ -187,7 +195,7 @@ for (m in 1:2) {
       
       plot(rep(1:4, 3) + rep((0:2) / 10, each = 4),
            tapply(tmp$theta.cor, tmp$cond, mean), 
-           ylim = c(0, 1), type = "p", pch = 19, 
+           ylim = c(lylim[m], 1), type = "p", pch = 19, 
            col = rep(color_plot, each = 4), xaxt = "n", yaxt = "n",
            xlab = "", ylab = "")
       segments(x0 = rep(1:4, 3) + rep((0:2) / 10, each = 4),
@@ -212,7 +220,7 @@ for (m in 1:2) {
   
   dev.off()
 }
-rm(tmp, tmp_down, tmp_up, i, m , l)
+rm(tmp, tmp_down, tmp_up, i, m , l, lylim)
 
 # Alpha parameters
 # Save plot to pdf
@@ -264,12 +272,14 @@ rm(i, l, tmp, tmp_up, tmp_down)
 # each set of parameters.  
 
 # Plots: Beta, theta, and lambda.
+# Column indexes of the statistics of interest
 col_index <- sapply(results_conv, function(x) {
   c(grep("beta",   names(x))[-c(1, 5)],
     grep("theta",  names(x))[-c(1, 5)],
     grep("lambda", names(x))[-3])
   })
 
+# Character vectors to use in the for loop to define the file name and y axis label.
 par_name <- rep(c("Beta", "Theta", "Lambda"), times = c(3, 3, 2))
 lab_name <- rep(c("Thresholds", "State Disposition", "Autoregression"), times = c(3, 3, 2))
 sta_name <- rep(c("Bias", "Abbias", "RMSE"), length.out = length(par_name))
