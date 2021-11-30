@@ -215,10 +215,6 @@ ppc.itcor3 <- function(object, data, method = "pearson", quiet = FALSE) {
 }
 
 
-ppc.itcor(fit, standata, method = "polyserial", quiet =TRUE)
-ppc.itcor2(fit, standata, method = "polyserial", quiet =TRUE)
-ppc.itcor3(fit, standata, quiet =TRUE)
-
 
 
 

@@ -92,12 +92,12 @@ abline(0, 1, col = 2, lwd = 2)
 rm(list = setdiff(ls(), lsf.str()))
 
 # Test P.GRM() ----
-set.seed(4)
-N             <- 500
-I             <- 6
+set.seed(12341)
+N             <- 100
+I             <- 3
 K             <- 5
 #theta         <- runif(N, -3, 3)
-theta         <- rnorm(N, 0, 1)
+{theta         <- rnorm(N, 0, 1)
 # I use Sebastian's code here, with some edits:
 alpha         <- rlnorm(I, 0, 0.25)    # Discrimination parameters.
 delta         <- matrix(NA, I, K - 1)  # Matrix to store difficulty parameters.
@@ -115,9 +115,20 @@ gen.data.grm           <- apply(probs.array, 1:2, function(vec) {which( rmultino
 colnames(gen.data.grm) <- paste0("It", 1:I)
 rm(probs.array, delta, alpha)
 # 
-mirt.grm       <- mirt(gen.data.grm, model = 1, itemtype = "graded")
+mirt.grm       <- mirt(gen.data.grm, model = 1, itemtype = "graded", SE = TRUE)
 mirt.grm.items <- coef(mirt.grm, IRTpars = TRUE, simplify = TRUE)
+mirt.grm.low   <- head(unlist(lapply(coef(mirt.grm, IRTpars = TRUE), function(x) x[2, ])), -2)
+mirt.grm.up    <- head(unlist(lapply(coef(mirt.grm, IRTpars = TRUE), function(x) x[3, ])), -2)
 mirt.grm.theta <- fscores(mirt.grm)
+
+plot(IP[, "alpha"], mirt.grm.items$items[, "a"], pch = 4, ylim = c(0, 5), xlim = c(0, 2),
+     main = paste0("Discrimination; cor = ", round(cor(IP[, "alpha"], mirt.grm.items$items[, "a"]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+segments(x0 = IP[, "alpha"],
+         y0 = mirt.grm.low[seq(1, K * I, by = K)],
+         y1 = mirt.grm.up[seq(1, K * I, by = K)])
+mirt.grm@OptimInfo$converged
+}
 
 # Fit GRM in Stan
 standata <- list(n_student    = N,                      # Number of persons.
@@ -144,9 +155,12 @@ sum.grm$beta    <- summary(fit.grm, pars = "beta")$summary
 sum.grm$theta   <- summary(fit.grm, pars = "theta")$summary
 
 # 
-plot(IP[, "alpha"], mirt.grm.items$items[, "a"], pch = 4, 
+plot(IP[, "alpha"], mirt.grm.items$items[, "a"], pch = 4, ylim = c(0, 5), xlim = c(0, 2),
      main = paste0("Discrimination; cor = ", round(cor(IP[, "alpha"], mirt.grm.items$items[, "a"]), 3)))
 abline(0, 1, col = 2, lwd = 2)
+segments(x0 = IP[, "alpha"],
+         y0 = mirt.grm.low[seq(1, K * I, by = K)],
+         y1 = mirt.grm.up[seq(1, K * I, by = K)])
 # 
 for (i in 1:(K-1))
 {
@@ -155,9 +169,13 @@ for (i in 1:(K-1))
   abline(0, 1, col = 2, lwd = 2)
 }
 
-plot(c(IP[, paste0("delta", 1:4)]), c(mirt.grm.items$items[, paste0("b", 1:4)]), pch = 4, 
+plot(c(IP[, paste0("delta", 1:4)]), c(mirt.grm.items$items[, paste0("b", 1:4)]), pch = 4, ylim = c(-4, 4), xlim = c(-4, 4), 
      main = paste0("cor = ", round(cor(c(IP[, paste0("delta", 1:4)]), c(mirt.grm.items$items[, paste0("b", 1:4)])), 4)))
 abline(0, 1, col = 2, lwd = 2)
+segments(x0 = c(t(IP[, paste0("delta", 1:4)])),
+         y0 = mirt.grm.low[-seq(1, K * I, by = K)],
+         y1 = mirt.grm.up[-seq(1, K * I, by = K)])
+
 
 # 
 plot(theta, mirt.grm.theta, pch = 4, 
