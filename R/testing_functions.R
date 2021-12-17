@@ -208,7 +208,7 @@ N             <- 1000
 I             <- 10
 K             <- 5
 M             <- K - 1
-theta         <- runif(N, -3, 3)
+theta         <- rnorm(N, 0, 1)
 
 # Generate item parameters.
 # Discrimination is equal to 1 for all items.
@@ -251,8 +251,8 @@ standata <- list(n_student    = N,                      # Number of persons.
 t0 <- proc.time()
 fit.pcm <- stan(file   = "Stan/pcm.stan", 
                 data   = standata,
-                iter   = 1000, 
-                warmup = 250, # it seems enough from previous runs
+                iter   = 2000, 
+                warmup = 500, # it seems enough from previous runs
                 chains = 3, 
                 thin   = 1, 
                 cores  = 3, 
@@ -266,7 +266,7 @@ sum.pcm$beta    <- summary(fit.pcm, pars = "beta")$summary
 sum.pcm$theta   <- summary(fit.pcm, pars = "theta")$summary
 
 plot(c(thresholds), c(mirt.pcm.items$items[, 2:K]), pch = 4, ylim = c(-2.3, 1.7), xlim = c(-2.3, 1.7), 
-     main = paste0("Discrimination; cor = ", round(cor(c(thresholds), c(mirt.pcm.items$items[, 2:K])), 3)))
+     main = paste0("Thresholds; cor = ", round(cor(c(thresholds), c(mirt.pcm.items$items[, 2:K])), 3)))
 abline(0, 1, col = 2, lwd = 2)
 segments(x0 = c(t(thresholds)),
          y0 = items.low,
@@ -288,6 +288,72 @@ plot(theta, sum.pcm$theta[, 1], pch = 4,
      main = paste0("Thetas; cor = ", round(cor(theta, sum.pcm$theta[, 1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
 
+# Test the pcm with ltm and a long format stan version instead
+detach("package:mirt")
+library(ltm)
+
+ltm.pcm <- gpcm(gen.data.pcm + 1, constraint = "rasch", IRT.param = TRUE)
+ltm.pcm.items <- coef(ltm.pcm)
+ltm.pcm.theta <- factor.scores(ltm.pcm, resp.patterns = gen.data.pcm + 1)
+ltm.pcm.theta <- ltm.pcm.theta$score.dat[, "z1"]
+
+responses <- gen.data.pcm + 1
+
+standata <- list(nT = N,
+                 I  = I,
+                 K  = K,
+                 N  = N * I,
+                 N_obs = sum(!is.na(c(responses))),
+                 tt = rep(1:N, I),
+                 ii = rep(1:I, each = N),
+                 tt_obs = rep(1:N, I)[!is.na(c(responses))],
+                 ii_obs = rep(1:I, each = N)[!is.na(c(responses))],
+                 y_obs  = c(responses)[!is.na(c(responses))])
+
+t0 <- proc.time()
+fit.pcm <- stan(file   = "Stan/irt_pcm_long.stan", 
+                data   = standata,
+                iter   = 2000, 
+                warmup = 500, # it seems enough from previous runs
+                chains = 3, 
+                thin   = 1, 
+                cores  = 3, 
+                pars   = c("beta", "theta"))
+time.vande <- proc.time() - t0
+rm(t0)
+
+sum.pcm <- list()
+
+sum.pcm$beta    <- summary(fit.pcm, pars = "beta")$summary
+sum.pcm$theta   <- summary(fit.pcm, pars = "theta")$summary
+
+plot(c(thresholds), c(ltm.pcm.items[, 1:(K - 1)]), pch = 4, ylim = c(-2.3, 1.7), xlim = c(-2.3, 1.7), 
+     main = paste0("Thresholds; cor = ", round(cor(c(thresholds), c(ltm.pcm.items[, 1:(K - 1)])), 3)))
+abline(0, 1, col = 2, lwd = 2)
+
+plot(theta, ltm.pcm.theta, pch = 4, 
+     main = paste0("Thetas; cor = ", round(cor(theta, ltm.pcm.theta), 3)))
+abline(0, 1, col = 2, lwd = 2)
+
+plot(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1], pch = 4, ylim = c(-2.3, 1.7), xlim = c(-2.3, 1.7),
+     main = paste0("Discrimination; cor = ", round(cor(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+segments(x0 = c(t(thresholds[, 1:M])),
+         y0 = sum.pcm$beta[, 4],
+         y1 = sum.pcm$beta[, 8])
+
+plot(theta, sum.pcm$theta[, 1], pch = 4, 
+     main = paste0("Thetas; cor = ", round(cor(theta, sum.pcm$theta[, 1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+
+plot(ltm.pcm, zrange = c(-3, 3)) # ICCs ltm
+plot.ICC(fit.pcm, standata, range = c(-3, 3), quiet = TRUE)
+
+plot(ltm.pcm, type = "IIC", zrange = c(-3, 3))
+plot.IIF(fit.pcm, standata, range = c(-3, 3), type = "IIF")
+
+plot(ltm.pcm, type = "IIC", zrange = c(-3, 3), items = 0)
+plot.IIF(fit.pcm, standata, range = c(-3, 3), type = "TIF")
+
 rm(list = setdiff(ls(), lsf.str()))
 
-# Fit vandemeleubroecke but ignoring the linear trend of theta ... just N(0, 1)

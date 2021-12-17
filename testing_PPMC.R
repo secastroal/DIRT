@@ -152,16 +152,146 @@ bidim_par  <- list(theta      = theta,
                    delta      = delta,
                    thresholds = thresholds,
                    lambda     = lambda)
-rm(theta, responses, taus, thresholds, delta, I, K, lambda, M, na_ind, nT)
+rm(theta, responses, taus, thresholds, delta, lambda, na_ind)
 
-plot(apply(arpcm_data$responses[1:50,], 1, mean), type = "l")
-lines(apply(bidim_data$responses[1:50,], 1, mean), col = 2)
+#plot (apply(arpcm_data$responses[1:50, 1:3], 1, mean), type = "l")
+#lines(apply(arpcm_data$responses[1:50, 4:6], 1, mean), col = 2)
 
 # 2. Fit the AR-PCM model ----
+
+# First we load the stan model that we are fitting.
+# This is an old version of the ar-pcm model that does not account for non-linear
+# trends and that assumes that variance of the innovations is fixed at 1.
+model <- stan_model(file = "Stan/ar_irt_pcm_na.stan", verbose = TRUE)
+
+# function to generate random initial values
+
+arpcm_inits <- function() {
+  list(lambda = runif(1, 0, 1),
+       beta   = array(rnorm(24, 0, 3), dim = c(6, 4)),
+       inno   = rnorm(200, 0, 3))
+} 
+
+arpcm_stan <- list(
+  nT = arpcm_data$nT,
+  I  = arpcm_data$I,
+  K  = arpcm_data$K,
+  N  = arpcm_data$nT * arpcm_data$I,
+  N_obs = sum(!is.na(c(arpcm_data$responses))),
+  tt = rep(1:arpcm_data$nT, arpcm_data$I),
+  ii = rep(1:arpcm_data$I, each = arpcm_data$nT),
+  tt_obs = rep(1:arpcm_data$nT, arpcm_data$I)[!is.na(c(arpcm_data$responses))],
+  ii_obs = rep(1:arpcm_data$I, each = arpcm_data$nT)[!is.na(c(arpcm_data$responses))],
+  y_obs  = c(arpcm_data$responses)[!is.na(c(arpcm_data$responses))]
+  )
+
+begin.time <- proc.time()
+arpcm_fit <- sampling(
+  model,                            # Stan model. 
+  data = arpcm_stan,                  # Data.
+  iter = 2000,                      # Number of iterations.
+  chains  = 3,                      # Number of chains.
+  warmup  = 1000,                   # Burn-in samples.
+  init    = arpcm_inits,
+  pars    = c("inno", "betasum", "log_lik", "imp_y"),
+  include = FALSE,
+  control = list(adapt_delta=0.95) # Other parameters to control sampling behavior.
+  )
+run.time <- proc.time() - begin.time
+rm(begin.time)
+
+bidim_stan <- list(
+  nT = bidim_data$nT,
+  I  = bidim_data$I,
+  K  = bidim_data$K,
+  N  = bidim_data$nT * bidim_data$I,
+  N_obs = sum(!is.na(c(bidim_data$responses))),
+  tt = rep(1:bidim_data$nT, bidim_data$I),
+  ii = rep(1:bidim_data$I, each = bidim_data$nT),
+  tt_obs = rep(1:bidim_data$nT, bidim_data$I)[!is.na(c(bidim_data$responses))],
+  ii_obs = rep(1:bidim_data$I, each = bidim_data$nT)[!is.na(c(bidim_data$responses))],
+  y_obs  = c(bidim_data$responses)[!is.na(c(bidim_data$responses))]
+)
+
+begin.time <- proc.time()
+bidim_fit <- sampling(
+  model,                            # Stan model. 
+  data = bidim_stan,                  # Data.
+  iter = 2000,                      # Number of iterations.
+  chains  = 3,                      # Number of chains.
+  warmup  = 1000,                   # Burn-in samples.
+  init    = arpcm_inits,
+  pars    = c("inno", "betasum", "log_lik", "imp_y"),
+  include = FALSE,
+  control = list(adapt_delta=0.95) # Other parameters to control sampling behavior.
+)
+run.time <- proc.time() - begin.time
+rm(begin.time)
+
+# Check convergence and parameter recovery.
+
+# Replace here the model to check 
+fit   <- bidim_fit
+tpars <- bidim_par
+tmp   <- list()
+
+tmp$beta    <- summary(fit, pars = "beta")$summary
+tmp$theta   <- summary(fit, pars = "theta")$summary
+tmp$lambda  <- summary(fit, pars = "lambda")$summary
+
+betapars  <- paste0("beta[", rep(c(1, ceiling(I / 2), I), each = 3), 
+                    ",", rep(c(1, ceiling(K / 2), K - 1), times = 3), "]")
+thetapars <- paste0("theta[", ceiling(unname(quantile(1:nT, 
+                                                      probs = seq(0, 1, length.out = 9)))), 
+                    "]")
+
+mcmc_rhat(rhat(fit))
+
+traceplot(fit, pars = betapars, inc_warmup = FALSE)
+traceplot(fit, pars = thetapars, inc_warmup = FALSE)
+traceplot(fit, pars = "lambda", inc_warmup = FALSE)
+
+plot(c(t(tpars$thresholds[, 1:M])), tmp$beta[, 1], pch = 20,
+     xlab = "True beta",
+     ylab = "Estimated beta",
+     xlim = c(-3.5, 3.5),
+     ylim = c(-5, 5),
+     main = paste0("Thresholds; cor = ", 
+                   round(cor(c(t(tpars$thresholds[, 1:M])), tmp$beta[, 1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+segments(x0  = c(t(tpars$thresholds)), 
+         y0  = tmp$beta[, 4], 
+         y1  = tmp$beta[, 8],
+         col = rgb(0, 0, 0, 0.25))
+
+plot(tpars$lambda, tmp$lambda[, 1], xlim = c(0, 1), ylim = c(0,1), pch = 16,
+     ylab = "Estimated Autoregressive Effect", xlab = "True Autoregressive Effect")
+abline(0, 1, col = 2, lwd = 2)
+segments(x0  = tpars$lambda,
+         y0  = tmp$lambda[, 4],
+         y1  = tmp$lambda[, 8],
+         col = rgb(0, 0, 0, 0.25))
+
+# for bidim use tpars$theta[, 1], tpars$theta[, 2], or apply(tpars$theta, 1, mean)
+plot(tpars$theta[, 2], type = "l", ylim = c(-3, 3), ylab = "Theta")
+polygon(c(1:nT, rev(1:nT)),
+        c(tmp$theta[, 4], rev(tmp$theta[, 8])),
+        border = NA,
+        col = rgb(1, 0, 0, 0.25))
+lines(tmp$theta[, 1], col = "red", lwd = 1)
+
+rm(tmp, tpars, fit, betapars, thetapars)
+
 # 3. Compute the PPMC methods ----
+par(mfrow = c(2, 3))
+ppc.itcor(arpcm_fit, arpcm_stan, method = "polyserial", quiet =TRUE)
+ppc.itcor(bidim_fit, bidim_stan, method = "polyserial", quiet =TRUE)
 
-ppc.itcor(fit, standata, method = "polyserial", quiet =TRUE)
-ppc.itcor2(fit, standata, method = "polyserial", quiet =TRUE)
-ppc.itcor3(fit, standata, quiet =TRUE)
+ppc.itcor2(arpcm_fit, arpcm_stan, method = "polyserial", quiet =TRUE)
+ppc.itcor2(bidim_fit, bidim_stan, method = "polyserial", quiet =TRUE)
 
+ppc.itcor3(arpcm_fit, arpcm_stan, quiet =TRUE)
+ppc.itcor3(bidim_fit, bidim_stan, quiet =TRUE)
+
+dev.off()
 # END ----
