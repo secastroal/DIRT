@@ -1,7 +1,7 @@
 # Dynamic Item Response Theory (DIRT)
 
 ## Description
-This project aims to develop polytomous item response theory models suitable to analyze intensive longitudinal psychological data. In particular, we are extending the partial credit model in order to analyze multivariate time series data (i.e., N = 1).
+This project aims to develop polytomous item response theory models suitable to analyze intensive longitudinal psychological data. In particular, we are extending the partial credit model in order to analyze multivariate time series data (i.e., N = 1). We aim to model nonlinear trends. Because of this, the latent variable is modeled via a time varying autoregressive model.
 
 ## Folders and Files Description
 This repository contains the main files needed to fit the dynamic item response theory models that we have developed and tested. Output files from the simulation studies (preliminary and final) are also available. The most important files and folders are: 
