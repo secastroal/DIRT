@@ -89,7 +89,7 @@ plot.IIF <- function(object, data, range = c(-5, 5), item_labels = NULL,
   }
   
   if (type == "TIF") {
-    plot(theta, rowSums(Info), type = "l", ylim =c(0, max(rowSums(Info)) + 0.5),
+    plot(theta, rowSums(Info), type = "l",
          ylab = "Information",
          xlab = expression(theta[t]),
          main = "Test Information Function", ...)

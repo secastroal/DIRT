@@ -2,6 +2,7 @@
 
 library(mirt)
 source("R/IRT_models.R")
+source("R/IRT_plots.R")
 library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores()-1)
@@ -327,12 +328,9 @@ sum.pcm <- list()
 sum.pcm$beta    <- summary(fit.pcm, pars = "beta")$summary
 sum.pcm$theta   <- summary(fit.pcm, pars = "theta")$summary
 
+# Plot true vs. estimated thresholds
 plot(c(thresholds), c(ltm.pcm.items[, 1:(K - 1)]), pch = 4, ylim = c(-2.3, 1.7), xlim = c(-2.3, 1.7), 
      main = paste0("Thresholds; cor = ", round(cor(c(thresholds), c(ltm.pcm.items[, 1:(K - 1)])), 3)))
-abline(0, 1, col = 2, lwd = 2)
-
-plot(theta, ltm.pcm.theta, pch = 4, 
-     main = paste0("Thetas; cor = ", round(cor(theta, ltm.pcm.theta), 3)))
 abline(0, 1, col = 2, lwd = 2)
 
 plot(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1], pch = 4, ylim = c(-2.3, 1.7), xlim = c(-2.3, 1.7),
@@ -342,18 +340,26 @@ segments(x0 = c(t(thresholds[, 1:M])),
          y0 = sum.pcm$beta[, 4],
          y1 = sum.pcm$beta[, 8])
 
+# Plot true vs. estimated thetas
+plot(theta, ltm.pcm.theta, pch = 4, 
+     main = paste0("Thetas; cor = ", round(cor(theta, ltm.pcm.theta), 3)))
+abline(0, 1, col = 2, lwd = 2)
+
 plot(theta, sum.pcm$theta[, 1], pch = 4, 
      main = paste0("Thetas; cor = ", round(cor(theta, sum.pcm$theta[, 1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
 
+# Plot ICCs
 plot(ltm.pcm, zrange = c(-3, 3)) # ICCs ltm
 plot.ICC(fit.pcm, standata, range = c(-3, 3), quiet = TRUE)
 
+# Plot IIFs
 plot(ltm.pcm, type = "IIC", zrange = c(-3, 3))
 plot.IIF(fit.pcm, standata, range = c(-3, 3), type = "IIF")
 
-plot(ltm.pcm, type = "IIC", zrange = c(-3, 3), items = 0)
-plot.IIF(fit.pcm, standata, range = c(-3, 3), type = "TIF")
+# Plot TIF
+plot(ltm.pcm, type = "IIC", ylim = c(0, 11), zrange = c(-3, 3), items = 0)
+plot.IIF(fit.pcm, standata, ylim = c(0, 11), range = c(-3, 3), type = "TIF")
 
 rm(list = setdiff(ls(), lsf.str()))
 
