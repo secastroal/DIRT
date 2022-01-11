@@ -217,11 +217,11 @@ alpha <- rep(1, I)
 
 # Thresholds
 thresholds <- t(apply(matrix(runif(I * M, .3, 1), I), 1, cumsum))
-thresholds <- -(thresholds - rowMeans(thresholds))
+thresholds <- thresholds - rowMeans(thresholds)
 thresholds <- thresholds + rnorm(I)
-thresholds <- thresholds * -1
 #JT# I wonder why you multiplied by -1 twice above? The code would be fine without it, I think.
-#SCA# Yes the code is fine without it.
+#SCA# Yes the code is fine without it. This happened because I partially recycled 
+#SCA# the code used to simulate the thresholds parameters of the GRM (lines 101-110).
 
 # Location
 delta <- rowMeans(thresholds)
