@@ -1,3 +1,6 @@
+# These functions to simulate IRT models were written by Jorge Tendeiro for the 
+# package GGUM.
+
 # IRT models to simulate data.
 P.GRM <- function(C, IP, theta)
 {

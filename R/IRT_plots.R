@@ -1,5 +1,7 @@
-
-plot.ICC <- function(object, data, range = c(-5, 5), item_labels = NULL, quiet = FALSE, ...) {
+#JT# Please offer the option to only plot the ICCs for the desired items.
+#JT# I actually wanted to plot one item at a time, to compare with ltm's ICCs.
+plot.ICC <- function(object, data, range = c(-5, 5), items = NULL, 
+                     item_labels = NULL, quiet = FALSE, ...) {
   
   tmp      <- list()
   tmp$beta <- summary(object, pars = "beta")$summary
@@ -10,6 +12,10 @@ plot.ICC <- function(object, data, range = c(-5, 5), item_labels = NULL, quiet =
   
   if (is.null(item_labels)) {
     item_labels <- paste0("It", 1:I) 
+  }
+  
+  if (is.null(items)) {
+    items <- 1:I
   }
   
   theta <- seq(range[1], range[2], length = 300)
@@ -29,13 +35,13 @@ plot.ICC <- function(object, data, range = c(-5, 5), item_labels = NULL, quiet =
                                      M     = M)
   }
     
-  for (i in 1:I) {
+  for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
-    matplot(theta, probs.array[, i, ], type = "l", 
+    matplot(theta, probs.array[, items[i], ], type = "l", 
             ylim = c(0, 1), lty = 1, 
             ylab = expression(paste("P(", X[i], "|", theta[t], ")")), 
             xlab = expression(theta[t]),
-            main = paste0("Item ", i, ": ", item_labels[i]), ...)
+            main = paste0("Item ", items[i], ": ", item_labels[items[i]]), ...)
   } 
 }
 

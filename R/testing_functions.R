@@ -220,6 +220,8 @@ thresholds <- t(apply(matrix(runif(I * M, .3, 1), I), 1, cumsum))
 thresholds <- -(thresholds - rowMeans(thresholds))
 thresholds <- thresholds + rnorm(I)
 thresholds <- thresholds * -1
+#JT# I wonder why you multiplied by -1 twice above? The code would be fine without it, I think.
+#SCA# Yes the code is fine without it.
 
 # Location
 delta <- rowMeans(thresholds)
@@ -237,6 +239,8 @@ gen.data.pcm      <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 
 colnames(gen.data.pcm) <- paste0("It", 1:I)
 
 # Fit PCM via ML
+# This way of fitting the pcm in mirt uses the 'classical' parameterization (i.e., 
+# threshold parameters).
 mirt.pcm <- mirt(gen.data.pcm, model = 1, itemtype = "Rasch", SE = TRUE)
 mirt.pcm.items <- coef(mirt.pcm, IRTpars = TRUE, simplify = TRUE)
 items.low <- unlist(lapply(coef(mirt.pcm, IRTpars = TRUE), function(x) x[2, -1]))[-41]
@@ -277,10 +281,11 @@ plot(theta, mirt.pcm.theta, pch = 4,
      main = paste0("Thetas; cor = ", round(cor(theta, mirt.pcm.theta), 3)))
 abline(0, 1, col = 2, lwd = 2)
 
-plot(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1], pch = 4, ylim = c(-2.3, 1.7), xlim = c(-2.3, 1.7),
-     main = paste0("Discrimination; cor = ", round(cor(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1]), 3)))
+#JT# Below, no need to use the [, 1:M] bits, as you use all columns anyway.
+plot(c(t(thresholds)), sum.pcm$beta[, 1], pch = 4, ylim = c(-2.3, 1.7), xlim = c(-2.3, 1.7),
+     main = paste0("Thresholds; cor = ", round(cor(c(t(thresholds)), sum.pcm$beta[, 1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
-segments(x0 = c(t(thresholds[, 1:M])),
+segments(x0 = c(t(thresholds)),
          y0 = sum.pcm$beta[, 4],
          y1 = sum.pcm$beta[, 8])
 
@@ -293,6 +298,7 @@ abline(0, 1, col = 2, lwd = 2)
 detach("package:mirt")
 library(ltm)
 
+# gpcm function in ltm also uses the 'classical' parameterization.
 ltm.pcm <- gpcm(gen.data.pcm + 1, constraint = "rasch", IRT.param = TRUE)
 ltm.pcm.items <- coef(ltm.pcm)
 ltm.pcm.theta <- factor.scores(ltm.pcm, resp.patterns = gen.data.pcm + 1)
@@ -333,10 +339,12 @@ plot(c(thresholds), c(ltm.pcm.items[, 1:(K - 1)]), pch = 4, ylim = c(-2.3, 1.7),
      main = paste0("Thresholds; cor = ", round(cor(c(thresholds), c(ltm.pcm.items[, 1:(K - 1)])), 3)))
 abline(0, 1, col = 2, lwd = 2)
 
-plot(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1], pch = 4, ylim = c(-2.3, 1.7), xlim = c(-2.3, 1.7),
-     main = paste0("Discrimination; cor = ", round(cor(c(t(thresholds[, 1:M])), sum.pcm$beta[, 1]), 3)))
+#JT# Again, no need for the [, 1:M] bits.
+#JT# The title in 'main' below should be Thresholds.
+plot(c(t(thresholds)), sum.pcm$beta[, 1], pch = 4, ylim = c(-2.3, 1.7), xlim = c(-2.3, 1.7),
+     main = paste0("Thresholds; cor = ", round(cor(c(t(thresholds)), sum.pcm$beta[, 1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
-segments(x0 = c(t(thresholds[, 1:M])),
+segments(x0 = c(t(thresholds)),
          y0 = sum.pcm$beta[, 4],
          y1 = sum.pcm$beta[, 8])
 
@@ -349,9 +357,27 @@ plot(theta, sum.pcm$theta[, 1], pch = 4,
      main = paste0("Thetas; cor = ", round(cor(theta, sum.pcm$theta[, 1]), 3)))
 abline(0, 1, col = 2, lwd = 2)
 
+#JT# For the ICCs below, I am sure that the ltm and Stan ones will be very close.
+#JT# It's only because all the item parameters estimated from both are very similar, 
+#JT# as you showed above.
+#JT# To reinforce that, instead of plotting 
+#JT#     true parameter vs ltm estimated parameter
+#JT# or
+#JT#     true parameter vs Stan estimated parameter
+#JT# you should plot
+#JT#     ltm estimated parameter vs Stan estimated parameter.
+#JT#
+plot(c(ltm.pcm.items[, 1:(K - 1)]), c(matrix(sum.pcm$beta[, 1], 10, 4, byrow=T)), 
+     pch = 4, main = paste0("Thresholds; cor = ", round(cor(c(ltm.pcm.items[, 1:(K - 1)]), c(matrix(sum.pcm$beta[, 1], 10, 4, byrow=T))), 3)))
+abline(0, 1, col = 2, lwd = 2)
+#JT#
+plot(ltm.pcm.theta, sum.pcm$theta[, 1], 
+     pch = 4, main = paste0("Thetas; cor = ", round(cor(ltm.pcm.theta, sum.pcm$theta[, 1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+
 # Plot ICCs
-plot(ltm.pcm, zrange = c(-3, 3)) # ICCs ltm
-plot.ICC(fit.pcm, standata, range = c(-3, 3), quiet = TRUE)
+plot(ltm.pcm, zrange = c(-3, 3), items = 1) # ICCs ltm
+plot.ICC(fit.pcm, standata, range = c(-3, 3), quiet = TRUE, items = 1)
 
 # Plot IIFs
 plot(ltm.pcm, type = "IIC", zrange = c(-3, 3))
