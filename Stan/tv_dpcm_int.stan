@@ -126,20 +126,20 @@ model {
 }
 
 generated quantities {
-   // int rep_y[N_obs];      // posterior simulation
-   // vector[N_obs] log_lik; // pointwise loglikelihood
+   int rep_y[N_obs];      // posterior simulation
+   vector[N_obs] log_lik; // pointwise loglikelihood
    vector[nT] attractor;  // attractor
    real p_var;            // variance of the process 
    
-   // for (n in 1:N_obs) {
-   //   vector[K] prob;
-   //   prob[1] = 0;
-   //   for (k in 2:K) {
-   //     prob[k] = (k - 1) * theta[tt_obs[n]] - betasum[ii_obs[n], k - 1];
-   //   }
-   //   rep_y[n] = categorical_logit_rng(prob);      
-   //   log_lik[n] = categorical_logit_lpmf(y_obs[n] | prob);
-   // }
+   for (n in 1:N_obs) {
+     vector[K] prob;
+     prob[1] = 0;
+     for (k in 2:K) {
+       prob[k] = (k - 1) * theta[tt_obs[n]] - betasum[ii_obs[n], k - 1];
+     }
+     rep_y[n] = categorical_logit_rng(prob);
+     log_lik[n] = categorical_logit_lpmf(y_obs[n] | prob);
+   }
    
    attractor = tv_int / (1 - lambda);
    p_var     = sigma2 / (1 - square(lambda));

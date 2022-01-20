@@ -16,7 +16,7 @@ library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 library(bayesplot)
-library("splines")
+library(splines)
 
 # Load required functions
 source("R/IRT_models.R")
@@ -48,7 +48,7 @@ n_basis  <- n_knots + s_degree - 1 # Compute number of basis.
 N.timepoints <- c(200)                # Number of timepoints
 N.items      <- c(6)                  # Number of items 
 S.lambda     <- c(0.25, 0.5)          # Size of the autoregressive effect
-M.prop       <- c(0)                  # Proportion of missing values
+M.prop       <- c(0, 0.15)            # Proportion of missing values
 
 Cond        <- expand.grid(N.timepoints, N.items, S.lambda, M.prop)
 names(Cond) <- c("nT", "I", "lambda", "NAprop")
@@ -73,7 +73,7 @@ args <- commandArgs(trailingOnly = TRUE)
 
 outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multicombine = TRUE) %:%
   foreach(r = args[3]:args[4], .combine = 'comb', .multicombine = TRUE, 
-          .packages = c("rstan", "bayesplot")) %dopar% {
+          .packages = c("rstan", "bayesplot", "splines")) %dopar% {
             
             # Define manipulated factors and seed
             nT     <- Cond[cond, 1]
@@ -261,18 +261,18 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
             sigma2.rbias2 <- round(sum.fit$sigma2[, 1] / in_var, 4)
             
             # coverage
-            beta.cover   <-  sum(sum.fit$beta[, 4] <= c(t(thresholds)) & 
-                                   c(t(thresholds)) <= sum.fit$beta[, 8]) / (I * M)
-            theta.cover  <-  sum(sum.fit$theta[, 4] <= theta &
-                                   theta <= sum.fit$theta[, 8]) / nT
-            attra.cover  <-  sum(sum.fit$attractor[, 4] <= attractor &
-                                   attractor <= sum.fit$attractor[, 8]) / nT
-            pvar.cover  <-  sum(sum.fit$p_var[, 4] <= p_var &
-                                   p_var <= sum.fit$p_var[, 8])
-            lambda.cover <-  sum(sum.fit$lambda[, 4] <= lambda & 
-                                   lambda <= sum.fit$lambda[, 8])
-            sigma2.cover <-  sum(sum.fit$sigma2[, 4] <= in_var & 
-                                   in_var <= sum.fit$sigma2[, 8])
+            beta.cover   <-  round(sum(sum.fit$beta[, 4] <= c(t(thresholds)) & 
+                                   c(t(thresholds)) <= sum.fit$beta[, 8]) / (I * M), 4)
+            theta.cover  <-  round(sum(sum.fit$theta[, 4] <= theta &
+                                   theta <= sum.fit$theta[, 8]) / nT, 4)
+            attra.cover  <-  round(sum(sum.fit$attractor[, 4] <= attractor &
+                                   attractor <= sum.fit$attractor[, 8]) / nT, 4)
+            pvar.cover   <-  round(sum(sum.fit$p_var[, 4] <= p_var &
+                                   p_var <= sum.fit$p_var[, 8]), 4)
+            lambda.cover <-  round(sum(sum.fit$lambda[, 4] <= lambda & 
+                                   lambda <= sum.fit$lambda[, 8]), 4)
+            sigma2.cover <-  round(sum(sum.fit$sigma2[, 4] <= in_var & 
+                                   in_var <= sum.fit$sigma2[, 8]), 4)
             
             # Conditional to check whether the mcmc algorithm is reliable (convergence and reasonable estimates)
             if (nRhat != 0   | ndiv != 0 | length(nbfmi) != 0) {
