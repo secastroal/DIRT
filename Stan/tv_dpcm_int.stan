@@ -75,18 +75,19 @@ transformed parameters {
   real sigma;             // innovations sd 
   
   // compute time varying intercepts based on the B-splines
-  // a = a_raw*tau;
+   a = a_raw*tau;
   // for penalized splines use:
-  a[1] = a_raw[1];
-  for (s in 2:n_basis) {
-   a[s] = a[s-1] + a_raw[s] * tau;
-  }
+  // a[1] = a_raw[1];
+  // for (s in 2:n_basis) {
+  //  a[s] = a[s-1] + a_raw[s] * tau;
+  // }
   tv_int = a0 * to_vector(time) + to_vector(a * B);
   
   // compute thetas
   // first theta is just the first innovation #!# Discuss with JN and LB
-  theta[1] = inno[1];
-  //theta[1] = tv_int[1] + inno[1];
+  // theta[1] = inno[1];
+  // theta[1] = tv_int[1] + inno[1];
+  theta[1] = tv_int[1]/(1 - lambda) + inno[1];
   
   for (t in 2:nT) {
     theta[t] = tv_int[t] + lambda * theta[t - 1] + inno[t];

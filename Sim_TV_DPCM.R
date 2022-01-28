@@ -187,6 +187,7 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                             chains  = 3,                      # Number of chains.
                             warmup  = 1000,                   # Burn-in samples.
                             init    = tvdpcm_inits,
+                            seed = seed,
                             pars = c("beta", "theta", "lambda",
                                      "sigma2", "p_var", "attractor"),
                             control = list(adapt_delta=0.95)) # Other parameters to control sampling behavior.
