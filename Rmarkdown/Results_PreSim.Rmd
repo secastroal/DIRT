@@ -29,7 +29,7 @@ library(plyr)
 ```
 
 ```{r settings}
-model_version <- "v6"
+model_version <- "v3_td15"
 
 bnw <- FALSE
 if (bnw) {
@@ -54,14 +54,15 @@ Cond        <- expand.grid(N_timepoints, N_items, S_lambda, M_prop)
 names(Cond) <- c("nT", "I", "lambda", "NAprop")
 ```
 
-This document presents the results of preliminary simulations of the time-varying dynamic partial credit model (TV-DPCM). The TV-DPCM combines the partial credit model [@Masters2016] with the time-varying vector autoregressive model [@Bringmann2017]. We implemented the model within the Bayesian framework in Stan. In particular, the model tested in this document defines the first $\theta_{1}$ in the transformed parameter block as `r ifelse(model_version %in% c("v1", "v4"), "$\\theta_{1} = \\varepsilon_{1}$", ifelse(model_version %in% c("v2", "v5"), "$\\theta_{1} = \\beta_{0,1} + \\varepsilon_{1}$", "$\\theta_{1} = \\beta_{0,1}/(1 - \\varphi) + \\varepsilon_{1}$"))` and uses `r ifelse(model_version %in% c("v1", "v2", "v3"), "non penalized", "penalized")` splines to model the time-varying intercept.
+This document presents the results of preliminary simulations of the time-varying dynamic partial credit model (TV-DPCM). The TV-DPCM combines the partial credit model [@Masters2016] with the time-varying vector autoregressive model [@Bringmann2017]. We implemented the model within the Bayesian framework in Stan. In particular, the model tested in this document defines the first $\theta_{1}$ in the transformed parameter block as `r ifelse(substr(model_version, 1, 2) %in% c("v1", "v4"), "$\\theta_{1} = \\varepsilon_{1}$", ifelse(substr(model_version, 1, 2) %in% c("v2", "v5"), "$\\theta_{1} = \\beta_{0,1} + \\varepsilon_{1}$", "$\\theta_{1} = \\beta_{0,1}/(1 - \\varphi) + \\varepsilon_{1}$"))` and uses `r ifelse(substr(model_version, 1, 2) %in% c("v1", "v2", "v3"), "non penalized", "penalized")` splines to model the time-varying intercept.
 
 The small simulation consists of a 2 $\times$ 2 design, in which we manipulated the number of time points (200 and 300) and the size of the autoregressive effect (0.25 and 0.5). Other factors such as, the number of items (6), response categories (5), and knots used to generate the time-varying intercepts (4) were fixed across the conditions. Conditions with missing data were not considered. Regarding the MCMC algorithm, the analyses were run with 3 parallel chains each with 2000 iterations half of which were burn in and thinning of 1. Moreover, we increased the `r cat("adapt_delta")` parameter of the Hamiltonian algorithm to 0.95 to facilitate convergence. Lastly, we ran 24 replications for each condition for a total of `r 24*nrow(Cond)` analyses.
 
 # Results' Summary
 
 ```{r}
-files <- paste0("../Simulation/Sim_TV_DPCM_", model_version, "_cond_", 1:nrow(Cond), ".txt")
+files <- paste0("../Simulation/Sim_TV_DPCM_", model_version, 
+                "_cond_", 1:nrow(Cond), ".txt")
 
 tmp <- lapply(files, function(x) read.table(file = x, header = TRUE))
 
