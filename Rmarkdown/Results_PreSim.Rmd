@@ -1,0 +1,393 @@
+---
+title: "Results Preliminary Simulations of the TV-DPCM"
+author: "Sebastian Castro-Alvarez"
+date: "`r format(Sys.Date(), '%B %d del %Y')`"
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{float}
+  - \usepackage{amsmath}
+output: 
+  bookdown::pdf_document2:
+    toc: false
+bibliography: references.bib
+csl: apa7.csl
+link-citations: true
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(kableExtra)
+knitr::opts_chunk$set(echo = FALSE, fig.height = 4, fig.width = 6, fig.pos = "!H",  
+                      warning=FALSE, message=FALSE)
+
+library(plyr)
+#render("Rmarkdown/Results_PreSim.Rmd", output_file = paste0("Results_PreSim_", model_version))
+```
+
+```{r settings}
+model_version <- "v6"
+
+bnw <- FALSE
+if (bnw) {
+        color_plot <- gray((0:1)/7)
+}else{
+        color_plot <- rainbow(7)
+}
+
+yaxis <- matrix(rep(c(TRUE, FALSE), times = c(2, 4)), ncol = 3)
+xaxis <- matrix(rep(c(FALSE, TRUE), each = 3), ncol = 3, byrow = TRUE)
+laxis <- matrix(FALSE, ncol = 3, nrow = 2)
+laxis[1, 3] <- TRUE
+```
+
+```{r conditions}
+N_timepoints <- c(200, 300)     # Number of timepoints
+N_items      <- c(6)            # Number of items 
+S_lambda     <- c(0.25, 0.5)    # Size of the autoregressive effect
+M_prop       <- c(0)            # Proportion of missing values
+
+Cond        <- expand.grid(N_timepoints, N_items, S_lambda, M_prop)
+names(Cond) <- c("nT", "I", "lambda", "NAprop")
+```
+
+This document presents the results of preliminary simulations of the time-varying dynamic partial credit model (TV-DPCM). The TV-DPCM combines the partial credit model [@Masters2016] with the time-varying vector autoregressive model [@Bringmann2017]. We implemented the model within the Bayesian framework in Stan. In particular, the model tested in this document defines the first $\theta_{1}$ in the transformed parameter block as `r ifelse(model_version %in% c("v1", "v4"), "$\\theta_{1} = \\varepsilon_{1}$", ifelse(model_version %in% c("v2", "v5"), "$\\theta_{1} = \\beta_{0,1} + \\varepsilon_{1}$", "$\\theta_{1} = \\beta_{0,1}/(1 - \\varphi) + \\varepsilon_{1}$"))` and uses `r ifelse(model_version %in% c("v1", "v2", "v3"), "non penalized", "penalized")` splines to model the time-varying intercept.
+
+The small simulation consists of a 2 $\times$ 2 design, in which we manipulated the number of time points (200 and 300) and the size of the autoregressive effect (0.25 and 0.5). Other factors such as, the number of items (6), response categories (5), and knots used to generate the time-varying intercepts (4) were fixed across the conditions. Conditions with missing data were not considered. Regarding the MCMC algorithm, the analyses were run with 3 parallel chains each with 2000 iterations half of which were burn in and thinning of 1. Moreover, we increased the `r cat("adapt_delta")` parameter of the Hamiltonian algorithm to 0.95 to facilitate convergence. Lastly, we ran 24 replications for each condition for a total of `r 24*nrow(Cond)` analyses.
+
+# Results' Summary
+
+```{r}
+files <- paste0("../Simulation/Sim_TV_DPCM_", model_version, "_cond_", 1:nrow(Cond), ".txt")
+
+tmp <- lapply(files, function(x) read.table(file = x, header = TRUE))
+
+results <- ldply(tmp, data.frame)
+
+rm(files, tmp)
+```
+
+To run the simulation, we used the cluster computer facilities at the University of Groningen (Peregrine HPC cluster). Hence, the analyses were run in parallel on a 24 cores node. In total, the computing time was `r round(sum(results$run.time)/3600, 1)` hours across all the replications and conditions, which was reduced to `r round(sum(results$run.time)/3600/24, 1)` hours in real time due to the parallel computing.
+
+## Convergence and Efficiency
+
+When doing Bayesian estimation, the convergence of the algorithm is always a concern. To assess convergence, it is common to use visual checks such as the traceplots and autocorrelation plots or statistics such as the Gelman-Rubin statistic, also known as $\hat{R}$. To check for convergence issues in the simulation, we relied on the warning messages from Stan. A summary of the warnings in Stan can be found [here](https://mc-stan.org/misc/warnings.html). These warnings highlight convergence and efficiency problems during the estimation. In general, we considered that an analysis did not converge if there were any $\hat{R}$ larger than 1.05, any divergent transition after warmup, or any Bayesian Fraction of Missing Information that was too low. On the other hand, the other warning messages do not necessarily imply that the analyses did not converge but they indicate that the estimation was inefficient. These warning messages might indicate that the maximum treedepth was exceeded or that the bulk or tail effective sample sizes were too low. If an analysis had these warning messages, then we considered that the results were reliable but the estimation was inefficient.
+
+Figure \@ref(fig:convplot) shows the number of replications that diverged, that were inefficient, and that ended successfully.
+
+```{r conv}
+n_div <- tapply(results$corrupt, results$cond, sum)
+
+# Exclude divergent analyses
+results_conv <- results[results$corrupt == 0, ]
+n_eff <- tapply(results_conv$efficiency, results_conv$cond, sum)
+
+# Count divergent, inefficient, and successful analyses
+
+performance <- ifelse(results$corrupt == 1, "Divergent", 
+                      ifelse(results$corrupt == 0 & results$efficiency == 1, 
+                             "Inefficient", "Successful"))
+
+counts <- table(performance, results$cond)
+```
+
+
+```{r convplot, results='hide', fig.cap="Number of replications that diverged, were inefficient, and ended succesfully per condition."}
+par(oma = c(0, 0, 0, 5))
+
+barplot(counts[, c(1, 3, 2, 4)], space = c(0, 0.2, 1, 0.2),
+        xlab="", legend.text = TRUE, ylim = c(0, 25),
+        names.arg = c(0.25, 0.5, 0.25, 0.5), col = color_plot,
+        ylab = "Number of Replications",
+        args.legend = list(x = "right", xpd = NA, inset = -0.3))
+
+mtext(c("200", "300"), 1, line = 2.5, at = c(1.1, 4.3))
+mtext("AR Effect", 1, line = 1, at = 0, adj = 1)
+mtext("Time Points", 1, line = 2.5, at = 0, adj = 1)
+```
+
+\newpage
+
+## Parameters Recovery
+
+To assess how accurate the model is at recovering the parameters, we looked into the correlation between the true and estimated parameters, the absolute bias, and the coverage. Next, we present the results for each set of parameters, which are: The thresholds parameters, the latent state disposition at each time point, the attractor (time varying mean of the dynamic process), the autoregressive effect, and the variance of the innovation.
+
+### Thresholds
+
+Figure \@ref(fig:thresholdplot) presents the average correlation, absolute bias, and C.I. coverage of the threshold parameters per condition. The lines in the plot show the 2.5% and the 97.5% percentiles of each condition.
+
+```{r thresholdplot, results='hide', fig.cap="Recovery of the threshold parameters across conditions."}
+
+par(mfrow = c(3, 1), mar = c(0.25, 4.1, 0.25, 2.1), oma = c(5.1, 0, 1.1, 0), xpd = NA)
+
+tmp_mean <- tapply(results_conv$beta.cor, results_conv$cond, mean)
+tmp_up   <- tapply(results_conv$beta.cor, results_conv$cond, 
+                   quantile, probs = 0.975)
+tmp_down <- tapply(results_conv$beta.cor, results_conv$cond, 
+                   quantile, probs = 0.025)
+
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(min(tmp_down) - 0.1, 1), xlab = "", ylab = "Correlation", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+segments(x0 = rep(1:2, 2) + rep(c(0, 0.1), each = 2),
+         y0 = tmp_down,
+         y1 = tmp_up,
+         lwd = 2, col = rep(color_plot, each  = 2))
+
+tmp_mean <- tapply(results_conv$beta.abbias, results_conv$cond, mean)
+tmp_up   <- tapply(results_conv$beta.abbias, results_conv$cond, 
+                   quantile, probs = 0.975)
+tmp_down <- tapply(results_conv$beta.abbias, results_conv$cond, 
+                   quantile, probs = 0.025)
+
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(0, max(tmp_up) + 0.1), xlab = "", ylab = "Ab. Bias", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+segments(x0 = rep(1:2, 2) + rep(c(0, 0.1), each = 2),
+         y0 = tmp_down,
+         y1 = tmp_up,
+         lwd = 2, col = rep(color_plot, each  = 2))
+
+tmp_mean <- tapply(results_conv$beta.cover, results_conv$cond, mean)
+tmp_up   <- tapply(results_conv$beta.cover, results_conv$cond, 
+                   quantile, probs = 0.975)
+tmp_down <- tapply(results_conv$beta.cover, results_conv$cond, 
+                   quantile, probs = 0.025)
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(0, 1), xlab = "", ylab = "C.I. Coverage", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+segments(x0 = rep(1:2, 2) + rep(c(0, 0.1), each = 2),
+         y0 = tmp_down,
+         y1 = tmp_up,
+         lwd = 2, col = rep(color_plot, each  = 2))
+
+axis(1, at = 1:2, labels = N_timepoints)
+legend("bottom", legend = c(expression(paste(phi, " = 0.25")), 
+                              expression(paste(phi, " = 0.5"))),
+       col = color_plot, lty = 1, lwd = 2, seg.len = 2)
+mtext("Number of Time Points", 1, outer = TRUE, line = 2.5)
+```
+
+\newpage
+
+### Latent State Disposition
+
+Similarly, Figure \@ref(fig:thetaplot) shows the averages of the selected measures of the $\theta$ parameters, namely, the latent state dispositions at each time points.
+
+```{r thetaplot, results='hide', fig.cap="Recovery of the latent state disposition parameters across conditions."}
+
+par(mfrow = c(3, 1), mar = c(0.25, 4.1, 0.25, 2.1), oma = c(5.1, 0, 1.1, 0), xpd = NA)
+
+tmp_mean <- tapply(results_conv$theta.cor, results_conv$cond, mean)
+tmp_up   <- tapply(results_conv$theta.cor, results_conv$cond, 
+                   quantile, probs = 0.975)
+tmp_down <- tapply(results_conv$theta.cor, results_conv$cond, 
+                   quantile, probs = 0.025)
+
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(min(tmp_down) - 0.1, 1), xlab = "", ylab = "Correlation", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+segments(x0 = rep(1:2, 2) + rep(c(0, 0.1), each = 2),
+         y0 = tmp_down,
+         y1 = tmp_up,
+         lwd = 2, col = rep(color_plot, each  = 2))
+
+tmp_mean <- tapply(results_conv$theta.abbias, results_conv$cond, mean)
+tmp_up   <- tapply(results_conv$theta.abbias, results_conv$cond, 
+                   quantile, probs = 0.975)
+tmp_down <- tapply(results_conv$theta.abbias, results_conv$cond, 
+                   quantile, probs = 0.025)
+
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(0, max(tmp_up) + 0.1), xlab = "", ylab = "Ab. Bias", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+segments(x0 = rep(1:2, 2) + rep(c(0, 0.1), each = 2),
+         y0 = tmp_down,
+         y1 = tmp_up,
+         lwd = 2, col = rep(color_plot, each  = 2))
+
+tmp_mean <- tapply(results_conv$theta.cover, results_conv$cond, mean)
+tmp_up   <- tapply(results_conv$theta.cover, results_conv$cond, 
+                   quantile, probs = 0.975)
+tmp_down <- tapply(results_conv$theta.cover, results_conv$cond, 
+                   quantile, probs = 0.025)
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(0, 1), xlab = "", ylab = "C.I. Coverage", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+segments(x0 = rep(1:2, 2) + rep(c(0, 0.1), each = 2),
+         y0 = tmp_down,
+         y1 = tmp_up,
+         lwd = 2, col = rep(color_plot, each  = 2))
+
+axis(1, at = 1:2, labels = N_timepoints)
+legend("bottom", legend = c(expression(paste(phi, " = 0.25")), 
+                              expression(paste(phi, " = 0.5"))),
+       col = color_plot, lty = 1, lwd = 2, seg.len = 2)
+mtext("Number of Time Points", 1, outer = TRUE, line = 2.5)
+```
+
+\newpage
+
+### Attractor
+
+Figure \@ref(fig:attraplot) presents the averages of the selected measures of the attractor. The attractor is the time varying mean of the dynamic process that is computed based on the time varying intercept and the autoregressive effect. Basically, the attractor is the nonlinear trend that describes the dynamic process.
+
+```{r attraplot, results='hide', fig.cap="Recovery of the attractor across conditions."}
+
+par(mfrow = c(3, 1), mar = c(0.25, 4.1, 0.25, 2.1), oma = c(5.1, 0, 1.1, 0), xpd = NA)
+
+tmp_mean <- tapply(results_conv$attra.cor, results_conv$cond, mean)
+tmp_up   <- tapply(results_conv$attra.cor, results_conv$cond, 
+                   quantile, probs = 0.975)
+tmp_down <- tapply(results_conv$attra.cor, results_conv$cond, 
+                   quantile, probs = 0.025)
+
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(min(tmp_down) - 0.1, 1), xlab = "", ylab = "Correlation", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+segments(x0 = rep(1:2, 2) + rep(c(0, 0.1), each = 2),
+         y0 = tmp_down,
+         y1 = tmp_up,
+         lwd = 2, col = rep(color_plot, each  = 2))
+
+tmp_mean <- tapply(results_conv$attra.abbias, results_conv$cond, mean)
+tmp_up   <- tapply(results_conv$attra.abbias, results_conv$cond, 
+                   quantile, probs = 0.975)
+tmp_down <- tapply(results_conv$attra.abbias, results_conv$cond, 
+                   quantile, probs = 0.025)
+
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(0, max(tmp_up) + 0.1), xlab = "", ylab = "Ab. Bias", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+segments(x0 = rep(1:2, 2) + rep(c(0, 0.1), each = 2),
+         y0 = tmp_down,
+         y1 = tmp_up,
+         lwd = 2, col = rep(color_plot, each  = 2))
+
+tmp_mean <- tapply(results_conv$attra.cover, results_conv$cond, mean)
+tmp_up   <- tapply(results_conv$attra.cover, results_conv$cond, 
+                   quantile, probs = 0.975)
+tmp_down <- tapply(results_conv$attra.cover, results_conv$cond, 
+                   quantile, probs = 0.025)
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(0, 1), xlab = "", ylab = "C.I. Coverage", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+segments(x0 = rep(1:2, 2) + rep(c(0, 0.1), each = 2),
+         y0 = tmp_down,
+         y1 = tmp_up,
+         lwd = 2, col = rep(color_plot, each  = 2))
+
+axis(1, at = 1:2, labels = N_timepoints)
+legend("bottom", legend = c(expression(paste(phi, " = 0.25")), 
+                              expression(paste(phi, " = 0.5"))),
+       col = color_plot, lty = 1, lwd = 2, seg.len = 2)
+mtext("Number of Time Points", 1, outer = TRUE, line = 2.5)
+```
+
+\newpage
+
+### Autoregressive Effect
+
+Figure \@ref(fig:arplot) only presents the average absolute bias and C.I. coverage of the autoregressive effect per condition.
+
+```{r arplot, results='hide', fig.cap="Recovery of the autoregressive parameter across conditions."}
+
+par(mfrow = c(2, 1), mar = c(0.25, 4.1, 0.25, 2.1), oma = c(5.1, 0, 1.1, 0), xpd = NA)
+
+tmp_mean <- tapply(results_conv$lambda.abbias, results_conv$cond, mean)
+tmp_up   <- tapply(results_conv$lambda.abbias, results_conv$cond, 
+                   quantile, probs = 0.975)
+tmp_down <- tapply(results_conv$lambda.abbias, results_conv$cond, 
+                   quantile, probs = 0.025)
+
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(0, max(tmp_up) + 0.1), xlab = "", ylab = "Ab. Bias", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+segments(x0 = rep(1:2, 2) + rep(c(0, 0.1), each = 2),
+         y0 = tmp_down,
+         y1 = tmp_up,
+         lwd = 2, col = rep(color_plot, each  = 2))
+
+tmp_mean <- tapply(results_conv$lambda.cover, results_conv$cond, mean)
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(0, 1), xlab = "", ylab = "C.I. Coverage", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+
+axis(1, at = 1:2, labels = N_timepoints)
+legend("bottom", legend = c(expression(paste(phi, " = 0.25")), 
+                              expression(paste(phi, " = 0.5"))),
+       col = color_plot, lty = 1, lwd = 2, seg.len = 2)
+mtext("Number of Time Points", 1, outer = TRUE, line = 2.5)
+```
+
+\newpage
+
+### Variance of the Innovation
+
+Figure \@ref(fig:invarplot) also only shows the average absolute bias and C.I. coverage of the variance of the innovations per condition.
+
+```{r invarplot, results='hide', fig.cap="Recovery of the variance of the innovations across conditions."}
+
+par(mfrow = c(2, 1), mar = c(0.25, 4.1, 0.25, 2.1), oma = c(5.1, 0, 1.1, 0), xpd = NA)
+
+tmp_mean <- tapply(results_conv$sigma2.abbias, results_conv$cond, mean)
+tmp_up   <- tapply(results_conv$sigma2.abbias, results_conv$cond, 
+                   quantile, probs = 0.975)
+tmp_down <- tapply(results_conv$sigma2.abbias, results_conv$cond, 
+                   quantile, probs = 0.025)
+
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(0, max(tmp_up) + 0.1), xlab = "", ylab = "Ab. Bias", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+segments(x0 = rep(1:2, 2) + rep(c(0, 0.1), each = 2),
+         y0 = tmp_down,
+         y1 = tmp_up,
+         lwd = 2, col = rep(color_plot, each  = 2))
+
+tmp_mean <- tapply(results_conv$sigma2.cover, results_conv$cond, mean)
+plot(rep(1:2, 2) + rep(c(0, 0.1), each = 2), 
+     tmp_mean, 
+     type = "p", pch = 19, col = rep(color_plot, each  = 2), 
+     ylim = c(0, 1), xlab = "", ylab = "C.I. Coverage", 
+     xaxt = "n", xlim = c(0.85, 2.15), las = 1)
+
+axis(1, at = 1:2, labels = N_timepoints)
+legend("bottom", legend = c(expression(paste(phi, " = 0.25")), 
+                              expression(paste(phi, " = 0.5"))),
+       col = color_plot, lty = 1, lwd = 2, seg.len = 2)
+mtext("Number of Time Points", 1, outer = TRUE, line = 2.5)
+```
+
+\newpage
+
+# References
+
+
+
