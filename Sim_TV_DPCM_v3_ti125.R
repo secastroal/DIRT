@@ -405,7 +405,7 @@ for (i in args[1]:args[2]) {
                      "sigma2.cover",
                      "corrupt",
                      "efficiency")
-  write.table(tmp, file = paste0(getwd(), "/Simulation/Sim_TV_DPCM_v3_td12_cond_", i, ".txt"),
+  write.table(tmp, file = paste0(getwd(), "/Simulation/Sim_TV_DPCM_v3_ti125_cond_", i, ".txt"),
               col.names = TRUE, row.names = FALSE, quote = FALSE)
   rm(tmp)
 }
