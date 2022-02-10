@@ -20,7 +20,7 @@ library(splines)
 
 # Load required functions
 source("R/IRT_models.R")
-source("R/IRT_plots.R")
+#source("R/IRT_plots.R")
 
 # Create folder to save output
 if (!dir.exists(paste(getwd(), "Simulation", sep = "/"))) {
@@ -58,7 +58,7 @@ rm(N.timepoints, N.items, S.lambda, M.prop)
 # Compile the model
 # To run the simulation we commented out the generated quantities block to 
 # reduce memory usage.
-model <- stan_model(file = "Stan/tv_dpcm_int.stan", verbose = FALSE)
+model <- stan_model(file = "Stan/tv_dpcm_int_v5.stan", verbose = FALSE)
 
 # 2.0 Run simulation ----
 
@@ -88,16 +88,8 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
             # True states
             time <- 1:nT
             
-            # Create the b-splines within the time interval.
-            B_true <- t(bs(time, df = n_basis, degree = s_degree, intercept = TRUE))
-            
-            # Define intercept and coefficients to generate the time-varying 
-            # intercept based on the b-splines.
-            a0 <- 0                    # intercept
-            a  <- rnorm(n_basis, 0, 1) # coefficients of B-splines
-            
-            # Compute time-varying intercept based on time and b-splines. 
-            tv_int <- as.vector(a0 * time + a %*% B_true)
+            # Create time varying intercept with s-shape growth
+            tv_int <- 2 * (exp(0.05 * (x - nT/2))/( 1 + exp(0.05 * (x - nT/2)))) - 1
             
             # Repeat lambda
             tv_lambda <- rep(lambda, nT)
@@ -405,7 +397,7 @@ for (i in args[1]:args[2]) {
                      "sigma2.cover",
                      "corrupt",
                      "efficiency")
-  write.table(tmp, file = paste0(getwd(), "/Simulation/Sim_TV_DPCM_cond_", i, ".txt"),
+  write.table(tmp, file = paste0(getwd(), "/Simulation/Sim_TV_DPCM_v5_log_cond_", i, ".txt"),
               col.names = TRUE, row.names = FALSE, quote = FALSE)
   rm(tmp)
 }
