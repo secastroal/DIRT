@@ -89,7 +89,7 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
             time <- 1:nT
             
             # Create time varying intercept with s-shape growth
-            tv_int <- 4 * (exp(0.05 * (x - nT/2))/( 1 + exp(0.05 * (x - nT/2)))) - 2
+            tv_int <- 4 * (exp(0.05 * (time - nT/2))/( 1 + exp(0.05 * (time - nT/2)))) - 2
             
             # Repeat lambda
             tv_lambda <- rep(lambda, nT)
