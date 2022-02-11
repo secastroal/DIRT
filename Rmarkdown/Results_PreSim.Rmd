@@ -29,7 +29,7 @@ library(plyr)
 ```
 
 ```{r settings}
-model_version <- "v2_ti125"
+model_version <- "v5_sin"
 
 bnw <- FALSE
 if (bnw) {

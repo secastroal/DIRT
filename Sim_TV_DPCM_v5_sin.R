@@ -331,7 +331,7 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                              corrupt,
                              efficiency))
             rm(standata, fit, sum.fit, thresholds, delta, taus, theta, responses,
-               B_true, a, a0, attractor, knots, tv_lambda, tv_int, time,
+               attractor, knots, tv_lambda, tv_int, time,
                run.time, p_var, nT, naprop, lambda, I, cond, r, seed,
                ndiv, nbfmi, ntree, nbulk, ntail, stan.diag, maxRhat, nRhat, 
                beta.cor, beta.bias, beta.abbias, beta.rmse, beta.rbias, beta.rbias2,
