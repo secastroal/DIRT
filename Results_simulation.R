@@ -41,8 +41,8 @@ laxis[1, 3] <- TRUE
 # 1.0 Read output files ----
 
 # Read output files into R
-grm_files <- paste0(getwd(), "/Simulation/Sim_AR_GRM_cond_", 1:72, ".txt")
-pcm_files <- paste0(getwd(), "/Simulation/Sim_AR_PCM_cond_", 1:72, ".txt")
+grm_files <- paste0(getwd(), "/Simulation/Results_Simulation_AR_IRT_30_09_2021/Sim_AR_GRM_cond_", 1:72, ".txt")
+pcm_files <- paste0(getwd(), "/Simulation/Results_Simulation_AR_IRT_30_09_2021/Sim_AR_PCM_cond_", 1:72, ".txt")
 
 data_grm <- lapply(grm_files, function(x) read.table(file = x, header = TRUE))
 data_pcm <- lapply(pcm_files, function(x) read.table(file = x, header = TRUE))
