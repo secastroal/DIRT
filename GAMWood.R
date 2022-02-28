@@ -276,32 +276,80 @@ plot(fit$fitted, trees$Volume, xlab = "Fitted volume",
      ylab = "Observed volume")
 am.plot(fit, xlab = c("Girth", "Height"), 
         ylab = c("s(Girth)", "s(Height)"))
+dev.off()
 
+# Introducing package mgcv
+rm(list = ls())
+library(mgcv)
+data(trees)
+par(mfrow = c(1, 2))
+ct1 <-  gam(Volume ~ s(Height) + s(Girth),
+            family = Gamma(link = "log"), data = trees)
+plot(ct1, residuals = TRUE)
 
+ct2 <- gam(Volume ~ s(Height, bs = "cr") + s(Girth, bs = "cr"),
+           family = Gamma(link = "log"), data = trees)
+plot(ct2, residuals = TRUE)
 
-theta <- rnorm(1)
-K <- 10e5
-beta  <- sort(rnorm(K))
-beta  <- beta - mean(beta)
+ct3 <- gam(Volume ~ s(Height) + s(Girth, bs = "cr", k = 20),
+           family = Gamma(link = "log"), data = trees)
+plot(ct3, residuals = TRUE)
 
+ct4 <- gam(Volume ~ s(Height) + s(Girth),
+           family = Gamma(link = "log"), data = trees, gamma = 1.4)
+plot(ct4, residuals = TRUE)
 
+# Using different kind of smoothers.
+ct5 <- gam(Volume ~ s(Height, Girth, k =  25),
+           family = Gamma(link = "log"), data = trees)
+plot(ct5, too.far = 0.15)
 
-system.time({
-  cumbeta <- cumsum(beta)
-  
-  probs <- rep(NA, K+1)
-probs[1] <- 0
-for (i in 2:(K + 1)) {
-  probs[i] <- (i - 1) * theta - cumbeta[i - 1]
-}}
-)
+ct6 <- gam(Volume ~ te(Height, Girth, k =  5),
+           family = Gamma(link = "log"), data = trees)
+plot(ct6, too.far = 0.15)
 
-system.time(probs2 <- c(0, cumsum(theta - beta)))
+# Combining smoothers and parametric models.
 
-all.equal(probs, probs2)
+trees$Hclass <-  factor(floor(trees$Height / 10) - 5,
+                        labels = c("small", "medium", "large"))
 
+ct7 <- gam(Volume ~ Hclass + s(Girth),
+           family = Gamma(link = "log"), data = trees)
+plot(ct7, all.terms = TRUE)
 
+anova(ct7)
+AIC(ct7)
+summary(ct7)
 
+# Exercises Chapter 4 ----
+# 1.
 
+set.seed(1)
+x <- sort(runif(40) * 10) ^ 0.5
+y <- sort(runif(40)) ^ 0.1
 
+p5  <- lm(y ~ poly(x, 5))
+p10 <- lm(y ~ poly(x, 10))
 
+x.predict <- data.frame(x = seq(min(x), max(x), length.out = 200))
+xp5  <- predict(p5, x.predict)
+xp10 <- predict(p10, x.predict)
+
+## spline fits ...
+sb <- function(x,xk) { abs(x-xk)^3}
+q  <- 11
+xk <- ((1:(q-2)/(q-1))*10)^.5
+## lazy person's formula construction ...
+form <- paste("sb(x,xk[",1:(q-2),"])",sep="",collapse="+")
+form <- paste("y~x+",form)
+cs   <- lm(formula(form))
+
+xcs <- predict(cs, x.predict)
+
+par(mfrow = c(1, 1))
+plot(x, y)
+lines(x.predict[, 1], xp5, col = "orange")
+lines(x.predict[, 1], xp10, col = "red")
+lines(x.predict[, 1], xcs, col = "darkgreen")
+
+# Chapter 5 ----

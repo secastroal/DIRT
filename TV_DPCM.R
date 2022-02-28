@@ -105,7 +105,7 @@ rm(probs.array, y)
 # model <- stan_model(file = "Stan/ar_irt_pcm_na.stan", verbose = FALSE)
 # model <- stan_model(file = "Stan/ar_irt_pcm_na_free.stan", verbose = FALSE)
 # model <- stan_model(file = "Stan/splines_irt_pcm_long.stan", verbose = FALSE)
-model <- stan_model(file = "Stan/tv_dpcm_int.stan", verbose = FALSE)
+model <- stan_model(file = "Stan/tv_dpcm_int_v7.stan", verbose = FALSE)
 # model <- stan_model(file = "Stan/tv_dpcm_slo.stan", verbose = FALSE)
 
 # standata <- list(num_data      = nT, 
@@ -156,6 +156,7 @@ fit <- sampling(model,                            # Stan model.
                 chains  = 3,                      # Number of chains.
                 warmup  = 1000,                   # Burn-in samples.
                 init    = arpcm_inits,
+                seed    = 123,
                 #pars = c("beta", "theta", "lambda"),
                 control = list(adapt_delta=0.95)) # Other parameters to control sampling behavior.
 run.time <- proc.time() - begin.time
