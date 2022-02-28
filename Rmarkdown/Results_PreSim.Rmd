@@ -20,6 +20,7 @@ always_allow_html: true
 
 ```{r setup, include=FALSE}
 library(knitr)
+library(bookdown)
 library(kableExtra)
 knitr::opts_chunk$set(echo = FALSE, fig.height = 4, fig.width = 6, fig.pos = "!H",  
                       warning=FALSE, message=FALSE)
