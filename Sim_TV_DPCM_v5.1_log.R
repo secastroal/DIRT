@@ -58,7 +58,7 @@ rm(N.timepoints, N.items, S.lambda, M.prop)
 # Compile the model
 # To run the simulation we commented out the generated quantities block to 
 # reduce memory usage.
-model <- stan_model(file = "Stan/tv_dpcm_int_v9.stan", verbose = FALSE)
+model <- stan_model(file = "Stan/tv_dpcm_int_v5.1.stan", verbose = FALSE)
 
 # 2.0 Run simulation ----
 
@@ -88,8 +88,8 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
             # True states
             time <- 1:nT
             
-            # Create time-invariant intercept as linear growth 
-            tv_int <- seq(-1, 1, length.out = nT)
+            # Create time varying intercept with s-shape growth
+            tv_int <- 2 * (exp(0.05 * (time - nT/2))/( 1 + exp(0.05 * (time - nT/2)))) - 1
             
             # Repeat lambda
             tv_lambda <- rep(lambda, nT)
@@ -172,36 +172,19 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                    sigma2 = rlnorm(1, 1))
             }
 
-            
-            out <- matrix(NA, nrow = 5, ncol = 4)
-            
-            ii <- 1
-            repeat {
-              begin.time <- proc.time()
-              fit <- sampling(model,                            # Stan model. 
-                              data = standata,                  # Data.
-                              iter = 2000,                      # Number of iterations.
-                              chains  = 3,                      # Number of chains.
-                              warmup  = 1000,                   # Burn-in samples.
-                              init    = tvdpcm_inits,
-                              seed = seed + ii,
-                              #pars = c("beta", "theta", "lambda",
-                              #         "sigma2", "p_var", "attractor"),
-                              control = list(adapt_delta=0.95)) # Other parameters to control sampling behavior.
-              run.time <- proc.time() - begin.time
-              rm(begin.time)
-              
-              cat("\nThis is try number ", ii, ", which took ", round(run.time[3]), " seconds to run.\n\n")
-              
-              out[ii, ] <- c(round(run.time[3]), get_num_divergent(fit), 
-                             get_num_max_treedepth(fit), sum(rhat(fit) > 1.05))
-              ii <-  ii + 1
-              if (ii == 6) {break}
-            }
-            
-            pairs(fit, pars = c("a0", "a_raw[5]", "inno[50]", "beta[1, 3]",
-                                "lambda", "tau", "sigma2", "lp__"), 
-                  log = TRUE, las = 1)
+            begin.time <- proc.time()
+            fit <- sampling(model,                            # Stan model. 
+                            data = standata,                  # Data.
+                            iter = 2000,                      # Number of iterations.
+                            chains  = 3,                      # Number of chains.
+                            warmup  = 1000,                   # Burn-in samples.
+                            init    = tvdpcm_inits,
+                            seed = seed,
+                            pars = c("beta", "theta", "lambda",
+                                     "sigma2", "p_var", "attractor"),
+                            control = list(adapt_delta=0.95)) # Other parameters to control sampling behavior.
+            run.time <- proc.time() - begin.time
+            rm(begin.time)
             
             # Extract stan results ----
             sum.fit <- list()
@@ -414,7 +397,7 @@ for (i in args[1]:args[2]) {
                      "sigma2.cover",
                      "corrupt",
                      "efficiency")
-  write.table(tmp, file = paste0(getwd(), "/Simulation/Sim_TV_DPCM_v5_lin_cond_", i, ".txt"),
+  write.table(tmp, file = paste0(getwd(), "/Simulation/Sim_TV_DPCM_v5.1_log_cond_", i, ".txt"),
               col.names = TRUE, row.names = FALSE, quote = FALSE)
   rm(tmp)
 }
