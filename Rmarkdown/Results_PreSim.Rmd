@@ -30,7 +30,7 @@ library(plyr)
 ```
 
 ```{r settings}
-model_version <- "v2_ti125"
+model_version <- "v5.1_sin"
 
 bnw <- FALSE
 if (bnw) {
@@ -94,6 +94,13 @@ performance <- ifelse(results$corrupt == 1, "Divergent",
                              "Inefficient", "Successful"))
 
 counts <- table(performance, results$cond)
+
+if (nrow(counts) != 3) {
+  compl_names <- c("Divergent", "Inefficient", "Successful")
+  counts <- rbind(counts, matrix(0, nrow = 3 - nrow(counts), ncol = ncol(Cond)))
+  row.names(counts)[which(row.names(counts) == "")] <- setdiff(compl_names, row.names(counts))
+  counts <- counts[match(compl_names, row.names(counts)), ]
+}
 ```
 
 
