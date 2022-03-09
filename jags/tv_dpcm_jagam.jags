@@ -1,0 +1,66 @@
+model {
+  
+  ## Data likelihood
+  for (n in 1:N) {
+  y[n] ~ dcat(prob[n, 1:K])
+  }
+  
+  ## Generated quantities
+  
+  attractor <- mu / (1 - lambda)
+  p_var     <- sigma2/(1 - pow(lambda, 2))
+  
+  ## Computing probabilties
+  
+  for (n in 1:N) {
+    for (k in 1:K) {
+      eta[n, k]     <- theta[tt[n]] - beta[ii[n], k]
+      psum[n, k]    <- sum(eta[n, 1:k])
+      exp_sum[n, k] <- exp(psum[n, k])
+      prob[n, k]    <- exp_sum[n, k] / sum(exp_sum[n, 1:K])
+    }
+  }
+  
+  ## Creating theta based on a tv-ar model (with time varying intercept)
+  
+  for (t in 2:nT) {
+    theta[t] ~ dnorm(mu[t] + lambda * theta[t - 1], pr_inno)
+  }
+  
+  theta[1] ~ dnorm(mu[1], pr_inno) 
+  
+  mu <- X %*% alpha 
+  
+  sigma2 <- 1/pr_inno
+  
+  ## Priors
+  
+  # Penalized prior for the splines slopes
+  alpha[2:n_basis] ~ dmnorm(zero[2:n_basis], K1)
+  
+  K1 <- S[1:(n_basis - 1), 1:(n_basis - 1)] * phi[1] + S[1:(n_basis - 1), n_basis:(2 * n_basis - 2)] * phi[2]
+  
+  alpha[1] ~ dnorm(0.0, 0.01)
+  
+  # smoothing parameter priors
+  for (i in 1:2) {
+    phi[i] ~ dgamma(.05,.005)
+    rho[i] <- log(phi[i])
+  }
+  
+  # Autoregressive effect
+  lambda ~ dunif(-1, 1)
+  
+  # pr_inno is the precision of the innovations (i.e., inverse of the variance) 
+  pr_inno ~ dgamma(.05, .005)
+  
+  # Threshold parameters
+  for (i in 1:I) {
+    beta[i, 1] <- 0
+    for (k in 2:K) {
+      beta[i, k] ~ dnorm(0.0, 1.0)
+    }
+  }
+  
+}
+# End model

@@ -353,3 +353,20 @@ lines(x.predict[, 1], xp10, col = "red")
 lines(x.predict[, 1], xcs, col = "darkgreen")
 
 # Chapter 5 ----
+
+# JAGAM ----
+
+library(mgcv)
+
+y  <- sort(rnorm(300))
+x0 <- seq(-2, 2, length.out = 300)
+
+dat <- data.frame(y, x0)
+
+jd <- jagam(y ~ s(x0, bs = "bs", m = c(3, 1)) - 1, data = dat,
+            family = gaussian(link=identity), file = "jags/test.jags")
+matplot(x0, jd$jags.data$X, type = "l", lty = 1, col = rainbow(9))
+round(rowSums(jd$jags.data$X), 2)
+round(rowSums(abs(jd$jags.data$X)), 2)
+str(jd$jags.data)
+str(jd$jags.ini)
