@@ -30,7 +30,7 @@ library(plyr)
 ```
 
 ```{r settings}
-model_version <- "v5.1_sin"
+model_version <- "v5.1_log99_td15"
 
 bnw <- FALSE
 if (bnw) {

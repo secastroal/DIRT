@@ -1,5 +1,6 @@
+# tvdpcm2jags_data ----
 # function to create the data list for the tv-dpcm jags models with different 
-# smooth functions
+# smooth functions (tv_dpcm_jagam.jags)
 
 # The required arguments are: A matrix of responses resp, the number of items,
 # the number of response categories, the time variable as numeric (integers), 
@@ -17,7 +18,7 @@ tvdpcm2jags_data <- function(resp, I, K, time, n_basis, bs = c("bs", "ps", "tp")
   tmp <- data.frame(theta, time)
   
   # Write formula with smooth term
-  gp <- interpret.gam(formula(theta ~ s(time, bs = bs, k = n_basis)))
+  gp <- mgcv::interpret.gam(formula(theta ~ s(time, bs = bs, k = n_basis)))
   
   # replicate code form jagam to be able to use gam.setup
   # using default values of jagam and gam.setup
@@ -52,14 +53,45 @@ tvdpcm2jags_data <- function(resp, I, K, time, n_basis, bs = c("bs", "ps", "tp")
   out$I       <- I
   out$K       <- K
   out$nT      <- nT
-  out$N       <- length(c(responses))
+  out$N       <- length(c(resp))
   out$n_basis <- n_basis
   out$ii      <- rep(1:I, each = nT)
   out$tt      <- rep(1:nT, times = I)
   out$X       <- G$X
   out$S       <- cbind(G$smooth[[1]]$S[[1]], G$smooth[[1]]$S[[2]])
   out$zero    <- rep(0, n_basis)
-  out$y       <- c(responses)
+  out$y       <- c(resp)
+  
+  return(out)
+}
+
+# tvdpcm2jags_data2 ----
+
+# function to create the data list for the tv_dpcm.jags model.
+
+# The arguments are: The matrix resp with the responses, the number of items I,
+# the number of response categories K, the time variable (integers), the number
+# of basis functions n_basis, and the degree of the B-splines s_degree.
+tvdpcm2jags_data2 <- function(resp, I, K, time, n_basis, s_degree){
+  # Get the number of time points
+  nT <- length(time)
+  
+  # Create the basis functions given the number of basis and the degree of the 
+  # splines
+  
+  X <- splines::bs(time, df = n_basis, degree = s_degree, intercept = TRUE)
+  
+  out <- list()
+  
+  out$I       <- I
+  out$K       <- K
+  out$nT      <- nT
+  out$N       <- length(c(resp))
+  out$n_basis <- n_basis
+  out$ii      <- rep(1:I, each = nT)
+  out$tt      <- rep(1:nT, times = I)
+  out$X       <- X
+  out$y       <- c(resp)
   
   return(out)
 }

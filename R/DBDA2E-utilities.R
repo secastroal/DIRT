@@ -8,38 +8,38 @@
 
 #------------------------------------------------------------------------------
 
-bookInfo = "Kruschke, J. K. (2015). Doing Bayesian Data Analysis, Second Edition:\nA Tutorial with R, JAGS, and Stan. Academic Press / Elsevier."
-bannerBreak = "\n*********************************************************************\n"
-cat(paste0(bannerBreak,bookInfo,bannerBreak,"\n"))
+# bookInfo = "Kruschke, J. K. (2015). Doing Bayesian Data Analysis, Second Edition:\nA Tutorial with R, JAGS, and Stan. Academic Press / Elsevier."
+# bannerBreak = "\n*********************************************************************\n"
+# cat(paste0(bannerBreak,bookInfo,bannerBreak,"\n"))
 
 #------------------------------------------------------------------------------
 # Check that required packages are installed:
-want = c("parallel","rjags","runjags","compute.es")
-have = want %in% rownames(installed.packages())
-if ( any(!have) ) { install.packages( want[!have] ) }
-
-# Load rjags. Assumes JAGS is already installed.
-try( library(rjags) )
-# Load runjags. Assumes JAGS is already installed.
-try( library(runjags) )
-try( runjags.options( inits.warning=FALSE , rng.warning=FALSE ) )
-
-# set default number of chains and parallelness for MCMC:
-library(parallel) # for detectCores().
-nCores = detectCores() 
-if ( !is.finite(nCores) ) { nCores = 1 } 
-if ( nCores > 4 ) { 
-  nChainsDefault = 4  # because JAGS has only 4 rng's.
-  runjagsMethodDefault = "parallel"
-}
-if ( nCores == 4 ) { 
-  nChainsDefault = 3  # save 1 core for other processes.
-  runjagsMethodDefault = "parallel"
-}
-if ( nCores < 4 ) { 
-  nChainsDefault = 3 
-  runjagsMethodDefault = "rjags" # NOT parallel
-}
+# want = c("parallel","rjags","runjags","compute.es")
+# have = want %in% rownames(installed.packages())
+# if ( any(!have) ) { install.packages( want[!have] ) }
+# 
+# # Load rjags. Assumes JAGS is already installed.
+# try( library(rjags) )
+# # Load runjags. Assumes JAGS is already installed.
+# try( library(runjags) )
+# try( runjags.options( inits.warning=FALSE , rng.warning=FALSE ) )
+# 
+# # set default number of chains and parallelness for MCMC:
+# library(parallel) # for detectCores().
+# nCores = detectCores() 
+# if ( !is.finite(nCores) ) { nCores = 1 } 
+# if ( nCores > 4 ) { 
+#   nChainsDefault = 4  # because JAGS has only 4 rng's.
+#   runjagsMethodDefault = "parallel"
+# }
+# if ( nCores == 4 ) { 
+#   nChainsDefault = 3  # save 1 core for other processes.
+#   runjagsMethodDefault = "parallel"
+# }
+# if ( nCores < 4 ) { 
+#   nChainsDefault = 3 
+#   runjagsMethodDefault = "rjags" # NOT parallel
+# }
 
 #------------------------------------------------------------------------------
 # Functions for opening and saving graphics that operate the same for 

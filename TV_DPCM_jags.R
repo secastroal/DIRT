@@ -6,7 +6,7 @@ library(runjags)
 
 # Load required functions
 source("R/IRT_models.R")
-source("DBDA/DBDA2E-utilities.R")
+source("R/DBDA2E-utilities.R")
 
 # Generate data ----
 nT       <- 200  # Number of time points
@@ -76,24 +76,12 @@ n_knots  <- 8  # Define number of knots.
 s_degree <- 3  # Define degree of splines.
 n_basis  <- n_knots + s_degree - 1 # Compute number of basis.
 
-X <- bs(time, df = n_basis, 
-        degree = s_degree, intercept = TRUE)
-
-y  <- c(responses)
-tt <- rep(1:nT, times = I)
-ii <- rep(1:I, each = nT)
-N  <- length(y)
-
-jags_data <- list(I = I,
-                  K = K,
-                  nT = nT,
-                  N = N,
-                  n_basis = n_basis,
-                  ii = ii,
-                  tt = tt,
-                  X = X,
-                  y = y
-                  )
+jags_data <- tvdpcm2jags_data2(responses,
+                               I = I,
+                               K = K,
+                               time     = time, 
+                               n_basis  = n_basis,
+                               s_degree = s_degree)
 
 j.inits <- function() {
   list(lambda    = runif(1, -1, 1),
