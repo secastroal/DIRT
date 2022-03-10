@@ -1,0 +1,585 @@
+---
+title: "The Time-Varying Dynamic Partial Credit Model in Stan and JAGS"
+author: "Sebastian Castro-Alvarez"
+date: "`r format(Sys.Date(), '%B %d del %Y')`"
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{float}
+  - \usepackage{amsmath}
+output: 
+  bookdown::pdf_document2:
+    toc: false
+bibliography: references.bib
+csl: apa7.csl
+link-citations: true
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(bookdown)
+library(kableExtra)
+knitr::opts_chunk$set(echo = FALSE, fig.height = 5, fig.width = 8,  
+                      warning=FALSE, message=FALSE)
+
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+library(bayesplot)
+library(runjags)
+
+source("../R/IRT_models.R")
+source("../R/IRT_plots.R")
+source("../R/DBDA2E-utilities.R")
+source("../R/tvdpcm2stan.R")
+source("../R/tvdpcm2jags.R")
+```
+
+```{r seed}
+nT         <- 200
+n_knots    <- 8
+s_degree   <- 3
+n_basis    <- n_knots + s_degree - 1
+seed       <- 1001
+set.seed(seed)
+
+# To render, run this chunk and save to use the specified seed, number of time
+# points and number of basis in the file name.
+# render("Rmarkdown/TV-DPCM_comp.Rmd", output_file = paste0("Rmarkdown/TV-DPCM_comp_", nT, "_", n_basis, "_", seed))
+```
+
+This document fits the time-varying dynamic partial credit model with Stan and JAGS to a simulated data set. The purpose is to quickly compare if the estimates are similar in both programs.   
+
+In a nutshell, the time-varying dynamic partial credit model (TV-DPCM) combines the partial credit model [@Masters2016] and the time-varying autoregressive model [@Bringmann2017]. In this case, only the intercept of the dynamic process is allowed to vary over time. To achieve this, this parameter is modeled by means of a generalized additive model.
+
+# Data Simulation
+
+```{r fixvalues}
+I      <- 6     # Number of items
+K      <- 5     # Number of categories per item
+M      <- K - 1 # Number of thresholds per item
+lambda <- 0.5   # Size of the autoregressive effect
+in_var <- 1     # Variance of the innovations
+```
+
+Here, we simulate data based on the TV-DPCM. In particular, we simulated responses of `r I` items, each with `r K` response options, for `r nT` time points. The non linear trend was defined based on a sinusoidal function that has two peaks and two valleys across the measurement occasions. Furthermore, the true autoregressive effect was set at `r lambda` and the variance of the innovations of the dynamic process was set to `r in_var`. The time series of the sumscores are presented in \@ref(fig:data1_plot).
+
+```{r data1}
+# True states
+time <- 1:nT
+
+# Create time-varying intercept based on cosine. 
+tv_int <- cos(3 * pi * time/(nT))
+
+# Repeat lambda
+tv_lambda <- rep(lambda, nT)
+
+# Generate the latent scores theta
+theta <- rep(NA, nT)
+
+# First theta based on an stationary marginal distribution 
+# (see Bringmann et al., 2017).
+theta[1] <- rnorm(1, tv_int[1]/(1 - tv_lambda[1]), sqrt(in_var/(1 - tv_lambda[1] ^ 2)))
+
+for (t in 2:nT) {
+  theta[t] <- tv_int[t] + tv_lambda[t] * theta[t - 1] + rnorm(1, 0, sqrt(in_var))
+}
+rm(t)
+
+attractor <- tv_int / (1 - tv_lambda)
+p_var     <- in_var / (1 - lambda ^ 2)
+
+# Create item parameters
+thresholds <- t(apply(matrix(runif(I * M, .3, 1), I), 1, cumsum))
+if (M == 1) {thresholds <- t(thresholds)}
+thresholds <- thresholds - rowMeans(thresholds)
+thresholds <- thresholds + rnorm(I)
+
+# Location
+delta <- rowMeans(thresholds)
+
+# Step parameters
+taus <- thresholds - delta
+
+# Generate responses
+probs.array <- array(NA, dim = c(length(theta), I, K))
+
+for (y in 0:M) {
+  probs.array[, , y + 1] <- P.GPCM(y     = y, 
+                                   alpha = rep(1, I), 
+                                   delta = delta, 
+                                   taus  = taus, 
+                                   theta = theta, 
+                                   M     = M)
+}
+responses   <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 1, vec) == 1) - 1 })
+responses   <- responses + 1 # To fit the PCM in stan, items should be coded starting from 1. 
+rm(probs.array, y)
+
+data1 <- responses
+```
+
+```{r data1_plot}
+plot(rowSums(data1), type = "l", ylab = "sumscores", xlab = "Time",
+     las = 1, lwd = 2)
+```
+
+# Fitting the TV-DPCM in Stan
+
+```{r stan_param}
+n_chains <- 3
+n_iter   <- 2000
+n_warm   <- 1000
+
+model <- stan_model(file = "../Stan/tv_dpcm_int_v5.1.stan", verbose = FALSE)
+```
+
+First, we fit the model in Stan. In particular, our implementation in Stan uses B-spline basis to model the smooth non-linear function that defines the trend over time. Thi model is penalized by means of a random-walk prior on the coefficients of the B-spline. The following code fits the model in Stan using `r n_chains` chains and `r n_iter` iterations, where `r n_warm` iterations are used for warm-up):
+
+```{r stanfit, echo = TRUE, results = 'hide'}
+# Create data list 
+standata <- tvdpcm2stan_data(resp = responses,
+                             I    = I,
+                             K    = K,
+                             time = time,
+                             n_knots  = n_knots,
+                             s_degree = s_degree)
+# Function to initiate some parameters.
+tvdpcm_inits <- function() {
+  list(lambda = runif(1, -1, 1),
+       beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
+       inno   = rnorm(nT, 0, 3),
+       sigma  = rlnorm(1, 1))
+}
+
+# Fit model in Stan
+begin.time <- proc.time()
+fit <- sampling(model,                            # Stan model. 
+                data = standata,                  # Data.
+                iter = n_iter,                    # Number of iterations.
+                chains  = n_chains,               # Number of chains.
+                warmup  = n_warm,                 # Burn-in samples.
+                init    = tvdpcm_inits,
+                seed = seed,
+                pars = c("beta", "theta", "lambda",
+                        "sigma2", "p_var", "attractor"),
+                control = list(adapt_delta = 0.99, max_treedepth = 15)) 
+run.time <- proc.time() - begin.time
+rm(begin.time)
+```
+
+```{r diagnostics, results='hide'}
+diag  <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), warmup = 0)
+
+nRhat <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                "sigma2", "p_var", "attractor")) > 1.05)
+ndiv  <- get_num_divergent(fit)
+
+nbfmi <- length(get_low_bfmi_chains(fit))
+
+ntree <- get_num_max_treedepth(fit)
+
+nbulk <- sum(diag$Bulk_ESS < 100 * n_chains)
+ntail <- sum(diag$Tail_ESS < 100 * n_chains)
+
+
+success <- ifelse(mean(c(nRhat, ndiv, nbfmi, ntree, nbulk, ntail)) == 0, 
+                  "the estimation finished successfully without any problems.", 
+                  "there were problem during the estimation. Therefore, the estimates are not reliable.")
+
+paramplots <- c(paste0("beta[", sample(1:I, 1), ",", sample(1:M, 1), "]"),
+                paste0("theta[", sample(1:nT, 1), "]"),
+                paste0("attractor[", sample(1:nT, 1), "]"),
+                "lambda", "sigma2", "p_var")
+```
+
+## Convergence Diagnostics
+
+Fitting the model in Stan took `r round(run.time[3])` seconds running chains in parallel with a `r benchmarkme::get_cpu()$model_name` CPU. According to the convergence checks of stan, there were `r nRhat` parameters with an Rhat statistic larger than 1.05, `r ndiv` divergent transitions, `r nbfmi` transitions with a BFMI that was too low, `r ntree` transitions that exceeded the maximum tree depth, `r nbulk` parameters with a low bulk ESS, and `r ntail` parameters with a low tail ESS. This means that `r success`.   
+
+Figures \@ref(fig:rhat_plot), \@ref(fig:trace_plot), and \@ref(fig:acf_plot) present diagnostic plots for some selected parameters.
+
+```{r rhat_plot, fig.height = 7, fig.width = 4}
+  print(mcmc_rhat(rhat(fit)))
+```
+
+```{r trace_plot, fig.height = 7}
+print(traceplot(fit, 
+                pars = paramplots, 
+                  inc_warmup = FALSE))
+```
+
+```{r}
+fit.array <- as.array(fit)
+```
+
+```{r acf_plot, fig.height = 7}
+print(mcmc_acf(fit.array,
+               pars = paramplots, 
+               lags = 20))
+```
+
+\newpage
+
+## Parameters Recovery
+
+In this section, Figures \@ref(fig:thres_stan), \@ref(fig:hist_stan), and \@ref(fig:theta_stan) present the estimated parameters against the true values of the threshold parameters, the autoregressive effect, the variance of the innovations, the variance of the dynamic process, and the latent states.
+```{r}
+sum.fit <- list()
+
+sum.fit$beta   <- summary(fit, pars = "beta")$summary
+sum.fit$theta  <- summary(fit, pars = "theta")$summary
+sum.fit$lambda <- summary(fit, pars = "lambda")$summary
+sum.fit$sigma2 <- summary(fit, pars = "sigma2")$summary
+sum.fit$p_var  <- summary(fit, pars = "p_var")$summary
+sum.fit$attractor <- summary(fit, pars = "attractor")$summary
+```
+
+
+```{r thres_stan}
+plot(c(t(thresholds)), sum.fit$beta[, 1], pch = 20,
+     xlab = "True beta",
+     ylab = "Estimated beta",
+     xlim = c(-3.5, 3.5),
+     ylim = c(-5, 5),
+     main = paste0("Thresholds; cor = ", 
+                   round(cor(c(t(thresholds)), sum.fit$beta[, 1]), 3)))
+abline(0, 1, col = 2, lwd = 2)
+segments(x0 = c(t(thresholds)), 
+         y0 = sum.fit$beta[, 4], 
+         y1 = sum.fit$beta[, 8],
+         col = rgb(0, 0, 0, 0.25))
+```
+
+```{r hist_stan, fig.height = 4}
+par(mfrow = c(1, 3))
+
+hist(fit.array[, , "lambda"], freq = FALSE)
+abline(v = lambda[1], lwd = 5, col = 2)
+abline(v = sum.fit$lambda[, 1], lwd = 5, col = 1)
+lines(sum.fit$lambda[, c(4, 8)], c(0, 0), lwd = 5, col = 3)
+
+hist(fit.array[, , "sigma2"], freq = FALSE)
+abline(v = in_var, lwd = 5, col = 2)
+abline(v = sum.fit$sigma2[, 1], lwd = 5, col = 1)
+lines(sum.fit$sigma2[, c(4, 8)], c(0, 0), lwd = 5, col = 3)
+
+hist(fit.array[, , "p_var"], freq = FALSE)
+abline(v = p_var[1], lwd = 5, col = 2)
+abline(v = sum.fit$p_var[, 1], lwd = 5, col = 1)
+lines(sum.fit$p_var[, c(4, 8)], c(0, 0), lwd = 5, col = 3)
+```
+
+```{r theta_stan, fig.height = 4}
+theta_stan <- {plot(theta, pch = 20, ylim = c(-4, 4))
+               polygon(c(time, rev(time)),
+                       c(sum.fit$theta[, 4], rev(sum.fit$theta[, 8])),
+                       border = NA,
+                       col = rgb(1, 0, 0, 0.25))
+               polygon(c(time, rev(time)),
+                       c(sum.fit$attractor[, 4], rev(sum.fit$attractor[, 8])),
+                       border = NA,
+                       col = rgb(0, 0, 1, 0.15))
+               lines(time, sum.fit$theta[, 1], col = "red", lwd = 2)
+               lines(time, attractor, col = gray(0.5), lwd = 2)
+               lines(time, sum.fit$attractor[, 1], col = "blue", lwd = 2)}
+
+print(theta_stan)
+```
+
+```{r}
+rm(fit, fit.array, sum.fit, standata)
+```
+
+\newpage
+
+# Fitting the TV-DPCM in JAGS: Version 1
+
+```{r jags_param}
+n_chains  <- 3
+n_iter    <- 10000
+n_warm    <- 4000
+n_adapt   <- 1000
+n_thin    <- 15
+```
+
+Now, we fit the TV-DPCM model with JAGS. This version of the model in JAGS is exactly equal to the implementation in Stan. This means that it uses the same random walk prior to penalize the coefficients of the B-splines. In this case, we use `r nchains` chains, `r n_adapt + n_warm` iterations for warm up, `r n_iter` for sampling, and a thinning factor of `r n_thin`. We use the following code to fit the model in jags:
+
+```{r jagsfit1, echo = TRUE, results = 'hide'}
+# Create data list for JAGS
+jags_data <- tvdpcm2jags_data2(resp = responses,
+                               I    = I,
+                               K    = K,
+                               time = time, 
+                               n_basis  = n_basis,
+                               s_degree = s_degree)
+
+# run model in runjags-rjags
+t0 <- proc.time()
+fit <- run.jags(model   = "../jags/tv_dpcm.jags",
+                monitor = c("beta", "theta", "attractor",
+                            "lambda", "sigma2", "p_var"),
+                data     = jags_data,
+                method   = "rjags",
+                n.chains = n_chains,
+                adapt  = n_adapt,
+                burnin = n_warm,
+                sample = n_iter,
+                thin   = n_thin,
+                summarise = FALSE,
+                plots = FALSE)
+t1 <- proc.time() - t0
+```
+
+```{r sum_jags1}
+fit <- as.mcmc.list(fit)
+fit_sum <- summary(fit)
+```
+
+## Convergence Diagnostics
+
+```{r rhats_get1}
+rhats <- gelman.diag(fit[, dimnames(fit[[1]])[[2]][-(1:I)]], 
+                     multivariate = FALSE, 
+                     autoburnin = FALSE)
+nRhat <- sum(rhats$psrf[, 1] > 1.05)
+
+success <- ifelse(nRhat == 0,
+                  "the different chains mixed with each other and converged to an interpretable solution.",
+                  "the estimates for those parameters are not reliable given that the chains are not mixing well enough.")
+```
+
+Fitting this model in JAGS took `r round(t1[3])` seconds running chains one after the other in one core. Given the Gelman-Rubin statistics, there were `r nRhat` parameters with divergent chains. This means that `r success` The estimated Gelman-Rubin statistics are shown in Figure \@ref(fig:rhat_jags1). Furthermore, diagnostic plots for 6 selected parameters are shown in Figures \@ref(fig:diag_1_jags1) to \@ref(fig:diag_6_jags1)
+
+```{r rhat_jags1, fig.height = 7, fig.width = 4}
+print(mcmc_rhat(rhats$psrf[, 1]))
+```
+
+```{r diag_1_jags1, fig.width = 5}
+diagMCMC(fit, parName = paramplots[1])
+```
+```{r diag_2_jags1, fig.width = 5}
+diagMCMC(fit, parName = paramplots[2])
+```
+```{r diag_3_jags1, fig.width = 5}
+diagMCMC(fit, parName = paramplots[3])
+```
+```{r diag_4_jags1, fig.width = 5}
+diagMCMC(fit, parName = paramplots[4])
+```
+```{r diag_5_jags1, fig.width = 5}
+diagMCMC(fit, parName = paramplots[5])
+```
+```{r diag_6_jags1, fig.width = 5}
+diagMCMC(fit, parName = paramplots[6])
+```
+
+\newpage
+
+## Parameters Recovery
+
+Regarding the recovery of the parameters, Figures \@ref(fig:thres_jags1) to \@ref(fig:theta_jags1) present the comparison of the true parameters against the estimated parameters.
+
+```{r thres_jags1}
+plot(c(thresholds), 
+     fit_sum$statistics[grep("beta", row.names(fit_sum$statistics)), 1][-(1:6)], 
+     pch = 20,
+     xlab = "True beta",
+     ylab = "Estimated beta",
+     xlim = c(-3.5, 3.5),
+     ylim = c(-5, 5),
+     main = paste0("Thresholds; cor = ", 
+                   round(cor(c(thresholds), 
+                             fit_sum$statistics[grep("beta", row.names(fit_sum$statistics)), 1][-(1:6)]), 
+                         3)))
+abline(0, 1, col = 2, lwd = 2)
+segments(x0 = c(thresholds), 
+         y0 = fit_sum$quantiles[grep("beta", row.names(fit_sum$statistics)), 1][-(1:I)], 
+         y1 = fit_sum$quantiles[grep("beta", row.names(fit_sum$statistics)), 5][-(1:I)],
+         col = rgb(0, 0, 0, 0.25))
+
+```
+
+```{r hist_jags1, fig.height = 4}
+par(mfrow = c(1, 3))
+
+plotPost(fit[, "lambda"], cenTend = "median", xlab = "lambda",
+         compVal = lambda)
+plotPost(fit[, "sigma2"], cenTend = "median", xlab = "sigma2",
+         compVal = in_var)
+plotPost(fit[, "p_var"], cenTend = "median", xlab = "p_var",
+         compVal = p_var)
+```
+
+```{r theta_jags1, fig.height = 4}
+theta_jags1 <- {plot(theta, pch = 20, ylim =c(-4, 4))
+polygon(c(time, rev(time)),
+        c(fit_sum$quantiles[grep("theta", row.names(fit_sum$statistics)), 1], 
+          rev(fit_sum$quantiles[grep("theta", row.names(fit_sum$statistics)), 5])),
+        border = NA,
+        col = rgb(1, 0, 0, 0.25))
+polygon(c(time, rev(time)),
+        c(fit_sum$quantiles[grep("attractor", row.names(fit_sum$statistics)), 1], 
+          rev(fit_sum$quantiles[grep("attractor", row.names(fit_sum$statistics)), 5])),
+        border = NA,
+        col = rgb(0, 0, 1, 0.15))
+lines(time, fit_sum$statistics[grep("theta", row.names(fit_sum$statistics)), 1], 
+      col = "red", lwd = 2)
+lines(time, attractor, col = gray(0.5), lwd = 2)
+lines(time, fit_sum$statistics[grep("attractor", row.names(fit_sum$statistics)), 1], 
+      col = "blue", lwd = 2)
+}
+
+print(theta_jags1)
+```
+
+\newpage
+
+# Fitting the TV-DPCM in JAGS: Version 2
+
+Lastly, we fit a second version of the TV-DPCM model with JAGS. This version can use other smooth functions as provided in the R package *mgcv*. In particular, it can use following smoothers: B-splines, P-splines, or thin plate. Furthermore, the penalization is achieved by using a multivariate normal prior with a penalized covariance matrix for the coefficients of the basis functions. Here, we use the same number of chains and iterations as in the previous section and we use the thin plate smoother to create the basis functions. The code to fit this model is as follows:  
+
+```{r jagsfit2, echo = TRUE, results = 'hide'}
+# Create data list for JAGS
+jags_data <- tvdpcm2jags_data(resp = responses,
+                              I    = I,
+                              K    = K,
+                              time = time,
+                              n_basis = n_basis,
+                              bs   = "tp")
+
+# run model in runjags-rjags
+t0 <- proc.time()
+fit <- run.jags(model   = "../jags/tv_dpcm_jagam.jags",
+                monitor = c("beta", "theta", "attractor",
+                            "lambda", "sigma2", "p_var"),
+                data     = jags_data,
+                method   = "rjags",
+                n.chains = n_chains,
+                adapt  = n_adapt,
+                burnin = n_warm,
+                sample = n_iter,
+                thin   = n_thin,
+                summarise = FALSE,
+                plots = FALSE)
+t1 <- proc.time() - t0
+```
+
+```{r sum_jags1}
+fit <- as.mcmc.list(fit)
+fit_sum <- summary(fit)
+```
+
+## Convergence Diagnostics
+
+```{r rhats_get2}
+rhats <- gelman.diag(fit[, dimnames(fit[[1]])[[2]][-(1:I)]], 
+                     multivariate = FALSE, 
+                     autoburnin = FALSE)
+nRhat <- sum(rhats$psrf[, 1] > 1.05)
+
+success <- ifelse(nRhat == 0,
+                  "the different chains mixed with each other and converged to an interpretable solution.",
+                  "the estimates for those parameters are not reliable given that the chains are not mixing well enough.")
+```
+
+Fitting this model in JAGS took `r round(t1[3])` seconds running chains one after the other in one core. Given the Gelman-Rubin statistics, there were `r nRhat` parameters with divergent chains. This means that `r success` The estimated Gelman-Rubin statistics are shown in Figure \@ref(fig:rhat_jags2). Furthermore, diagnostic plots for 6 selected parameters are shown in Figures \@ref(fig:diag_1_jags2) to \@ref(fig:diag_6_jags2)
+
+```{r rhat_jags2, fig.height = 7, fig.width = 4}
+print(mcmc_rhat(rhats$psrf[, 1]))
+```
+
+```{r diag_1_jags2, fig.width = 5}
+diagMCMC(fit, parName = paramplots[1])
+```
+```{r diag_2_jags2, fig.width = 5}
+diagMCMC(fit, parName = paramplots[2])
+```
+```{r diag_3_jags2, fig.width = 5}
+diagMCMC(fit, parName = paramplots[3])
+```
+```{r diag_4_jags2, fig.width = 5}
+diagMCMC(fit, parName = paramplots[4])
+```
+```{r diag_5_jags2, fig.width = 5}
+diagMCMC(fit, parName = paramplots[5])
+```
+```{r diag_6_jags2, fig.width = 5}
+diagMCMC(fit, parName = paramplots[6])
+```
+
+\newpage
+
+## Parameters Recovery
+
+Just as in the previous JAGS fit, the recovery of the parameters is shown in Figures \@ref(fig:thres_jags2) to \@ref(fig:theta_jags2).
+
+```{r thres_jags2}
+plot(c(thresholds), 
+     fit_sum$statistics[grep("beta", row.names(fit_sum$statistics)), 1][-(1:6)], 
+     pch = 20,
+     xlab = "True beta",
+     ylab = "Estimated beta",
+     xlim = c(-3.5, 3.5),
+     ylim = c(-5, 5),
+     main = paste0("Thresholds; cor = ", 
+                   round(cor(c(thresholds), 
+                             fit_sum$statistics[grep("beta", row.names(fit_sum$statistics)), 1][-(1:6)]), 
+                         3)))
+abline(0, 1, col = 2, lwd = 2)
+segments(x0 = c(thresholds), 
+         y0 = fit_sum$quantiles[grep("beta", row.names(fit_sum$statistics)), 1][-(1:I)], 
+         y1 = fit_sum$quantiles[grep("beta", row.names(fit_sum$statistics)), 5][-(1:I)],
+         col = rgb(0, 0, 0, 0.25))
+
+```
+
+```{r hist_jags2, fig.height = 4}
+par(mfrow = c(1, 3))
+
+plotPost(fit[, "lambda"], cenTend = "median", xlab = "lambda",
+         compVal = lambda)
+plotPost(fit[, "sigma2"], cenTend = "median", xlab = "sigma2",
+         compVal = in_var)
+plotPost(fit[, "p_var"], cenTend = "median", xlab = "p_var",
+         compVal = p_var)
+```
+
+```{r theta_jags2, fig.height = 4}
+theta_jags2 <- {plot(theta, pch = 20, ylim =c(-4, 4))
+polygon(c(time, rev(time)),
+        c(fit_sum$quantiles[grep("theta", row.names(fit_sum$statistics)), 1], 
+          rev(fit_sum$quantiles[grep("theta", row.names(fit_sum$statistics)), 5])),
+        border = NA,
+        col = rgb(1, 0, 0, 0.25))
+polygon(c(time, rev(time)),
+        c(fit_sum$quantiles[grep("attractor", row.names(fit_sum$statistics)), 1], 
+          rev(fit_sum$quantiles[grep("attractor", row.names(fit_sum$statistics)), 5])),
+        border = NA,
+        col = rgb(0, 0, 1, 0.15))
+lines(time, fit_sum$statistics[grep("theta", row.names(fit_sum$statistics)), 1], 
+      col = "red", lwd = 2)
+lines(time, attractor, col = gray(0.5), lwd = 2)
+lines(time, fit_sum$statistics[grep("attractor", row.names(fit_sum$statistics)), 1], 
+      col = "blue", lwd = 2)
+}
+
+print(theta_jags2)
+```
+
+# Conclusion
+
+Based on these results, we can probably conclude that the models are equivalent. To facilitate the comparison of the estimation of the latent dynamic process across the three fitted models, see Figure \@ref(fig:theta_all).
+
+```{r theta_all, fig.height = 6}
+par(mfrow = c(3, 1))
+print(theta_stan)
+print(theta_jags1)
+print(theta_jags2)
+```
+
+
+# References
