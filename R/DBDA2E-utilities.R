@@ -211,7 +211,7 @@ DbdaDensPlot = function( codaObject , parName=varnames(codaObject)[1] , plColors
 diagMCMC = function( codaObject , parName=varnames(codaObject)[1] ,
                      saveName=NULL , saveType="jpg" ) {
   DBDAplColors = c("skyblue","black","royalblue","steelblue")
-  openGraph(height=5,width=7)
+  #openGraph(height=5,width=7)
   par( mar=0.5+c(3,4,1,0) , oma=0.1+c(0,0,2,0) , mgp=c(2.25,0.7,0) , 
        cex.lab=1.5 )
   layout(matrix(1:4,nrow=2))
@@ -508,48 +508,48 @@ gammaShRaFromModeSD = function( mode , sd ) {
 #------------------------------------------------------------------------------
 
 # Make some data files for examples...
-createDataFiles=FALSE
-if ( createDataFiles ) {
-  
-  source("HtWtDataGenerator.R")
-  N=300
-  m = HtWtDataGenerator( N , rndsd=47405 )
-  write.csv( file=paste0("HtWtData",N,".csv") , row.names=FALSE , m )
-  
-  
-  # Function for generating normal data with normal outliers:
-  genYwithOut = function( N , pcntOut=15 , sdOut=3.0 ) {
-    inl = rnorm( N-ceiling(pcntOut/100*N) )
-    out = rnorm(   ceiling(pcntOut/100*N) )
-    inl = (inl-mean(inl))/sd(inl)
-    out = (out-mean(out))/sd(out) * sdOut
-    return(c(inl,out))
-  }
-  
-  # Two-group IQ scores with outliers 
-  set.seed(47405)
-  y1 = round(pmax(50,genYwithOut(63,20,3.5)*17.5+106))
-  y2 = round(pmax(50,genYwithOut(57,20,3.5)*10+100))
-  write.csv( file="TwoGroupIQ.csv" , row.names=FALSE ,
-             data.frame( Score=c(y1,y2) , 
-                         Group=c(rep("Smart Drug",length(y1)),
-                                 rep("Placebo",length(y2))) ) )
-  
-  # One-group log-normal
-  set.seed(47405)
-  z = rnorm(123)
-  logY = (z-mean(z))/sd(z) * 0.5 + 5.5 # logY has mean 5.5 and sd 0.5
-  y = round( exp(logY) , 2 )
-  write.csv( file="OneGroupLogNormal.csv" , row.names=FALSE ,
-             cbind(y) )
-  
-  # One-group gamma
-  desiredMode = 250
-  desiredSD = 100
-  desiredRate = (desiredMode+sqrt(desiredMode^2+4*desiredSD^2))/(2*desiredSD^2)
-  desiredShape = 1+desiredMode*desiredRate
-  set.seed(47405)
-  y = round( rgamma( 153 , shape=desiredShape , rate=desiredRate ) , 2 )
-  write.csv( file="OneGroupGamma.csv" , row.names=FALSE , cbind(y) )
-  
-} # end if createDataFiles
+# createDataFiles=FALSE
+# if ( createDataFiles ) {
+#   
+#   source("HtWtDataGenerator.R")
+#   N=300
+#   m = HtWtDataGenerator( N , rndsd=47405 )
+#   write.csv( file=paste0("HtWtData",N,".csv") , row.names=FALSE , m )
+#   
+#   
+#   # Function for generating normal data with normal outliers:
+#   genYwithOut = function( N , pcntOut=15 , sdOut=3.0 ) {
+#     inl = rnorm( N-ceiling(pcntOut/100*N) )
+#     out = rnorm(   ceiling(pcntOut/100*N) )
+#     inl = (inl-mean(inl))/sd(inl)
+#     out = (out-mean(out))/sd(out) * sdOut
+#     return(c(inl,out))
+#   }
+#   
+#   # Two-group IQ scores with outliers 
+#   set.seed(47405)
+#   y1 = round(pmax(50,genYwithOut(63,20,3.5)*17.5+106))
+#   y2 = round(pmax(50,genYwithOut(57,20,3.5)*10+100))
+#   write.csv( file="TwoGroupIQ.csv" , row.names=FALSE ,
+#              data.frame( Score=c(y1,y2) , 
+#                          Group=c(rep("Smart Drug",length(y1)),
+#                                  rep("Placebo",length(y2))) ) )
+#   
+#   # One-group log-normal
+#   set.seed(47405)
+#   z = rnorm(123)
+#   logY = (z-mean(z))/sd(z) * 0.5 + 5.5 # logY has mean 5.5 and sd 0.5
+#   y = round( exp(logY) , 2 )
+#   write.csv( file="OneGroupLogNormal.csv" , row.names=FALSE ,
+#              cbind(y) )
+#   
+#   # One-group gamma
+#   desiredMode = 250
+#   desiredSD = 100
+#   desiredRate = (desiredMode+sqrt(desiredMode^2+4*desiredSD^2))/(2*desiredSD^2)
+#   desiredShape = 1+desiredMode*desiredRate
+#   set.seed(47405)
+#   y = round( rgamma( 153 , shape=desiredShape , rate=desiredRate ) , 2 )
+#   write.csv( file="OneGroupGamma.csv" , row.names=FALSE , cbind(y) )
+#   
+# } # end if createDataFiles
