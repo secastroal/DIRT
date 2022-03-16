@@ -20,7 +20,7 @@ library(splines)
 
 # Load required functions
 source("R/IRT_models.R")
-source("R/IRT_plots.R")
+#source("R/IRT_plots.R")
 
 # Create folder to save output
 if (!dir.exists(paste(getwd(), "Simulation", sep = "/"))) {
@@ -58,7 +58,7 @@ rm(N.timepoints, N.items, S.lambda, M.prop)
 # Compile the model
 # To run the simulation we commented out the generated quantities block to 
 # reduce memory usage.
-model <- stan_model(file = "Stan/tv_dpcm_int.stan", verbose = FALSE)
+model <- stan_model(file = "Stan/tv_dpcm_int_v5.1.stan", verbose = FALSE)
 
 # 2.0 Run simulation ----
 
@@ -190,7 +190,8 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                             seed = seed,
                             pars = c("beta", "theta", "lambda",
                                      "sigma2", "p_var", "attractor"),
-                            control = list(adapt_delta=0.95)) # Other parameters to control sampling behavior.
+                            control = list(adapt_delta   = 0.99,
+                                           max_treedepth = 15)) # Other parameters to control sampling behavior.
             run.time <- proc.time() - begin.time
             rm(begin.time)
             
