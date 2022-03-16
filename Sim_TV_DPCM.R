@@ -124,7 +124,7 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                             init    = tvdpcm_inits, # Initial values
                             seed = seed,            # Seed
                             pars = c("beta", "theta", "lambda",
-                                     "sigma2", "p_var", "attractor"),
+                                     "sigma2", "pvar", "attractor"),
                             control = list(adapt_delta   = 0.99,
                                            max_treedepth = 15)) # Other parameters to control sampling behavior.
             run.time <- proc.time() - begin.time
@@ -153,9 +153,9 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
           
             #max Rhat
             maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
-                                                    "sigma2", "p_var", "attractor"))), 4)
+                                                    "sigma2", "pvar", "attractor"))), 4)
             nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
-                                              "sigma2", "p_var", "attractor")) > 1.05)
+                                              "sigma2", "pvar", "attractor")) > 1.05)
             
             # Compare the true and the estimated parameters. 
             # correlations 
@@ -286,9 +286,8 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                              sigma2.CI,
                              corrupt,
                              efficiency))
-            rm(standata, fit, sum.fit, thresholds, delta, taus, theta, responses,
-               B_true, a, a0, attractor, knots, tv_lambda, tv_int, time,
-               run.time, p_var, nT, naprop, lambda, I, cond, r, seed,
+            rm(standata, fit, sum.fit, gen.Data, trend,
+               run.time, nT, naprop, lambda, I, cond, r, seed,
                ndiv, nbfmi, ntree, nbulk, ntail, stan.diag, maxRhat, nRhat, 
                beta.cor, beta.bias, beta.abbias, beta.rmse, beta.cover,
                beta.CI, theta.cor, theta.bias, theta.abbias, theta.rmse,
