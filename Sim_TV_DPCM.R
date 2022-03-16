@@ -72,7 +72,8 @@ args <- commandArgs(trailingOnly = TRUE)
 
 outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multicombine = TRUE) %:%
   foreach(r = args[3]:args[4], .combine = 'comb', .multicombine = TRUE, 
-          .packages = c("rstan", "bayesplot")) %dopar% {
+          .packages = c("rstan", "bayesplot"), 
+          .export = c("linear", "sinusoidal", "logarithmic")) %dopar% {
             
             # Define manipulated factors and seed
             nT     <- Cond[cond, 1]
