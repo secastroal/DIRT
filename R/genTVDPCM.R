@@ -39,7 +39,7 @@ select_trend <- function(nT, FUN, ...) {
 # The required arguments are the number of time points nT; the number of items I;
 # the number of response categories K; the population parameters pop.param,
 # which must be given as a list with the true autoregressive effect (lambda), 
-# the variance of the innovations (varinno), and the thresholds parameters 
+# the variance of the innovations (sigma2), and the thresholds parameters 
 # (thresholds); the seed used to simulate the data; a function FUN which can be 
 # predefined or customized as in apply; and additional arguments for FUN.
 # The list of true parameters can be ommited or partially given. If missing,
@@ -61,8 +61,8 @@ gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
     pop.param$lambda <- runif(1, -1, 1)
   }
   
-  if (is.null(pop.param$var_inno)) {
-    pop.param$varinno <- 1
+  if (is.null(pop.param$sigma2)) {
+    pop.param$sigma2 <- 1
   }
   
   if (is.null(pop.param$thresholds)) {
@@ -86,17 +86,17 @@ gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
   theta <- rep(NA, nT)
   
   theta[1] <- rnorm(1, tv_int[1]/(1 - pop.param$lambda), 
-                    sqrt(pop.param$varinno/(1 - pop.param$lambda ^ 2)))
+                    sqrt(pop.param$sigma2/(1 - pop.param$lambda ^ 2)))
   
   for (t in 2:nT) {
     theta[t] <- tv_int[t] + pop.param$lambda * theta[t - 1] + 
-      rnorm(1, 0, sqrt(pop.param$varinno))
+      rnorm(1, 0, sqrt(pop.param$sigma2))
   }
   rm(t)
   
   # Compute the attractor and the variance of the dynamic process
   attractor <- tv_int / (1 - pop.param$lambda)
-  vardpro   <- pop.param$varinno / (1 - pop.param$lambda ^ 2)
+  pvar      <- pop.param$sigma2 / (1 - pop.param$lambda ^ 2)
   
   # Generate item responses given the PCM ----
   # The function used to generate the responses uses another parameterization 
@@ -130,8 +130,8 @@ gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
               theta.gen      = theta,
               attractor.gen  = attractor,
               lambda.gen     = pop.param$lambda,
-              varinno.gen    = pop.param$varinno,
-              vardpro.gen    = vardpro,
+              sigma2.gen     = pop.param$sigma2,
+              pvar.gen       = pvar,
               data           = responses)
   
   return(out)

@@ -133,7 +133,7 @@ generated quantities {
    // int rep_y[N_obs];      // posterior simulation
    // vector[N_obs] log_lik; // pointwise loglikelihood
    vector[nT] attractor;  // attractor
-   real p_var;            // variance of the process 
+   real pvar;            // variance of the process 
    
    // for (n in 1:N_obs) {
    //   vector[K] prob;
@@ -146,7 +146,7 @@ generated quantities {
    // }
    
    attractor = tv_int / (1 - lambda);
-   p_var     = sigma2 / (1 - square(lambda));
+   pvar      = sigma2 / (1 - square(lambda));
    // p_var     = 1 / (1 - square(lambda));
 
 }
