@@ -39,11 +39,11 @@ source("../R/tvdpcm2jags.R")
 ```
 
 ```{r seed}
-nT         <- 400
+nT         <- 500
 n_knots    <- 8
 s_degree   <- 3
 n_basis    <- n_knots + s_degree - 1
-seed       <- 1000
+seed       <- 1002
 set.seed(seed)
 
 # To render, run this chunk and save to use the specified seed, number of time
