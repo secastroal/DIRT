@@ -10,12 +10,12 @@
 
 # 0.0 Prepare Environment----
 # Load required packages
-library(doParallel)
-library(foreach)
-library(rstan)
+suppressPackageStartupMessages(library(doParallel))
+suppressPackageStartupMessages(library(foreach))
+suppressPackageStartupMessages(library(rstan))
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
-library(bayesplot)
+suppressPackageStartupMessages(library(bayesplot))
 
 # Load required functions
 source("R/IRT_models.R")
@@ -62,7 +62,7 @@ model <- stan_model(file = "Stan/tv_dpcm_int_v5.1.stan", verbose = FALSE)
 # 2.0 Run simulation ----
 
 # Setup parallel backend to use parallel tasks
-cl <- makeCluster(24)
+cl <- makeCluster(24, outfile = "")
 registerDoParallel(cl, cores = 24)
 
 # Get conditions and replications from the batch file
@@ -82,6 +82,8 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
             naprop <- Cond[cond, 4]
             trend  <- Cond[cond, 5]
             seed   <- 1000 * cond + r
+            
+            cat(sprintf("This is the %dth replication of condition %d\n", r, cond))
             
             # Simulate data ----
             
@@ -127,7 +129,9 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                             pars = c("beta", "theta", "lambda",
                                      "sigma2", "pvar", "attractor"),
                             control = list(adapt_delta   = 0.99,
-                                           max_treedepth = 15)) # Other parameters to control sampling behavior.
+                                           max_treedepth = 15), # Other parameters to control sampling behavior.
+                            show_messages = FALSE,
+                            refresh = 0) 
             run.time <- proc.time() - begin.time
             rm(begin.time)
             
@@ -144,7 +148,8 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
             
             # Get stan convergence checks. 
             # All these values are expected to be 0.
-            stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), warmup = 0)
+            stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
             
             ndiv  <- get_num_divergent(fit)     # number of divergent transitions
             nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 

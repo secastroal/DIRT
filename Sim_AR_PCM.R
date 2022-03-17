@@ -10,12 +10,12 @@
 
 # 0.0 Prepare Environment----
 # Load required packages
-library(doParallel)
-library(foreach)
-library(rstan)
+suppressPackageStartupMessages(library(doParallel))
+suppressPackageStartupMessages(library(foreach))
+suppressPackageStartupMessages(library(rstan))
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
-library(bayesplot)
+suppressPackageStartupMessages(library(bayesplot))
 
 # Load required functions
 source("R/IRT_models.R")
