@@ -43,11 +43,11 @@ s_degree <- 3   # Define degree of splines.
 
 # Manipulated conditions
 
-N.timepoints <- c(100, 200, 350, 500) # Number of timepoints
+N.timepoints <- c(100, 200, 300, 500) # Number of timepoints
 N.items      <- c(3, 6)               # Number of items 
 S.lambda     <- c(0, 0.25, 0.5)       # Size of the autoregressive effect
-M.prop       <- c(0, 0.15, 0.3)       # Proportion of missing values
-T.trend      <- c("linear", "logarithmic", "sinusoidal") # Shape of the true trend
+M.prop       <- c(0, 0.3)       # Proportion of missing values
+T.trend      <- c("sinusoidal") # Shape of the true trend
 
 Cond        <- expand.grid(N.timepoints, N.items, S.lambda, M.prop, T.trend)
 names(Cond) <- c("nT", "I", "lambda", "NAprop", "Trend")
