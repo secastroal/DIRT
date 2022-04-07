@@ -113,6 +113,41 @@ ppc.acf <- function(object, data, lag.max = 5) {
   return(round(out, 3))
 }
 
+# Mean Square Successive Difference ----
+
+ppc.mssd <- function(object, data) {
+  repy <- extract(object)[["rep_y"]]
+  I    <- data$I
+  K    <- data$K
+  nT   <- data$nT
+  y    <- data$y_obs
+  
+  # Compute sumscores
+  sumscores <- tapply(y, data$tt_obs, sum)
+  sumscoresrepy <- apply(repy, 1, function(x) {
+    tapply(x, data$tt_obs, sum)
+  })
+  
+  # Compute mssd
+  mssd <- sum(diff(sumscores) ^ 2)/(nT - 1)
+  
+  mssdrep <- apply(sumscoresrepy, 2, function(x) {
+    out <- sum(diff(x) ^ 2)/(nT - 1)
+    return(out)
+  })
+  
+  # Compute posterior predictive p-values
+  out <- sum(mssdrep <= mssd) / length(mssdrep)
+  
+  hist(mssdrep, main = "Histogram MSSD",
+       xlab = "MSSD")
+  abline(v = mssd, lwd = 3)
+  mtext(paste0("PPP = ", round(out, 3)), line = -1.5, col = "red", 
+        cex = 0.8, adj = 0)
+  
+  return(round(out, 3))
+}
+
 # Item score time series ----
 ppc.item.ts <- function(object, data, quiet = FALSE, items = NULL) {
   
@@ -383,6 +418,93 @@ ppc.itcor3 <- function(object, data, method = "pearson", items = NULL, quiet = F
   return(round(out, 3))
 }
 
+# Yen's Q1 unmodified ----
+
+# Function to compute the Yen's Q1 for polytomous models
+# The arguments are the estimated theta and threshold parameters, and
+# the standata list.
+gpcm.Q1 <- function(data, theta, beta) {
+  
+  I    <- data$I
+  K    <- data$K
+  M    <- data$K - 1
+  nT   <- data$nT
+  y    <- data$y_obs
+  
+  tmpx <- order(theta)
+  tmpx <- cbind(tmpx, cut(seq_along(tmpx), 10, labels = FALSE))
+  tmpx <- tmpx[order(tmpx[, 1]), ]
+  
+  group       <- tmpx[, 2]
+  group_index <- tmpx[data$tt_obs, 2]
+  
+  thresholds  <- matrix(beta, nrow = I, ncol = M, byrow = TRUE)
+  delta       <- rowMeans(thresholds)
+  taus        <- thresholds - delta
+  
+  probs.array <- array(NA, dim = c(length(theta), I, K))
+  
+  for (yy in 0:M) {
+    probs.array[, , yy + 1] <- P.GPCM(y     = yy, 
+                                     alpha = rep(1, I), 
+                                     delta = delta, 
+                                     taus  = taus, 
+                                     theta = theta, 
+                                     M     = M)
+  }
+  
+  E <- apply(probs.array, c(3, 2), function(x) {
+    tapply(x, group, mean)
+    })
+  
+  O <-  tapply(y, list(group_index, data$ii_obs), function(x) {
+    x    <- factor(x, levels = 1:K)
+    xtab <- prop.table(table(x, exclude = FALSE))
+    return(as.vector(xtab))
+    })
+  
+  q1 <- rep(0, I)
+  g_size <- table(group)
+  
+  for (i in 1:I) {
+    for (g in 1:10) {
+      q1[i] <- q1[i] + sum(g_size[g] * ((O[g, i][[1]] - E[g, , i])^2 / E[g, , i]))
+    }
+  }
+  
+  return(q1)
+}
+
+
+ppc.Q1 <- function(object, data, items = NULL, quiet = FALSE) {
+  
+  tmp       <- list()
+  tmp$beta  <- summary(object, pars = "beta")$summary
+  tmp$theta <- summary(object, pars = "theta")$summary
+  
+  repy <- extract(object)[["rep_y"]]
+  I    <- data$I
+  K    <- data$K
+  M    <- data$K - 1
+  nT   <- data$nT
+  y    <- data$y_obs
+  
+  if (is.null(items)) {
+    items <- 1:I
+  }
+  
+  times_obs <- intersect(data$tt, data$tt_obs)
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  }
 
 
 
