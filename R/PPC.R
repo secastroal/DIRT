@@ -421,24 +421,14 @@ ppc.itcor3 <- function(object, data, method = "pearson", items = NULL, quiet = F
 # Yen's Q1 unmodified ----
 
 # Function to compute the Yen's Q1 for polytomous models
-# The arguments are the estimated theta and threshold parameters, and
-# the standata list.
-gpcm.Q1 <- function(data, theta, beta) {
+# The arguments are the estimated theta, threshold, and discrimination 
+# parameters, the number of items, the number of response categories,
+# the grouping variable for each time point, and a grouping index for
+# the data in long format.
+gpcm.Q1 <- function(y, theta, thresholds, alpha, I, K, group, group_index) {
   
-  I    <- data$I
-  K    <- data$K
-  M    <- data$K - 1
-  nT   <- data$nT
-  y    <- data$y_obs
+  M <- K - 1
   
-  tmpx <- order(theta)
-  tmpx <- cbind(tmpx, cut(seq_along(tmpx), 10, labels = FALSE))
-  tmpx <- tmpx[order(tmpx[, 1]), ]
-  
-  group       <- tmpx[, 2]
-  group_index <- tmpx[data$tt_obs, 2]
-  
-  thresholds  <- matrix(beta, nrow = I, ncol = M, byrow = TRUE)
   delta       <- rowMeans(thresholds)
   taus        <- thresholds - delta
   
@@ -446,11 +436,11 @@ gpcm.Q1 <- function(data, theta, beta) {
   
   for (yy in 0:M) {
     probs.array[, , yy + 1] <- P.GPCM(y     = yy, 
-                                     alpha = rep(1, I), 
-                                     delta = delta, 
-                                     taus  = taus, 
-                                     theta = theta, 
-                                     M     = M)
+                                      alpha = alpha, 
+                                      delta = delta, 
+                                      taus  = taus, 
+                                      theta = theta, 
+                                      M     = M)
   }
   
   E <- apply(probs.array, c(3, 2), function(x) {
@@ -475,13 +465,10 @@ gpcm.Q1 <- function(data, theta, beta) {
   return(q1)
 }
 
-
 ppc.Q1 <- function(object, data, items = NULL, quiet = FALSE) {
   
-  tmp       <- list()
-  tmp$beta  <- summary(object, pars = "beta")$summary
-  tmp$theta <- summary(object, pars = "theta")$summary
-  
+  betasamples  <- extract(object)[["beta"]]
+  thetasamples <- extract(object)[["theta"]]
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -493,19 +480,264 @@ ppc.Q1 <- function(object, data, items = NULL, quiet = FALSE) {
     items <- 1:I
   }
   
+  # Get the observed timepoints. Relevant if there were missing data.
   times_obs <- intersect(data$tt, data$tt_obs)
   
+  # Create array to store the computed Yen's Q1.
+  discrepancy <- array(NA, dim = c(nrow(repy), I, 2))
   
+  for (r in 1:nrow(repy)) {
+    # Get estimated parameters for the i-th iteration.
+    thresholds <- betasamples[r, , ]
+    theta      <- thetasamples[r, ][times_obs]
+    
+    # Create groups for Yen's Q1
+    tmpx <- order(theta)
+    tmpx <- cbind(tmpx, cut(seq_along(tmpx), 10, labels = FALSE))
+    tmpx <- tmpx[order(tmpx[, 1]), ]
+    
+    group       <- tmpx[, 2]
+    group_index <- tmpx[data$tt_obs, 2]
+    rm(tmpx)
+    
+    # Yen's Q1 for the observed scores
+    discrepancy[r, , 1] <- gpcm.Q1(y           = y, 
+                                   theta       = theta, 
+                                   thresholds  = thresholds, 
+                                   alpha       = rep(1, I), 
+                                   I           = I, 
+                                   K           = K, 
+                                   group       = group,
+                                   group_index = group_index)
+    # Yen's Q1 for the i-th replicated scores
+    discrepancy[r, , 2] <- gpcm.Q1(y           = repy[r, ], 
+                                   theta       = theta, 
+                                   thresholds  = thresholds, 
+                                   alpha       = rep(1, I), 
+                                   I           = I, 
+                                   K           = K, 
+                                   group       = group,
+                                   group_index = group_index)
+  }
+  rm(r)
   
+  # Compute posterior predictive p-values
+  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+  names(out) <- paste0("Item_", items)
   
+  for (i in 1:length(items)) {
+    if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
+    plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], las = 1,
+         main = paste0("Scatterplot Yen's Q1 of item ", items[i]),
+         ylab = expression(paste("Yen's ", Q[1], "(", y^rep, ";", Theta, ")")),
+         xlab = expression(paste("Yen's ", Q[1], "(y;", Theta, ")")))
+    abline(a= 0, b = 1, col = "red")
+    mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
+          cex = 0.8, adj = 0)
+  }
   
-  
-  
-  
-  
-  
+  return(round(out, 3))
   }
 
+# Yen's Q1 modified ----
+# This is an alternative version of Yen's Q1 in which the groups are not made by
+# ordering the estimated latent values. Instead, the groups are simply defined 
+# by the time in which the observation were made. The purpose of this is to take 
+# the time into account.
+
+ppc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE) {
+  
+  betasamples  <- extract(object)[["beta"]]
+  thetasamples <- extract(object)[["theta"]]
+  repy <- extract(object)[["rep_y"]]
+  I    <- data$I
+  K    <- data$K
+  M    <- data$K - 1
+  nT   <- data$nT
+  y    <- data$y_obs
+  
+  if (is.null(items)) {
+    items <- 1:I
+  }
+  
+  # Get the observed timepoints. Relevant if there were missing data.
+  times_obs <- intersect(data$tt, data$tt_obs)
+  
+  # Create array to store the computed Yen's Q1.
+  discrepancy <- array(NA, dim = c(nrow(repy), I, 2))
+  
+  for (r in 1:nrow(repy)) {
+    # Get estimated parameters for the i-th iteration.
+    thresholds <- betasamples[r, , ]
+    theta      <- thetasamples[r, ][times_obs]
+    
+    # Create groups for Yen's Q1 given the time order
+    group       <- cut(seq_along(theta), 10, labels = FALSE)
+    group_index <- group[data$tt_obs]
+    
+    # Yen's Q1 for the observed scores
+    discrepancy[r, , 1] <- gpcm.Q1(y           = y, 
+                                   theta       = theta, 
+                                   thresholds  = thresholds, 
+                                   alpha       = rep(1, I), 
+                                   I           = I, 
+                                   K           = K, 
+                                   group       = group,
+                                   group_index = group_index)
+    # Yen's Q1 for the i-th replicated scores
+    discrepancy[r, , 2] <- gpcm.Q1(y           = repy[r, ], 
+                                   theta       = theta, 
+                                   thresholds  = thresholds, 
+                                   alpha       = rep(1, I), 
+                                   I           = I, 
+                                   K           = K, 
+                                   group       = group,
+                                   group_index = group_index)
+  }
+  rm(r)
+  
+  # Compute posterior predictive p-values
+  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+  names(out) <- paste0("Item_", items)
+  
+  for (i in 1:length(items)) {
+    if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
+    plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], las = 1,
+         main = paste0("Scatterplot Alt. Yen's Q1 of item ", items[i]),
+         ylab = expression(paste("Alt. Yen's ", Q[1], "(", y^rep, ";", Theta, ")")),
+         xlab = expression(paste("Alt. Yen's ", Q[1], "(y;", Theta, ")")))
+    abline(a= 0, b = 1, col = "red")
+    mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
+          cex = 0.8, adj = 0)
+  }
+  
+  return(round(out, 3))
+}
+
+# Yen's Q3 ----
+
+# First we create a function to compute Yen's Q3. The function requires the 
+# vector of responses y, the estimated theta, thresholds, and discrimination
+# parameters, the number of items, the number of response categories, and two 
+# index variables t_index for time and i_index for items given that the data is
+# in long format.
+
+gpcm.Q3 <- function(y, theta, thresholds, alpha, I, K, t_index, i_index) {
+  
+  M <- K - 1
+  
+  # Restructure responses in a matrix
+  Y <- matrix(NA, nT, I)
+  
+  for (t in 1:nT) {
+    for (i in 1:I) {
+      Y[t, i] <- y[t_index == t & i_index == i]
+    }
+  }
+  
+  delta       <- rowMeans(thresholds)
+  taus        <- thresholds - delta
+  
+  probs.array <- array(NA, dim = c(length(theta), I, K))
+  
+  for (yy in 0:M) {
+    probs.array[, , yy + 1] <- P.GPCM(y    = yy, 
+                                      alpha = alpha, 
+                                      delta = delta, 
+                                      taus  = taus, 
+                                      theta = theta, 
+                                      M     = M)
+  }
+  
+  E <- apply(probs.array, c(1, 2), function(x) sum(x * 1:K))
+  
+  D <- Y - E
+  
+  CorD <- cor(D, use = "pairwise.complete.obs")
+  q3 <- CorD[lower.tri(CorD)]
+  names(q3) <- apply(which(lower.tri(CorD), arr.ind = TRUE), 1, function(x)
+    paste0("(", paste(x, collapse = ","), ")"))
+  
+  return(q3)
+}
+
+ppc.Q3 <- function(object, data, scatterplots = FALSE) {
+  
+  require(scatterpie)
+  
+  betasamples  <- extract(object)[["beta"]]
+  thetasamples <- extract(object)[["theta"]]
+  repy <- extract(object)[["rep_y"]]
+  I    <- data$I
+  K    <- data$K
+  M    <- data$K - 1
+  nT   <- data$nT
+  y    <- data$y_obs
+  
+  # Create array to store the computed Yen's Q1.
+  discrepancy <- array(NA, dim = c(nrow(repy), (I * (I - 1))/2, 2))
+  
+  for (r in 1:nrow(repy)) {
+    # Get estimated parameters for the i-th iteration.
+    thresholds <- betasamples[r, , ]
+    theta      <- thetasamples[r, ]
+    
+    # Yen's Q3 for the observed scores
+    discrepancy[r, , 1] <- gpcm.Q3(y          = y,
+                                   theta      = theta,
+                                   thresholds = thresholds,
+                                   alpha      = rep(1, I),
+                                   I          = I,
+                                   K          = K,
+                                   t_index    = data$tt_obs,
+                                   i_index    = data$ii_obs)
+    
+    # Yen's Q1 for the i-th replicated scores
+    discrepancy[r, , 2] <- gpcm.Q3(y          = repy[r, ],
+                                   theta      = theta,
+                                   thresholds = thresholds,
+                                   alpha      = rep(1, I),
+                                   I          = I,
+                                   K          = K,
+                                   t_index    = data$tt_obs,
+                                   i_index    = data$ii_obs)
+  }
+  rm(r)
+  
+  # Compute posterior predictive p-values
+  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+  names(out) <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
+    paste0("ppp-q3(", paste(x, collapse = ","), ")"))
+  
+  if (scatterplots) {
+    for (i in 1:15) {
+      #if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
+      plot(discrepancy[, i, 1], discrepancy[, i, 2], las = 1,
+           main = paste0("Scatterplot Yen's Q3 of items ", substring(names(out)[i], 7)),
+           ylab = expression(paste("Yen's ", Q[3], "(", y^rep, ";", Theta, ")")),
+           xlab = expression(paste("Yen's ", Q[3], "(y;", Theta, ")")))
+      abline(a= 0, b = 1, col = "red")
+      mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
+            cex = 0.8, adj = 0)
+    }
+  }
+  
+  tmp <- data.frame(which(lower.tri(diag(I)), arr.ind = TRUE), out)
+  tmp$out2   <- 1 - out
+  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2) 
+  
+  ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
+                             cols=c("out","out2"), color = NA, 
+                             show.legend = FALSE) + coord_equal()  +
+    scale_fill_manual(values = c("black", gray(0.9))) +
+    labs(y = "Item", x = "Item") + theme_bw() + 
+    theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"))
+  
+  
+  return(round(out, 3))
+}
 
 
 
