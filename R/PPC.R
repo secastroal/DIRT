@@ -877,7 +877,7 @@ ppc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
 
 # Odds Ratio Difference ----
 
-ppc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
+ppc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE) {
   
   require(scatterpie)
   
