@@ -618,11 +618,11 @@ ppc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE) {
 
 # First we create a function to compute Yen's Q3. The function requires the 
 # vector of responses y, the estimated theta, thresholds, and discrimination
-# parameters, the number of items, the number of response categories, and two 
-# index variables t_index for time and i_index for items given that the data is
-# in long format.
+# parameters, the number of time points, the number of items, the number of 
+# response categories, and two index variables t_index for time and i_index 
+# for items given that the data is in long format.
 
-gpcm.Q3 <- function(y, theta, thresholds, alpha, I, K, t_index, i_index) {
+gpcm.Q3 <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
   
   M <- K - 1
   
@@ -674,7 +674,7 @@ ppc.Q3 <- function(object, data, scatterplots = FALSE) {
   nT   <- data$nT
   y    <- data$y_obs
   
-  # Create array to store the computed Yen's Q1.
+  # Create array to store the computed Yen's Q3.
   discrepancy <- array(NA, dim = c(nrow(repy), (I * (I - 1))/2, 2))
   
   for (r in 1:nrow(repy)) {
@@ -687,16 +687,18 @@ ppc.Q3 <- function(object, data, scatterplots = FALSE) {
                                    theta      = theta,
                                    thresholds = thresholds,
                                    alpha      = rep(1, I),
+                                   nT         = nT,
                                    I          = I,
                                    K          = K,
                                    t_index    = data$tt_obs,
                                    i_index    = data$ii_obs)
     
-    # Yen's Q1 for the i-th replicated scores
+    # Yen's Q3 for the i-th replicated scores
     discrepancy[r, , 2] <- gpcm.Q3(y          = repy[r, ],
                                    theta      = theta,
                                    thresholds = thresholds,
                                    alpha      = rep(1, I),
+                                   nT         = nT,
                                    I          = I,
                                    K          = K,
                                    t_index    = data$tt_obs,
@@ -711,7 +713,6 @@ ppc.Q3 <- function(object, data, scatterplots = FALSE) {
   
   if (scatterplots) {
     for (i in 1:15) {
-      #if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
       plot(discrepancy[, i, 1], discrepancy[, i, 2], las = 1,
            main = paste0("Scatterplot Yen's Q3 of items ", substring(names(out)[i], 7)),
            ylab = expression(paste("Yen's ", Q[3], "(", y^rep, ";", Theta, ")")),
@@ -724,10 +725,10 @@ ppc.Q3 <- function(object, data, scatterplots = FALSE) {
   
   tmp <- data.frame(which(lower.tri(diag(I)), arr.ind = TRUE), out)
   tmp$out2   <- 1 - out
-  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2) 
+  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2)
   
-  ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
-                             cols=c("out","out2"), color = NA, 
+  sp <- ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
+                             cols=c("out","out2"), color = NA,
                              show.legend = FALSE) + coord_equal()  +
     scale_fill_manual(values = c("black", gray(0.9))) +
     labs(y = "Item", x = "Item") + theme_bw() + 
@@ -735,10 +736,146 @@ ppc.Q3 <- function(object, data, scatterplots = FALSE) {
           panel.grid.minor = element_blank(), 
           axis.line = element_line(colour = "black"))
   
+  print(sp)
+  return(round(out, 3))
+}
+
+# Odds Ratio ----
+# To compute the odds ratio for polytomous data, the items need to be 
+# dichotomized. After this, the odds ratio can be compute as normally.
+# Therefore, we first create to auxiliary functions, one used to dichotomize
+# categorical responses and a second one to compute the odds ratio. These 
+# functions assume that the responses are in long format.
+
+# To dichotomize, this function requires the responses in long format, 
+# an index variable indicating the item, the number of items, the number of
+# response categories, and the cut value used to dichotomize the responses.
+# The cutoff value might be different per item. The default cutoff is 
+# ceiling(K/2) + 1
+dicho <- function(y, I, K, i_index, cutoff = ceiling(K/2) + 1) {
+  if (length(cutoff) == 1) {cutoff <- rep(cutoff, I)}
   
+  out <- ifelse(y < cutoff[i_index], 0, 1)
+  
+  return(out)
+}
+
+# This function computes the odd ratio of a matrix. If any if the counts of the 
+# denominator is equal to 0, the Haldane-Anscombe correction correction is 
+# used (i.e., add 0.5 to each cell of the 2X2 matrix).
+odds.ratio <- function(y, nT, I, K, t_index, i_index) {
+  
+  # Restructure responses in a matrix
+  Y <- matrix(NA, nT, I)
+  
+  for (t in 1:nT) {
+    for (i in 1:I) {
+      Y[t, i] <- y[t_index == t & i_index == i]
+    }
+  }
+  rm(t, i)
+  
+  # Vector to store Odds ratio
+  or <- rep(NA, (I * (I - 1))/2)
+  
+  count <- 1
+  for (i in 1:(I - 1)) {
+    j <- i + 1
+    while (i<j) {
+      n    <- rep(NA, 4)
+      n[1] <- sum(Y[, i] == 1 & Y[, j] == 1, na.rm = TRUE)
+      n[2] <- sum(Y[, i] == 0 & Y[, j] == 0, na.rm = TRUE)
+      n[3] <- sum(Y[, i] == 1 & Y[, j] == 0, na.rm = TRUE)
+      n[4] <- sum(Y[, i] == 0 & Y[, j] == 1, na.rm = TRUE)
+      if (any(n[3:4] == 0)) {n <- n + 0.5}
+      or[count] <- (n[1]*n[2])/(n[3]*n[4])
+      names(or)[count] <- paste0('OR(', j, ',', i, ")")
+      count <- count + 1
+      if (j == I) {
+        break
+      } else {
+        j <- j + 1
+      }
+    }
+  }
+  
+  return(or)
+}
+
+ppc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
+  
+  require(scatterpie)
+  
+  repy <- extract(object)[["rep_y"]]
+  I    <- data$I
+  K    <- data$K
+  M    <- data$K - 1
+  nT   <- data$nT
+  y    <- data$y_obs
+  
+  if (is.null(cutoff)) {cutoff <- rep(ceiling(K/2) + 1, I)}
+  if (length(cutoff) == 1) {cutoff <- rep(cutoff, I)}
+  
+  ydich <- dicho(y = y, 
+                 I = I, 
+                 K = K, 
+                 i_index = data$ii_obs, 
+                 cutoff  = cutoff)
+  or    <- odds.ratio(y  = ydich, 
+                      nT = nT, 
+                      I  = I, 
+                      K  = K, 
+                      t_index = data$tt_obs, 
+                      i_index = data$ii_obs)
+  
+  
+  orrep <- apply(repy, 1, function(x) {
+    repyd <- dicho(y = x, 
+                   I = I, 
+                   K = K, 
+                   i_index = data$ii_obs, 
+                   cutoff  = cutoff)
+    out   <- odds.ratio(y  = repyd, 
+                        nT = nT, 
+                        I  = I, 
+                        K  = K, 
+                        t_index = data$tt_obs, 
+                        i_index = data$ii_obs)
+    return(out)
+  })
+  
+  # Compute posterior predictive p-values
+  out <- apply(orrep <= or, 1, function(x) sum(x)/dim(orrep)[2])
+  
+  
+  if (histograms) {
+    for (i in 1:length(or)) {
+      hist(orrep[i, ], main = paste0("Histogram Odd Ratio of Items ", 
+                                     substring(names(out)[i], 3)),
+           xlab = "Odd Ratio")
+      abline(v = or[i], lwd = 3)
+      mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
+            cex = 0.8, adj = 0)
+    }
+  }
+  
+  tmp <- data.frame(which(lower.tri(diag(I)), arr.ind = TRUE), out)
+  tmp$out2   <- 1 - out
+  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2)
+  
+  sp <- ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
+                                   cols=c("out","out2"), color = NA,
+                                   show.legend = FALSE) + coord_equal()  +
+    scale_fill_manual(values = c("black", gray(0.9))) +
+    labs(y = "Item", x = "Item") + theme_bw() + 
+    theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"))
+  
+  print(sp)
   return(round(out, 3))
 }
 
 
-
+# rm(list = setdiff(ls(), c(lsf.str(), "object", "data", "fit")))
 
