@@ -809,7 +809,6 @@ ppc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
-  M    <- data$K - 1
   nT   <- data$nT
   y    <- data$y_obs
   
@@ -876,6 +875,101 @@ ppc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
   return(round(out, 3))
 }
 
+# Odds Ratio Difference ----
+
+ppc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
+  
+  require(scatterpie)
+  
+  repy <- extract(object)[["rep_y"]]
+  I    <- data$I
+  K    <- data$K
+  nT   <- data$nT
+  y    <- data$y_obs
+  
+  if (is.null(cutoff)) {cutoff <- rep(ceiling(K/2) + 1, I)}
+  if (length(cutoff) == 1) {cutoff <- rep(cutoff, I)}
+  
+  timesplit <- ifelse(data$tt_obs <= ceiling(nT/2), 0, 1)
+  
+  ydich  <- dicho(y = y, 
+                  I = I, 
+                  K = K, 
+                  i_index = data$ii_obs, 
+                  cutoff  = cutoff)
+  
+  orsplit <- matrix(NA, nrow = (I * (I - 1))/2, ncol = 2)
+  
+  for (s in 0:1) {
+    tmp.nT <- ifelse(nT/2 - ceiling(nT/2) == 0, nT/2, ceiling(nT/2) - s)
+    
+    orsplit[, s + 1] <- odds.ratio(y  = ydich[timesplit == s],
+                                   nT = tmp.nT,
+                                   I  = I,
+                                   K  = K,
+                                   t_index = data$tt_obs[timesplit == s] - tmp.nT * s,
+                                   i_index = data$ii_obs[timesplit == s])
+  }
+  
+  ordiff <- c(diff(t(orsplit)))
+  
+  ordiffrep <- apply(repy, 1, function(x) {
+    repyd  <- dicho(y = x, 
+                    I = I, 
+                    K = K, 
+                    i_index = data$ii_obs, 
+                    cutoff  = cutoff)
+    
+    orsplitrep <- matrix(NA, nrow = (I * (I - 1))/2, ncol = 2)
+    
+    for (s in 0:1) {
+      tmp.nT <- ifelse(nT/2 - ceiling(nT/2) == 0, nT/2, ceiling(nT/2) - s)
+      
+      orsplitrep[, s + 1] <- odds.ratio(y  = repyd[timesplit == s],
+                                        nT = tmp.nT,
+                                        I  = I,
+                                        K  = K,
+                                        t_index = data$tt_obs[timesplit == s] - tmp.nT * s,
+                                        i_index = data$ii_obs[timesplit == s])
+    }
+    
+    out <- diff(t(orsplitrep))
+    return(out)
+  })
+  
+  # Compute posterior predictive p-values
+  out <- apply(ordiffrep <= ordiff, 1, function(x) sum(x)/dim(ordiffrep)[2])
+  names(out) <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
+    paste0("ppp-ordiff(", paste(x, collapse = ","), ")"))
+  
+  if (histograms) {
+    for (i in 1:length(ordiff)) {
+      hist(ordiffrep[i, ], 
+           main = paste0("Histogram Odd Ratio Difference of Items ",
+                         substring(names(out)[i], 11)),
+           xlab = "Odd Ratio Difference")
+      abline(v = ordiff[i], lwd = 3)
+      mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
+            cex = 0.8, adj = 0)
+    }
+  }
+  
+  tmp <- data.frame(which(lower.tri(diag(I)), arr.ind = TRUE), out)
+  tmp$out2   <- 1 - out
+  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2)
+  
+  sp <- ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
+                                   cols=c("out","out2"), color = NA,
+                                   show.legend = FALSE) + coord_equal()  +
+    scale_fill_manual(values = c("black", gray(0.9))) +
+    labs(y = "Item", x = "Item") + theme_bw() + 
+    theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"))
+  
+  print(sp)
+  return(round(out, 3))
+}
 
 # rm(list = setdiff(ls(), c(lsf.str(), "object", "data", "fit")))
 
