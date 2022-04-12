@@ -1107,6 +1107,9 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
   nT   <- data$nT
   y    <- data$y_obs
   
+  # Create dummy variable to split observations in two halves
+  timesplit <- ifelse(data$tt_obs <= ceiling(nT/2), 0, 1)
+  
   # Create array to store the computed absolute covariance residuals.
   discrepancy <- array(NA, dim = c(nrow(repy), (I * (I - 1))/2, 2))
   
@@ -1115,41 +1118,53 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
     thresholds <- betasamples[r, , ]
     theta      <- thetasamples[r, ]
     
-    # RESID for the observed scores
-    discrepancy[r, , 1] <- cov.resid(y          = y,
-                                     theta      = theta,
-                                     thresholds = thresholds,
-                                     alpha      = rep(1, I),
-                                     nT         = nT,
-                                     I          = I,
-                                     K          = K,
-                                     t_index    = data$tt_obs,
-                                     i_index    = data$ii_obs)
+    tmp <- array(NA, dim = c((I * (I - 1))/2, 2, 2))
     
-    # RESID for the i-th replicated scores
-    discrepancy[r, , 2] <- cov.resid(y          = repy[r, ],
-                                     theta      = theta,
-                                     thresholds = thresholds,
-                                     alpha      = rep(1, I),
-                                     nT         = nT,
-                                     I          = I,
-                                     K          = K,
-                                     t_index    = data$tt_obs,
-                                     i_index    = data$ii_obs)
+    # Loop through the two halves.
+    for (s in 0:1) {
+      tmp.nT <- ifelse(nT/2 - ceiling(nT/2) == 0, nT/2, ceiling(nT/2) - s)
+      
+      # RESID difference of the observed scores
+      tmp[, 1, s + 1] <- cov.resid(y          = y[timesplit == s],
+                                   theta      = theta,
+                                   thresholds = thresholds,
+                                   alpha      = rep(1, I),
+                                   nT         = tmp.nT,
+                                   I          = I,
+                                   K          = K,
+                                   t_index    = data$tt_obs[timesplit == s] - tmp.nT * s,
+                                   i_index    = data$ii_obs[timesplit == s])
+      
+      # RESID difference of the replicated scores
+      tmp[, 2, s + 1] <- cov.resid(y          = repy[r, ][timesplit == s],
+                                   theta      = theta,
+                                   thresholds = thresholds,
+                                   alpha      = rep(1, I),
+                                   nT         = tmp.nT,
+                                   I          = I,
+                                   K          = K,
+                                   t_index    = data$tt_obs[timesplit == s] - tmp.nT * s,
+                                   i_index    = data$ii_obs[timesplit == s])
+    }
+    
+    discrepancy[r, , 1] <- c(diff(t(tmp[, 1, ])))
+    
+    discrepancy[r, , 2] <- c(diff(t(tmp[, 2, ])))
   }
   rm(r)
+    
   
   # Compute posterior predictive p-values
   out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
   names(out) <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
-    paste0("ppp-resid(", paste(x, collapse = ","), ")"))
+    paste0("ppp-rediff(", paste(x, collapse = ","), ")"))
   
   if (scatterplots) {
     for (i in 1:15) {
       plot(discrepancy[, i, 1], discrepancy[, i, 2], las = 1,
-           main = paste0("Scatterplot cov RESID of items ", substring(names(out)[i], 10)),
-           ylab = expression(paste("Cov RESID (", y^rep, ";", Theta, ")")),
-           xlab = expression(paste("Cov RESID (y;", Theta, ")")))
+           main = paste0("Scatterplot cov REDIFF of items ", substring(names(out)[i], 11)),
+           ylab = expression(paste("Cov REDIFF (", y^rep, ";", Theta, ")")),
+           xlab = expression(paste("Cov REDIFF (y;", Theta, ")")))
       abline(a= 0, b = 1, col = "red")
       mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
             cex = 0.8, adj = 0)
