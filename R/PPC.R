@@ -5,7 +5,7 @@
 # other parameters.
 
 # Sumscores time series ----
-ppc.sumscore.ts <- function(object, data) {
+ppmc.sumscore.ts <- function(object, data) {
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -46,7 +46,7 @@ ppc.sumscore.ts <- function(object, data) {
 }
 
 # Autocorrelation of the residuals ----
-ppc.racf <- function(object, data) {
+ppmc.racf <- function(object, data) {
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -81,7 +81,7 @@ ppc.racf <- function(object, data) {
 }
 
 # Autocorrelation of the sumscores ----
-ppc.acf <- function(object, data, lag.max = 5) {
+ppmc.acf <- function(object, data, lag.max = 5) {
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -115,7 +115,7 @@ ppc.acf <- function(object, data, lag.max = 5) {
 
 # Mean Square Successive Difference ----
 
-ppc.mssd <- function(object, data) {
+ppmc.mssd <- function(object, data) {
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -149,7 +149,7 @@ ppc.mssd <- function(object, data) {
 }
 
 # Item score time series ----
-ppc.item.ts <- function(object, data, quiet = FALSE, items = NULL) {
+ppmc.item.ts <- function(object, data, quiet = FALSE, items = NULL) {
   
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
@@ -203,7 +203,7 @@ ppc.item.ts <- function(object, data, quiet = FALSE, items = NULL) {
 # There might be warning messages with the polyserial correlation because the 
 # estimated correlation is larger than 1. For example, "initial correlation 
 # inadmissible, 1.01866242085942, set to 0.9999"
-ppc.itcor <- function(object, data, method = c("polyserial", "pearson"), items = NULL, quiet = FALSE) {
+ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items = NULL, quiet = FALSE) {
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -281,7 +281,7 @@ ppc.itcor <- function(object, data, method = c("polyserial", "pearson"), items =
 # Again, one can use either polyserial or pearson correlation.
 # Apparently with this methods, we do not get the warnings about correlations 
 # larger than 1, when using polyserial correlation.
-ppc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items = NULL, quiet = FALSE) {
+ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items = NULL, quiet = FALSE) {
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -363,7 +363,7 @@ ppc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items 
 # Item-total Correlation Version 3 ----
 # In this version, we fit a autoregressive model to both the item scores and 
 # the rescores. Then, the residuals from these model are correlated.
-ppc.itcor3 <- function(object, data, method = "pearson", items = NULL, quiet = FALSE) {
+ppmc.itcor3 <- function(object, data, method = "pearson", items = NULL, quiet = FALSE) {
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -465,7 +465,7 @@ gpcm.Q1 <- function(y, theta, thresholds, alpha, I, K, group, group_index) {
   return(q1)
 }
 
-ppc.Q1 <- function(object, data, items = NULL, quiet = FALSE) {
+ppmc.Q1 <- function(object, data, items = NULL, quiet = FALSE) {
   
   betasamples  <- extract(object)[["beta"]]
   thetasamples <- extract(object)[["theta"]]
@@ -545,7 +545,7 @@ ppc.Q1 <- function(object, data, items = NULL, quiet = FALSE) {
 # by the time in which the observation were made. The purpose of this is to take 
 # the time into account.
 
-ppc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE) {
+ppmc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE) {
   
   betasamples  <- extract(object)[["beta"]]
   thetasamples <- extract(object)[["theta"]]
@@ -661,7 +661,7 @@ gpcm.Q3 <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
   return(q3)
 }
 
-ppc.Q3 <- function(object, data, scatterplots = FALSE) {
+ppmc.Q3 <- function(object, data, scatterplots = FALSE) {
   
   require(scatterpie)
   
@@ -802,7 +802,7 @@ odds.ratio <- function(y, nT, I, K, t_index, i_index) {
   return(or)
 }
 
-ppc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
+ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
   
   require(scatterpie)
   
@@ -877,7 +877,7 @@ ppc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
 
 # Odds Ratio Difference ----
 
-ppc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE) {
+ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE) {
   
   require(scatterpie)
   
@@ -949,6 +949,208 @@ ppc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE) {
                          substring(names(out)[i], 11)),
            xlab = "Odd Ratio Difference")
       abline(v = ordiff[i], lwd = 3)
+      mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
+            cex = 0.8, adj = 0)
+    }
+  }
+  
+  tmp <- data.frame(which(lower.tri(diag(I)), arr.ind = TRUE), out)
+  tmp$out2   <- 1 - out
+  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2)
+  
+  sp <- ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
+                                   cols=c("out","out2"), color = NA,
+                                   show.legend = FALSE) + coord_equal()  +
+    scale_fill_manual(values = c("black", gray(0.9))) +
+    labs(y = "Item", x = "Item") + theme_bw() + 
+    theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"))
+  
+  print(sp)
+  return(round(out, 3))
+}
+
+# Absolute Item Covariance Residual - RESID ----
+# This function computes the absolute item covariance residual. It requires
+# the vector of observed responses in long format, the estimated theta, 
+# threshold, and discrimination parameters, the number of time points, 
+# the number of items, the number of responses categories, and index variables 
+# for the time points and the items.
+cov.resid <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
+  M <- K - 1
+  
+  # Restructure responses in a matrix
+  Y <- matrix(NA, nT, I)
+  
+  for (t in 1:nT) {
+    for (i in 1:I) {
+      Y[t, i] <- y[t_index == t & i_index == i]
+    }
+  }
+  
+  delta       <- rowMeans(thresholds)
+  taus        <- thresholds - delta
+  
+  probs.array <- array(NA, dim = c(length(theta), I, K))
+  
+  for (yy in 0:M) {
+    probs.array[, , yy + 1] <- P.GPCM(y    = yy, 
+                                      alpha = alpha, 
+                                      delta = delta, 
+                                      taus  = taus, 
+                                      theta = theta, 
+                                      M     = M)
+  }
+  
+  E <- apply(probs.array, c(1, 2), function(x) sum(x * 1:K))
+  
+  out <- abs(cov(Y) - cov(E))
+  out <- out[lower.tri(out)]
+  names(out) <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
+    paste0("(", paste(x, collapse = ","), ")"))
+  
+  return(out)
+}
+
+ppmc.cov.resid <- function(object, data, scatterplots = FALSE) {
+  
+  require(scatterpie)
+  
+  betasamples  <- extract(object)[["beta"]]
+  thetasamples <- extract(object)[["theta"]]
+  repy <- extract(object)[["rep_y"]]
+  I    <- data$I
+  K    <- data$K
+  M    <- data$K - 1
+  nT   <- data$nT
+  y    <- data$y_obs
+  
+  # Create array to store the computed absolute covariance residuals.
+  discrepancy <- array(NA, dim = c(nrow(repy), (I * (I - 1))/2, 2))
+  
+  for (r in 1:nrow(repy)) {
+    # Get estimated parameters for the i-th iteration.
+    thresholds <- betasamples[r, , ]
+    theta      <- thetasamples[r, ]
+    
+    # RESID for the observed scores
+    discrepancy[r, , 1] <- cov.resid(y          = y,
+                                     theta      = theta,
+                                     thresholds = thresholds,
+                                     alpha      = rep(1, I),
+                                     nT         = nT,
+                                     I          = I,
+                                     K          = K,
+                                     t_index    = data$tt_obs,
+                                     i_index    = data$ii_obs)
+    
+    # RESID for the i-th replicated scores
+    discrepancy[r, , 2] <- cov.resid(y          = repy[r, ],
+                                     theta      = theta,
+                                     thresholds = thresholds,
+                                     alpha      = rep(1, I),
+                                     nT         = nT,
+                                     I          = I,
+                                     K          = K,
+                                     t_index    = data$tt_obs,
+                                     i_index    = data$ii_obs)
+  }
+  rm(r)
+  
+  # Compute posterior predictive p-values
+  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+  names(out) <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
+    paste0("ppp-resid(", paste(x, collapse = ","), ")"))
+  
+  if (scatterplots) {
+    for (i in 1:15) {
+      plot(discrepancy[, i, 1], discrepancy[, i, 2], las = 1,
+           main = paste0("Scatterplot cov RESID of items ", substring(names(out)[i], 10)),
+           ylab = expression(paste("Cov RESID (", y^rep, ";", Theta, ")")),
+           xlab = expression(paste("Cov RESID (y;", Theta, ")")))
+      abline(a= 0, b = 1, col = "red")
+      mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
+            cex = 0.8, adj = 0)
+    }
+  }
+  
+  tmp <- data.frame(which(lower.tri(diag(I)), arr.ind = TRUE), out)
+  tmp$out2   <- 1 - out
+  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2)
+  
+  sp <- ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
+                                   cols=c("out","out2"), color = NA,
+                                   show.legend = FALSE) + coord_equal()  +
+    scale_fill_manual(values = c("black", gray(0.9))) +
+    labs(y = "Item", x = "Item") + theme_bw() + 
+    theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"))
+  
+  print(sp)
+  return(round(out, 3))
+}
+
+# Absolute Item Covariance Residual Difference ----
+
+ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
+  
+  require(scatterpie)
+  
+  betasamples  <- extract(object)[["beta"]]
+  thetasamples <- extract(object)[["theta"]]
+  repy <- extract(object)[["rep_y"]]
+  I    <- data$I
+  K    <- data$K
+  M    <- data$K - 1
+  nT   <- data$nT
+  y    <- data$y_obs
+  
+  # Create array to store the computed absolute covariance residuals.
+  discrepancy <- array(NA, dim = c(nrow(repy), (I * (I - 1))/2, 2))
+  
+  for (r in 1:nrow(repy)) {
+    # Get estimated parameters for the i-th iteration.
+    thresholds <- betasamples[r, , ]
+    theta      <- thetasamples[r, ]
+    
+    # RESID for the observed scores
+    discrepancy[r, , 1] <- cov.resid(y          = y,
+                                     theta      = theta,
+                                     thresholds = thresholds,
+                                     alpha      = rep(1, I),
+                                     nT         = nT,
+                                     I          = I,
+                                     K          = K,
+                                     t_index    = data$tt_obs,
+                                     i_index    = data$ii_obs)
+    
+    # RESID for the i-th replicated scores
+    discrepancy[r, , 2] <- cov.resid(y          = repy[r, ],
+                                     theta      = theta,
+                                     thresholds = thresholds,
+                                     alpha      = rep(1, I),
+                                     nT         = nT,
+                                     I          = I,
+                                     K          = K,
+                                     t_index    = data$tt_obs,
+                                     i_index    = data$ii_obs)
+  }
+  rm(r)
+  
+  # Compute posterior predictive p-values
+  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+  names(out) <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
+    paste0("ppp-resid(", paste(x, collapse = ","), ")"))
+  
+  if (scatterplots) {
+    for (i in 1:15) {
+      plot(discrepancy[, i, 1], discrepancy[, i, 2], las = 1,
+           main = paste0("Scatterplot cov RESID of items ", substring(names(out)[i], 10)),
+           ylab = expression(paste("Cov RESID (", y^rep, ";", Theta, ")")),
+           xlab = expression(paste("Cov RESID (y;", Theta, ")")))
+      abline(a= 0, b = 1, col = "red")
       mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
             cex = 0.8, adj = 0)
     }
