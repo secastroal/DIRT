@@ -39,13 +39,19 @@ select_trend <- function(nT, FUN, ...) {
 # The required arguments are the number of time points nT; the number of items I;
 # the number of response categories K; the population parameters pop.param,
 # which must be given as a list with the true autoregressive effect (lambda), 
-# the variance of the innovations (sigma2), and the thresholds parameters 
-# (thresholds); the seed used to simulate the data; a function FUN which can be 
+# the variance of the innovations (sigma2), the thresholds parameters 
+# (thresholds), the discrimination parameters (alpha), and the theta parameters 
+# (theta); the seed used to simulate the data; a function FUN which can be 
 # predefined or customized as in apply; and additional arguments for FUN.
 # The list of true parameters can be ommited or partially given. If missing,
 # the autoregressive effect is randomly sampled from a uniform distribution,
-# the variance of the innovations is set to 1, and the threshold parameters 
-# are randomly generated.
+# the variance of the innovations is set to 1, the threshold parameters 
+# are randomly generated, the discrimination parameters are set to 1, and the 
+# theta parameters are generated based on the TV-DPCM and the given function for 
+# the trend of the intercept. The function must create a vector of length nT. 
+# Even when theta is provided in pop.param, the trend of the intercept must be 
+# specified via FUN. To have the intercept constant over time define 
+# FUN = function(x) {rep(0, nT)}.
 gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
   # Set seed to allow replicability
   set.seed(seed)
@@ -75,24 +81,32 @@ gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
     pop.param$thresholds <- thresholds
   }
   
-  # Generate the latent dynamic process ----
+  if (is.null(pop.param$alpha)) {
+    pop.param$alpha <- rep(1, I)
+  }
+  
+  # Generate the latent dynamic process if theta is missing ----
   
   # Create time varying intercept
   tv_int <- select_trend(nT, FUN, ...)
   
-  # Create latent state disposition scores
-  # First theta based on an stationary marginal distribution 
-  # (see Bringmann et al., 2017).
-  theta <- rep(NA, nT)
-  
-  theta[1] <- rnorm(1, tv_int[1]/(1 - pop.param$lambda), 
-                    sqrt(pop.param$sigma2/(1 - pop.param$lambda ^ 2)))
-  
-  for (t in 2:nT) {
-    theta[t] <- tv_int[t] + pop.param$lambda * theta[t - 1] + 
-      rnorm(1, 0, sqrt(pop.param$sigma2))
+  if (is.null(pop.param$theta)) {
+    # Create latent state disposition scores
+    # First theta based on an stationary marginal distribution 
+    # (see Bringmann et al., 2017).
+    theta <- rep(NA, nT)
+    
+    theta[1] <- rnorm(1, tv_int[1]/(1 - pop.param$lambda), 
+                      sqrt(pop.param$sigma2/(1 - pop.param$lambda ^ 2)))
+    
+    for (t in 2:nT) {
+      theta[t] <- tv_int[t] + pop.param$lambda * theta[t - 1] + 
+        rnorm(1, 0, sqrt(pop.param$sigma2))
+    }
+    rm(t)
+    
+    pop.param$theta <- theta
   }
-  rm(t)
   
   # Compute the attractor and the variance of the dynamic process
   attractor <- tv_int / (1 - pop.param$lambda)
@@ -109,14 +123,14 @@ gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
   taus  <- pop.param$thresholds - delta
   
   # Generate responses
-  probs.array <- array(NA, dim = c(length(theta), I, K))
+  probs.array <- array(NA, dim = c(length(pop.param$theta), I, K))
   
   for (y in 0:M) {
     probs.array[, , y + 1] <- P.GPCM(y     = y, 
-                                     alpha = rep(1, I), 
+                                     alpha = pop.param$alpha, 
                                      delta = delta, 
                                      taus  = taus, 
-                                     theta = theta, 
+                                     theta = pop.param$theta, 
                                      M     = M)
   }
   # The reponses are coded from 1 to I
@@ -127,7 +141,8 @@ gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
   
   # Return list with the simulated data and the true population parameters
   out <- list(thresholds.gen = pop.param$thresholds,
-              theta.gen      = theta,
+              alpha.gen      = pop.param$alpha,
+              theta.gen      = pop.param$theta,
               attractor.gen  = attractor,
               lambda.gen     = pop.param$lambda,
               sigma2.gen     = pop.param$sigma2,

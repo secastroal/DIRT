@@ -553,5 +553,46 @@ par(mfrow = c(2, 3))
 ppmc.Q1.alt(fit[[4]], standata[[4]], quiet = TRUE)
 ```
 
+# Yen's Q3
+
+```{r q3_1, fig.height = 6, results='hide'}
+for (i in 1:4) {
+  ppmc.Q3(fit[[i]], standata[[i]])
+}
+```
+
+
+# OR 
+
+```{r OR_1, fig.height = 6, results='hide'}
+for (i in 1:4) {
+  ppmc.OR(fit[[i]], standata[[i]])
+}
+```
+
+# OR Modified
+
+```{r ORdiff_1, fig.height = 6, results='hide'}
+for (i in 1:4) {
+  ppmc.ORDiff(fit[[i]], standata[[i]])
+}
+```
+
+# RESID
+
+```{r resid_1, fig.height = 6, results='hide'}
+for (i in 1:4) {
+  ppmc.cov.resid(fit[[i]], standata[[i]])
+}
+```
+
+# RESID Diff
+
+```{r resid_1, fig.height = 6, results='hide'}
+for (i in 1:4) {
+  ppmc.cov.rediff(fit[[i]], standata[[i]])
+}
+```
+
 
 # References
