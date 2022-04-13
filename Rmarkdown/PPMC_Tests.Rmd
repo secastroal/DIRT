@@ -52,13 +52,33 @@ In this document, we test the posterior predictive model checking methods that w
 
 # TV-DPCM
 
-The time-varying dynamic partial credit model is a model that aims to analyze the psychological time series of one individual. Consider for example that a person that is attending therapy is requested to report their emotions multiple times on a daily basis to monitor their progress. Thus, the person has to answer multiple likert-scale questions (the same questions every time) about how they feel. Moreover, we assume that some of these emotions measure a construct such as positive or negative affect. Given this situation, the observed data are categorical time series from a single individual. To analyze such data, we are developing (work still in progress) the time-varying dynamic partial credit model. 
+The time-varying dynamic partial credit model is a model that aims to analyze the psychological time series of one individual. Consider for example that a person that is attending therapy is requested to report their emotions multiple times on a daily basis to monitor their progress. Thus, the person has to answer multiple likert-scale questions (the same questions every time) about how they feel. Moreover, we assume that some of these emotions measure a construct such as positive or negative affect. Given this situation, the observed data are categorical time series from a single individual. To analyze such data, we developed the time-varying dynamic partial credit model. 
 
-This model combines two frameworks: The item response theory [@Embretson2000] and the time-varying vector autoregressive model [@Bringmann2017]. In particular, the measurement component of the model uses the partial credit model [@Masters2016] to relate the responses to the items with the latent construct of interest. Then, at the latent label, the latent variable, which represents the latent state dispositions of the individual at each time point, is modeled by means of a time-varying autoregressive model [@Bringmann2017]. In this case, we only allow the intercept of the autoregressive model to vary over time while the autoregressive effect is assumed to be time invariant. Thus, the intercept is further modeled with the generalized additive model with splines. This allows the time series to follow a non linear (smooth) trend.
+This model combines two frameworks: The item response theory [@Embretson2000] and the time-varying vector autoregressive model [@Bringmann2017]. In particular, the measurement component of the model uses the partial credit model [@Masters2016] to relate the responses to the items with the latent construct of interest. Then, at the latent level, the latent variable, which represents the latent state dispositions of the individual at each time point, is modeled by means of a time-varying autoregressive model [@Bringmann2017]. In this case, we only allow the intercept of the autoregressive model to vary over time while the autoregressive effect is assumed to be time invariant. Thus, the intercept is further modeled with the generalized additive model with splines [@Wood2017]. This allows the time series to follow a non linear (smooth) trend. To be more precise, the model is defined in two equations: The measurement equation and the structural equation. The measurement equation defines the measurement model that relates the responses with the latent construct, namely, the PCM, which is as follows:
+
+$$
+P(X_i = x|\theta_t) = \frac{exp\Big[\sum\limits_{k=0}^{x}(\theta_t - \delta_{ik})\Big]}{\sum\limits_{v=0}^{m_{i}}exp\Big[\sum\limits_{k=0}^{v}(\theta_t - \delta_{ik})\Big]},
+$$
+
+where $\theta_{t}$ is the latent state disposition at time $t$ and $\delta_{ik}$ is the step parameter of the $k$-th category of the $i$-th item. Then, the latent state dispositions ($\theta_t$) are further modeled at the structural equation with the TV-AR model. This means that $\theta_t$ is regressed on a lagged version of itself, resulting in the following equation:
+
+$$
+\theta_{t} = \alpha_{t} + \varphi\theta_{t-1} + \varepsilon_{t},
+$$
+
+where $\alpha_t$ is the time varying intercept of the dynamic process, $\varphi$ is the time invariant autoregressive effect between consecutive latent state dispositions, and $\varepsilon_{t}$ is the residual, also known as the innovation, at time $t$. Lastly, the time varying intercepts ($\alpha_t$) are further modeled as a function of time with a generalized additive model. This means that:
+
+$$
+\alpha_{t} = f(t) = \sum\limits_{j=1}^{s}b_{j}(t)\beta_{j},
+$$
+
+where $b_j(t)$ is a function of time, which is known as a basis function. These basis functions can be specified in many different ways given a certain smoother [@Wood2017]. In this particular implementation, we define the basis functions based on B-splines.
+
+\newpage
 
 # Data Simulation
 
-In this example, we simulated four data sets. The first data set perfectly matches the proposed TV-DPCM. The second data set is a constrained version of the TV-DPCM model in which the intercept does not vary over time. A third data set assumes that the latent structure is bidimensional instead of unidimensional. The last data set assumes that there is item parameter drift (i.e., the item parameters change over time). For these data sets, we simulated 200 time points of 6 items each with 5 response options. Moreover, the autoregressive effect is set at 0.5 and the variance of the innovations is set to 1.  
+In this example, we simulated six data sets. The first data set perfectly matches the proposed TV-DPCM. The second data set is a constrained version of the TV-DPCM model in which the intercept does not vary over time. A third data set assumes that the latent structure is bidimensional instead of unidimensional. The fourth data set assumes that there is item parameter drift (i.e., the item parameters change over time). The fifth data set simulates data based on the generalized PCM, in other words, it allows the discrimination parameters to vary across items. Lastly, the last data set simulates a TV-DPCM of order 3 (i.e., the latent state disposition is regressed on the three previous time points). For these data sets, we simulated 200 time points of 6 items each with 5 response options. Moreover, the autoregressive effect is set at 0.5 and the variance of the innovations is set to 1.  
 
 ```{r fixvalues}
 nT     <- 200   # Number of time points
@@ -69,7 +89,7 @@ lambda <- 0.5   # Size of the autoregressive effect
 in_var <- 1     # Variance of the innovations
 ```
 
-Data1 perfectly matches the TV-DPCM. In this case, we simulate the time-varying intercept based on a B-splines of degree three with 2 internal knots. The simulated time series of the sumscores are presented in following figure: 
+Data1 perfectly matches the TV-DPCM. In this case, we simulate the time-varying intercept based on sinusoidal trend with one and a half period. The simulated time series of the sumscores are presented in following figure: 
 
 ```{r data1}
 # Generate Data based on the TV-DPCM
@@ -110,13 +130,13 @@ plot(rowSums(data2), type = "l", ylab = "sumscores", xlab = "Time",
      las = 1, lwd = 2)
 ```
 
-The next data set (Data3) assumes that the factor structure is bidimensional instead of unidimensional. The two factors are correlated ($r = 0.6$). The latent process of these two factors was also simulated based on an autoregressive model without time varying parameters. Thus, the simulated time series of the sumscores of each factor and the whole scale are presented in the following figure:
+The next data set (Data3) assumes that the factor structure is bidimensional instead of unidimensional. The two factors are correlated ($r = 0.5$). The latent process of these two factors was also simulated based on an autoregressive model without time varying parameters. Thus, the simulated time series of the sumscores of each factor and the whole scale are presented in the following figure:
 
 ```{r data3}
 # Now, theta is a matrix with two factors that are weakly correlated.
 theta <- matrix(NA, nrow = nT, ncol = 2)
 mu    <- c(0, 0)
-Sigma <- matrix(c(1, 0.3, 0.3, 1), 2)
+Sigma <- matrix(c(1, 0.5, 0.5, 1), 2)
 
 theta[1, ] <- MASS::mvrnorm(1, mu = mu, Sigma = Sigma)
 
@@ -179,7 +199,7 @@ legend("topright", c("Total", "Factor 1", "Factor 2"),
 
 ```
 
-Lastly, Data4 assumes that the item parameters change over time. For this, we keep the same generated thetas as the ones use to generate Data1. We also use the same item parameters as we used for the other data sets to generate the first half of the responses. In contrast, for the second half of the responses, the thresholds parameters are modified by resting 2 to all of them. This means that the individual is more likely to endorse high responses on the second half of the measurement. Now, the following figure presents the simulated time series:
+Next, Data4 assumes that the item parameters change over time. For this, we keep the same generated thetas as the ones use to generate Data1. We also use the same item parameters as we used for the other data sets to generate the first half of the responses. In contrast, for the second half of the responses, the thresholds parameters are modified by resting 1.5 to all of them. This means that the individual is more likely to endorse high responses on the second half of the measurement. Now, the following figure presents the simulated time series:
 
 ```{r data4}
 # Use same theta as in data1
@@ -236,9 +256,84 @@ plot(rowSums(data4[1:100, ]), type = "l", ylab = "sumscores", xlab = "Time",
 lines(100:200, rowSums(data4[100:200, ]), col = "darkgreen", lwd = 2)
 ```
 
+The fifth dataset (Data5) simulates data using the GPCM instead of the PCM for the measurement equation. This means that the discrimination parameters vary across items. The discrimination parameters are generated based on a lognormal distribution with mean 0 and standard deviation 0.25. The simulated data is presented in following Figure:
+
+```{r data5}
+# Generate Data based on the TV-DPCM using the GPCM for the measurement model.
+data5 <- gen.TVDPCM(nT = nT, 
+                    I  = I, 
+                    K  = K, 
+                    pop.param = list(lambda = dataTRUE$lambda.gen,
+                                     sigma2 = dataTRUE$sigma2.gen,
+                                     thresholds = dataTRUE$thresholds.gen,
+                                     theta = dataTRUE$theta.gen,
+                                     alpha = rlnorm(I, 0, 0.25)), 
+                    seed = seed, 
+                    FUN  = "sinusoidal",
+                    maxAbsValue = 1)
+
+data5 <- data5$data
+```
+
+```{r data5_plot}
+plot(rowSums(data5), type = "l", ylab = "sumscores", xlab = "Time",
+     las = 1, lwd = 2)
+```
+
+Finally, the last data set (Data6) is simulated based on a dynamic process of order 3. This means that the latent state disposition at time $t$ has an effect on the latent state disposition at time $t + 3$. The observed time series of Data6 are presented in the following Figure:
+
+```{r data6}
+# Generate the dynamic process of order 3.
+# Define autoregressive effect up to lag 3.
+lambda <- c(0.3, 0.2, 0.1)
+
+# Use the same time varying intercept as in Data1.
+tv_int <- sinusoidal(nT, 1)
+tv_int <- c(tv_int * -1, tv_int)
+
+# We generate a dynamic process twice the required length and the drop the first 
+# half
+theta <- rep(NA, nT * 2)
+
+# The three first thetas are randomly generated.
+theta[1:3] <- rnorm(1, 0, sqrt(dataTRUE$sigma2.gen))
+
+for (t in 4:(nT * 2)) {
+      theta[t] <- tv_int[t] + lambda[1] * theta[t - 1] +
+        lambda[2] * theta[t - 2] + lambda[3] * theta[t - 3] +
+        rnorm(1, 0, sqrt(dataTRUE$sigma2.gen))
+    }
+    rm(t)
+
+theta <- theta[(nT + 1):(nT * 2)]
+
+# Generate Data based on the TV-DPCM
+data6 <- gen.TVDPCM(nT = nT, 
+                    I  = I, 
+                    K  = K, 
+                    pop.param = list(lambda = lambda[1],
+                                     sigma2 = dataTRUE$sigma2.gen,
+                                     thresholds = dataTRUE$thresholds.gen,
+                                     theta = theta), 
+                    seed = seed, 
+                    FUN  = "sinusoidal",
+                    maxAbsValue = 1)
+
+data6 <- data6$data
+```
+
+```{r data6_plot}
+plot(rowSums(data6), type = "l", ylab = "sumscores", xlab = "Time",
+     las = 1, lwd = 2)
+```
+
+In the next section, we proceed to analyze the simulated data sets with the TV-DPCM and to compute several posterior predictive model checking methods.
+
+\newpage
+
 # Posterior Predictive Model Checking Methods
 
-In this section, we fit the TV-DPCM to all the generated data sets. Then, we compute some of the posterior predictive checking methods and modified versions of these methods that have been proposed for IRT in @Li2017, @Sinharay2006a, and @Zhu2011. First, let's verify by means of the Rubin-Gelman statistics that the model converged on each of the data sets. This is presented in the following figure: 
+In this section, we fit the TV-DPCM to all the generated data sets. To run the algorithm, we used 3 parallel chains and 2000 iterations per chain, of which 500 were discarded as burn-in. For the B-splines, we used 8 internal knots, which means that we used 10 basis functions to model the trend. Once the estimation of the model was finished, we computed some of the posterior predictive model checking methods and modified versions of these methods that have been proposed for IRT in @Li2017, @Sinharay2006a, and @Zhu2011. First, to verify that the models converged, we looked at the warning messages from Stan. These messages indicate if there were divergent transitions, if there were Gelman-Rubin statistics larger than 1.05, and other checks available in Stan. These diagnostic checks are presented in the following Table for each data set. If the estimation of the model finished without any issues, all the different warnings must be 0. 
 
 ```{r selectmodel}
 if (setmodel == "TVPCM") {
@@ -285,12 +380,12 @@ if (setmodel == "PCM") {
 ```{r stanfit}
 model <- stan_model(file = paste0("../Stan/", modelfile), verbose = FALSE)
 
-datasets <- list(data1, data2, data3, data4)
+datasets <- list(data1, data2, data3, data4, data5, data6)
 standata <- list()
 fit      <- list()
 
 # Fit the TV-DPCM model with stan
-for (i in 1:4) {
+for (i in 1:6) {
 
 responses <- datasets[[i]]
 
@@ -317,16 +412,14 @@ rm(begin.time)
 }
 ```
 
-## Verify model convergence.
-
 ```{r diagnostics, results='hide'}
 
 diag <- lapply(fit, function (x) {
   monitor(extract(x, permuted = FALSE, inc_warmup = FALSE), warmup = 0)
 })
 
-diag.table <- matrix(NA, nrow = 6, ncol = 4)
-colnames(diag.table)  <- paste0("Data", 1:4)
+diag.table <- matrix(NA, nrow = 6, ncol = 6)
+colnames(diag.table)  <- paste0("Data", 1:6)
 row.names(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
                            "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
 
@@ -360,14 +453,14 @@ diag.table[6, ] <- unlist(
 kbl(diag.table, align = "c", booktabs = TRUE)
 ```
 
-```{r pairs_plot}
+```{r pairs_plot, eval = FALSE}
 for (i in 1:4) {
   pairs(fit[[i]], pars = paramplot, log = TRUE, las = 1)
 }
 rm(i)
 ```
 
-```{r rhat_plot, fig.height = 8}
+```{r rhat_plot, fig.height = 8, eval = FALSE}
 par(mfrow = c(2, 2))
 for (i in 1:4) {
   print(mcmc_rhat(rhat(fit[[i]])))
@@ -375,7 +468,7 @@ for (i in 1:4) {
 rm(i)
 ```
 
-```{r trace_plot}
+```{r trace_plot, eval = FALSE}
 for (i in 1:4) {
   print(traceplot(fit[[i]], pars = paramplot, 
                   inc_warmup = FALSE))
@@ -383,15 +476,23 @@ for (i in 1:4) {
 rm(i)
 ```
 
+In what follows, different posterior predictive model checking methods are applied on the fitted models in order to illustrate how they work and to explore whether they are useful to identify model misfit. We expect some of this methods to show misfit on Data3 to Data6, as these simulated data sets clearly violate some of the assumptions of the TV-DPCM. In contrast, the fitted models to Data1 and Data2 should not show model misfit given that Data1 perfectly matches the model and Data2 was simulated based on a simplified version of the model.
+
+\newpage
+
 ## Sumscores Time Series
 
+A popular test level measure to assess model fit of IRT models is the Test Score distribution [@Li2017, @Zhu2011], which compares the test score distribution of the observed data with the replicated data. However, assessing the test score distribution did not seem to be adequate for the TV-DPCM model as it does not take into account the time component. Because of this, we compared the observed and the replicated time series of the test scores instead. In the next Figure, we plotted the observed test scores against the median test score of the replicated data with its 95\% percentile band of the replicated scores. If a large amount of observed scores are out of the 95\% percentile band, it would indicate some sort of model misfit.   
+
 ```{r sums_ts, fig.height = 8}
-par(mfrow = c(4, 1))
-for(i in 1:4) {
+par(mfrow = c(6, 1), oma = c(1, 3, 1, 1))
+for(i in 1:6) {
   ppmc.sumscore.ts(fit[[i]], standata[[i]])
 }
 rm(i)
 ```
+
+\newpage
 
 ## Autocorrelation: 1st, 2nd, and 3rd
 
