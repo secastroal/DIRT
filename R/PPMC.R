@@ -423,9 +423,9 @@ ppmc.itcor3 <- function(object, data, method = "pearson", items = NULL, quiet = 
 # Function to compute the Yen's Q1 for polytomous models
 # The arguments are the estimated theta, threshold, and discrimination 
 # parameters, the number of items, the number of response categories,
-# the grouping variable for each time point, and a grouping index for
+# the grouping variable for each time point, and a grouping and item index for
 # the data in long format.
-gpcm.Q1 <- function(y, theta, thresholds, alpha, I, K, group, group_index) {
+gpcm.Q1 <- function(y, theta, thresholds, alpha, I, K, group, group_index, i_index) {
   
   M <- K - 1
   
@@ -447,7 +447,7 @@ gpcm.Q1 <- function(y, theta, thresholds, alpha, I, K, group, group_index) {
     tapply(x, group, mean)
     })
   
-  O <-  tapply(y, list(group_index, data$ii_obs), function(x) {
+  O <-  tapply(y, list(group_index, i_index), function(x) {
     x    <- factor(x, levels = 1:K)
     xtab <- prop.table(table(x, exclude = FALSE))
     return(as.vector(xtab))
@@ -508,7 +508,8 @@ ppmc.Q1 <- function(object, data, items = NULL, quiet = FALSE) {
                                    I           = I, 
                                    K           = K, 
                                    group       = group,
-                                   group_index = group_index)
+                                   group_index = group_index,
+                                   i_index     = data$ii_obs)
     # Yen's Q1 for the i-th replicated scores
     discrepancy[r, , 2] <- gpcm.Q1(y           = repy[r, ], 
                                    theta       = theta, 
@@ -517,7 +518,8 @@ ppmc.Q1 <- function(object, data, items = NULL, quiet = FALSE) {
                                    I           = I, 
                                    K           = K, 
                                    group       = group,
-                                   group_index = group_index)
+                                   group_index = group_index,
+                                   i_index     = data$ii_obs)
   }
   rm(r)
   
@@ -583,7 +585,8 @@ ppmc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE) {
                                    I           = I, 
                                    K           = K, 
                                    group       = group,
-                                   group_index = group_index)
+                                   group_index = group_index,
+                                   i_index     = data$ii_obs)
     # Yen's Q1 for the i-th replicated scores
     discrepancy[r, , 2] <- gpcm.Q1(y           = repy[r, ], 
                                    theta       = theta, 
@@ -592,7 +595,8 @@ ppmc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE) {
                                    I           = I, 
                                    K           = K, 
                                    group       = group,
-                                   group_index = group_index)
+                                   group_index = group_index,
+                                   i_index     = data$ii_obs)
   }
   rm(r)
   

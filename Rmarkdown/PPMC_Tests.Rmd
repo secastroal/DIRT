@@ -32,11 +32,13 @@ library("splines")
 
 source("../R/IRT_models.R")
 source("../R/IRT_plots.R")
-source("../R/PPC.R")
+source("../R/PPMC.R")
+source("../R/genTVDPCM.R")
+source("../R/tvdpcm2stan.R")
 ```
 
 ```{r seed}
-seed <- 1001
+seed <- 1005
 set.seed(seed)
 ```
 
@@ -70,73 +72,16 @@ in_var <- 1     # Variance of the innovations
 Data1 perfectly matches the TV-DPCM. In this case, we simulate the time-varying intercept based on a B-splines of degree three with 2 internal knots. The simulated time series of the sumscores are presented in following figure: 
 
 ```{r data1}
-time     <- 1:nT
-n_knots  <- 4  # Define number of knots.
-s_degree <- 3  # Define degree of splines.
-n_basis  <- n_knots + s_degree - 1 # Compute number of basis.
+# Generate Data based on the TV-DPCM
+dataTRUE <- gen.TVDPCM(nT = nT, 
+                       I  = I, 
+                       K  = K, 
+                       pop.param = list(lambda = lambda), 
+                       seed = seed, 
+                       FUN  = "sinusoidal",
+                       maxAbsValue = 1)
 
-# Create the b-splines within the time interval.
-B_true <- t(bs(time, df = n_basis, degree = s_degree, intercept = TRUE))
-
-# Define intercept and coefficients to generate the time-varying intercept based 
-# on the b-splines.
-a0 <- 0                    # intercept
-a  <- rnorm(n_basis, 0, 1) # coefficients of B-splines
-
-# Compute time-varying intercept based on time and b-splines. 
-tv_int <- as.vector(a0 * time + a %*% B_true)
-
-# Repeat lambda
-tv_lambda <- rep(lambda, nT)
-
-# Generate the latent scores theta
-theta <- rep(NA, nT)
-
-# First theta based on an stationary marginal distribution (see Bringmann et al., 2017).
-theta[1] <- rnorm(1, tv_int[1]/(1 - tv_lambda[1]), sqrt(in_var/(1 - tv_lambda[1] ^ 2)))
-
-for (t in 2:nT) {
-  theta[t] <- tv_int[t] + tv_lambda[t] * theta[t - 1] + rnorm(1, 0, sqrt(in_var))
-}
-rm(t)
-
-theta_splines <- theta
-
-attractor <- tv_int / (1 - lambda)
-p_var     <- in_var / (1 - lambda ^ 2)
-
-# Next, we generate data based on the PCM and the thetas we just created.
-
-# Create item parameters
-
-# Thresholds
-thresholds <- t(apply(matrix(runif(I * M, .3, 1), I), 1, cumsum))
-if (M == 1) {thresholds <- t(thresholds)}
-thresholds <- thresholds - rowMeans(thresholds)
-thresholds <- thresholds + rnorm(I)
-
-# Location
-delta <- rowMeans(thresholds)
-
-# Step parameters
-taus <- thresholds - delta
-
-# Generate responses
-probs.array <- array(NA, dim = c(length(theta), I, K))
-
-for (y in 0:M) {
-  probs.array[, , y + 1] <- P.GPCM(y     = y, 
-                                   alpha = rep(1, I), 
-                                   delta = delta, 
-                                   taus  = taus, 
-                                   theta = theta, 
-                                   M     = M)
-}
-responses   <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 1, vec) == 1) - 1 })
-responses   <- responses + 1 # To fit the PCM in stan, items should be coded starting from 1. 
-rm(probs.array, y)
-
-data1 <- responses
+data1 <- dataTRUE$data
 ```
 
 ```{r data1_plot}
@@ -147,33 +92,17 @@ plot(rowSums(data1), type = "l", ylab = "sumscores", xlab = "Time",
 Secondly, Data2 was simulated based on a simpler version of the model that does not allow the intercept to vary over time. In this case, the latent variable is also modeled after an autoregressive model, but the structure is assumed to be stationary. Therefore, there are not trends in the time series. In this case, the simulated time series of the sumscores look like this:
 
 ```{r data2}
+# Simulate data with no trend
+data2 <- gen.TVDPCM(nT = nT,
+                    I  = I,
+                    K  = K,
+                    pop.param = list(lambda = dataTRUE$lambda.gen,
+                                     sigma2 = dataTRUE$sigma2.gen,
+                                     thresholds = dataTRUE$thresholds.gen),
+                    seed = seed,
+                    FUN = function(x) {rep(0, nT)})
 
-theta <- rep(NA, nT)
-
-theta[1] <- rnorm(1)
-
-for (i in 2:nT) {
-  theta[i] <- lambda * theta[i - 1] + rnorm(1, 0, 1) 
-}
-rm(i)
-
-# Generate responses
-probs.array <- array(NA, dim = c(length(theta), I, K))
-
-for (y in 0:M) {
-  probs.array[, , y + 1] <- P.GPCM(y     = y, 
-                                   alpha = rep(1, I), 
-                                   delta = delta, 
-                                   taus  = taus, 
-                                   theta = theta, 
-                                   M     = M)
-}
-responses   <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 1, vec) == 1) - 1 })
-responses   <- responses + 1 # To fit the PCM in stan, items should be coded starting from 1. 
-rm(probs.array, y)
-
-data2 <- responses
-
+data2 <- data2$data
 ```
 
 ```{r data2_plot}
@@ -198,6 +127,11 @@ rm(i, mu, Sigma)
 
 # Now, let's use the same item parameters to generate the data but using three
 # items for one factor and three items for the other factor.
+# Location
+delta <- rowMeans(dataTRUE$thresholds.gen)
+  
+# Steps
+taus  <- dataTRUE$thresholds.gen - delta
 
 # Responses factor 1
 probs.array <- array(NA, dim = c(dim(theta)[1], I / 2, K))
@@ -249,10 +183,10 @@ Lastly, Data4 assumes that the item parameters change over time. For this, we ke
 
 ```{r data4}
 # Use same theta as in data1
-theta <- theta_splines
+theta <- dataTRUE$theta.gen
 
 # Create item parameters for the second half.
-thresholds2 <- thresholds - 2
+thresholds2 <- dataTRUE$thresholds.gen - 1.5
 
 # Location
 delta2 <- rowMeans(thresholds2)
@@ -291,7 +225,7 @@ responses2   <- responses2 + 1 # To fit the PCM in stan, items should be coded s
 rm(probs.array, y)
 
 responses <- rbind(responses1, responses2)
-#rm(responses1, responses2)
+rm(responses1, responses2)
 
 data4 <- responses
 ```
@@ -308,20 +242,16 @@ In this section, we fit the TV-DPCM to all the generated data sets. Then, we com
 
 ```{r selectmodel}
 if (setmodel == "TVPCM") {
-  modelfile   <- "tv_dpcm_int.stan"
-  paramsample <- c("beta", "theta", "lambda", "sigma2", "p_var", 
+  modelfile   <- "tv_dpcm_int_v5.1.stan"
+  paramsample <- c("beta", "theta", "lambda", "sigma2", "pvar", 
                    "attractor", "rep_y")
-  paramplot   <- c("beta[1,1]", "beta[3,3]", "beta[6,4]", "theta[1]", 
-                   "theta[100]", "theta[200]", "lambda", "sigma2", 
-                   "p_var")
+  paramplot   <- c("beta[3,3]", "theta[100]", "attractor[50]", 
+                   "lambda", "sigma2", "pvar")
   inits <- function() {
-  list(#a_raw  = rnorm(n_basis),
-       #a0     = rnorm(1),
-       #tau    = rnorm(1),
-       lambda = runif(1, -1, 1),
+  list(lambda = runif(1, -1, 1),
        beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
        inno   = rnorm(nT, 0, 3),
-       sigma2 = rlnorm(1, 1))
+       sigma  = rlnorm(1, 1))
   }
 }
 
@@ -355,8 +285,6 @@ if (setmodel == "PCM") {
 ```{r stanfit}
 model <- stan_model(file = paste0("../Stan/", modelfile), verbose = FALSE)
 
-knots <- trunc(seq(1, nT, length.out = n_knots * 2))
-
 datasets <- list(data1, data2, data3, data4)
 standata <- list()
 fit      <- list()
@@ -366,30 +294,23 @@ for (i in 1:4) {
 
 responses <- datasets[[i]]
 
-standata[[i]] <- list(nT = nT,
-                      n_knots  = n_knots * 2,
-                      knots    = knots,
-                      s_degree = s_degree,
-                      I  = I,
-                      K  = K,
-                      N  = nT * I,
-                      N_obs = sum(!is.na(c(responses))),
-                      tt = rep(1:nT, I),
-                      ii = rep(1:I, each = nT),
-                      tt_obs = rep(1:nT, I)[!is.na(c(responses))],
-                      ii_obs = rep(1:I, each = nT)[!is.na(c(responses))],
-                      y_obs  = c(responses)[!is.na(c(responses))],
-                      time = time)
+standata[[i]] <- tvdpcm2stan_data(resp = responses,
+                                  I = I,
+                                  K = K,
+                                  nT = nT,
+                                  n_knots = 8,
+                                  s_degree = 3)
             
 begin.time <- proc.time()
 fit[[i]] <- sampling(model,                            # Stan model. 
                      data = standata[[i]],             # Data.
                      iter = 2000,                      # Number of iterations.
                      chains  = 3,                      # Number of chains.
-                     warmup  = 1000,                   # Burn-in samples.
+                     warmup  = 500,                   # Burn-in samples.
                      init    = inits,
+                     seed    = seed,
                      pars    = paramsample,
-                     control = list(adapt_delta=0.8, max_treedepth = 10)) # Other parameters to control sampling behavior.
+                     control = list(adapt_delta=0.99, max_treedepth = 15)) # Other parameters to control sampling behavior.
 run.time <- proc.time() - begin.time
 rm(begin.time)
             
@@ -453,6 +374,7 @@ for (i in 1:4) {
 }
 rm(i)
 ```
+
 ```{r trace_plot}
 for (i in 1:4) {
   print(traceplot(fit[[i]], pars = paramplot, 
@@ -466,7 +388,7 @@ rm(i)
 ```{r sums_ts, fig.height = 8}
 par(mfrow = c(4, 1))
 for(i in 1:4) {
-  ppc.sumscore.ts(fit[[i]], standata[[i]])
+  ppmc.sumscore.ts(fit[[i]], standata[[i]])
 }
 rm(i)
 ```
@@ -476,7 +398,7 @@ rm(i)
 ```{r acf, fig.height = 8}
 par(mfrow = c(4, 3))
 for(i in 1:4) {
-  ppc.acf(fit[[i]], standata[[i]], lag.max = 3)
+  ppmc.acf(fit[[i]], standata[[i]], lag.max = 3)
 }
 rm(i)
 ```
@@ -486,17 +408,28 @@ rm(i)
 ```{r racf, fig.height = 8}
 par(mfrow = c(2, 2))
 for(i in 1:4) {
-  ppc.racf(fit[[i]], standata[[i]])
+  ppmc.racf(fit[[i]], standata[[i]])
 }
 rm(i)
 ```
+
+## Mean Squared Succesive Differences
+
+```{r racf, fig.height = 8}
+par(mfrow = c(2, 2))
+for(i in 1:4) {
+  ppmc.mssd(fit[[i]], standata[[i]])
+}
+rm(i)
+```
+
 
 ## Items Scores Time Series: Item 1
 
 ```{r item_ts, fig.height = 8}
 par(mfrow = c(4, 1))
 for(i in 1:4) {
-  ppc.item.ts(fit[[i]], standata[[i]], quiet = TRUE, items = 1)
+  ppmc.item.ts(fit[[i]], standata[[i]], quiet = TRUE, items = 1)
 }
 rm(i)
 ```
@@ -505,44 +438,44 @@ rm(i)
 Data1:
 ```{r itcor_1, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor(fit[[1]], standata[[1]], quiet = TRUE, method = "pearson")
+ppmc.itcor(fit[[1]], standata[[1]], quiet = TRUE, method = "pearson")
 ```
 Data2:
 ```{r itcor_2, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor(fit[[2]], standata[[2]], quiet = TRUE, method = "pearson")
+ppmc.itcor(fit[[2]], standata[[2]], quiet = TRUE, method = "pearson")
 ```
 Data3:
 ```{r itcor_3, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor(fit[[3]], standata[[3]], quiet = TRUE, method = "pearson")
+ppmc.itcor(fit[[3]], standata[[3]], quiet = TRUE, method = "pearson")
 ```
 Data4:
 ```{r itcor_4, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor(fit[[4]], standata[[4]], quiet = TRUE, method = "pearson")
+ppmc.itcor(fit[[4]], standata[[4]], quiet = TRUE, method = "pearson")
 ```
 
 ## Item-Total Correlation: Version 2
 Data1:
 ```{r itcor2_1, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor2(fit[[1]], standata[[1]], quiet = TRUE, method = "polyserial")
+ppmc.itcor2(fit[[1]], standata[[1]], quiet = TRUE, method = "polyserial")
 ```
 Data2:
 ```{r itcor2_2, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor2(fit[[2]], standata[[2]], quiet = TRUE, method = "polyserial")
+ppmc.itcor2(fit[[2]], standata[[2]], quiet = TRUE, method = "polyserial")
 ```
 Data3:
 ```{r itcor2_3, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor2(fit[[3]], standata[[3]], quiet = TRUE, method = "polyserial")
+ppmc.itcor2(fit[[3]], standata[[3]], quiet = TRUE, method = "polyserial")
 ```
 Data4:
 ```{r itcor2_4, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor2(fit[[4]], standata[[4]], quiet = TRUE, method = "polyserial")
+ppmc.itcor2(fit[[4]], standata[[4]], quiet = TRUE, method = "polyserial")
 ```
 
 
@@ -550,22 +483,74 @@ ppc.itcor2(fit[[4]], standata[[4]], quiet = TRUE, method = "polyserial")
 Data1:
 ```{r itcor3_1, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor3(fit[[1]], standata[[1]], quiet = TRUE)
+ppmc.itcor3(fit[[1]], standata[[1]], quiet = TRUE)
 ```
 Data2:
 ```{r itcor3_2, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor3(fit[[2]], standata[[2]], quiet = TRUE)
+ppmc.itcor3(fit[[2]], standata[[2]], quiet = TRUE)
 ```
 Data3:
 ```{r itcor3_3, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor3(fit[[3]], standata[[3]], quiet = TRUE)
+ppmc.itcor3(fit[[3]], standata[[3]], quiet = TRUE)
 ```
 Data4:
 ```{r itcor3_4, fig.height = 6, results='hide'}
 par(mfrow = c(2, 3))
-ppc.itcor3(fit[[4]], standata[[4]], quiet = TRUE)
+ppmc.itcor3(fit[[4]], standata[[4]], quiet = TRUE)
+```
+
+## Yen's Q1
+
+Data1:
+```{r q1_1, fig.height = 6, results='hide'}
+par(mfrow = c(2, 3))
+ppmc.Q1(fit[[1]], standata[[1]], quiet = TRUE)
+```
+
+Data2:
+```{r q1_2, fig.height = 6, results='hide'}
+par(mfrow = c(2, 3))
+ppmc.Q1(fit[[2]], standata[[2]], quiet = TRUE)
+```
+
+Data3:
+```{r q1_3, fig.height = 6, results='hide'}
+par(mfrow = c(2, 3))
+ppmc.Q1(fit[[3]], standata[[3]], quiet = TRUE)
+```
+
+Data4:
+```{r q1_4, fig.height = 6, results='hide'}
+par(mfrow = c(2, 3))
+ppmc.Q1(fit[[4]], standata[[4]], quiet = TRUE)
+```
+
+## Yen's Q1 modified
+
+Data1:
+```{r q1alt_1, fig.height = 6, results='hide'}
+par(mfrow = c(2, 3))
+ppmc.Q1.alt(fit[[1]], standata[[1]], quiet = TRUE)
+```
+
+Data1:
+```{r q1alt_2, fig.height = 6, results='hide'}
+par(mfrow = c(2, 3))
+ppmc.Q1.alt(fit[[2]], standata[[2]], quiet = TRUE)
+```
+
+Data1:
+```{r q1alt_3, fig.height = 6, results='hide'}
+par(mfrow = c(2, 3))
+ppmc.Q1.alt(fit[[3]], standata[[3]], quiet = TRUE)
+```
+
+Data4:
+```{r q1alt_4, fig.height = 6, results='hide'}
+par(mfrow = c(2, 3))
+ppmc.Q1.alt(fit[[4]], standata[[4]], quiet = TRUE)
 ```
 
 
