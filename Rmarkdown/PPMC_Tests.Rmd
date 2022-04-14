@@ -498,15 +498,7 @@ rm(i)
 
 One of the key features of the TV-DPCM is the assumption that the latent dynamic process follows a first order TV-AR model. Intuitively, we think that the autocorrelation can be a useful statistic to assess model fit via PPMC methods. Because of this, we computed the autocorrelation of the observed test scores up to lag 3. We expect this statistic to show some kind of misfit if the autoregressive order of the real data is larger than 1. However, this does not seem to be the case given the computed ppp-values presented in the following Table.
 
-```{r acf, fig.height = 8, eval = FALSE}
-par(mfrow = c(6, 3))
-for(i in 1:6) {
-  ppmc.acf(fit[[i]], standata[[i]], lag.max = 3)
-}
-rm(i)
-```
-
-```{r acftable, results="hide", fig.show = "hide"}
+```{r acf, results="hide", fig.show = "hide"}
 acftable <- matrix(NA, ncol = 3, nrow = 6)
 colnames(acftable) <- paste0("ACF", 1:3)
 row.names(acftable) <- paste("Data", 1:6)
@@ -514,6 +506,9 @@ for(i in 1:6) {
   acftable[i, ] <- ppmc.acf(fit[[i]], standata[[i]], lag.max = 3)
 }
 rm(i)
+```
+
+```{r acftable, results="hide"}
 kbl(acftable, align = "c", booktabs = TRUE)
 ```
 
