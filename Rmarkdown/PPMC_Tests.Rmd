@@ -823,5 +823,8 @@ ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
                   label.x = 0.1)
 ```
 
+# Conclusion
+
+In the present document, we illustrate the ideas that we have about the PPMC methods and some modified versions of these methods that can be used to assess the fit of the TV-DPCM. In this example, we simulated 6 different data sets, 4 of which violated some of the assumptions of the model. Then, we fitted the TV-DPCM model to each data set and we computed the PPMC methods available. From these preliminary analyses, it seems that the pair-wise discrepancy measures such as Yen's $Q_3$ and the odds ratio are to some extend useful to identify violations of unidimensionality. The other PPMC methods presented did not seem to be able to identify model misfit witht he given data sets.
 
 # References
