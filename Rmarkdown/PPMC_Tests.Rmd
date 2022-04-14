@@ -28,7 +28,6 @@ library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 library(bayesplot)
-library("splines")
 
 source("../R/IRT_models.R")
 source("../R/IRT_plots.R")
@@ -45,7 +44,7 @@ set.seed(seed)
 ```{r setmodel}
 # Use TVPCM, ARPCM, or PCM
 setmodel <- "TVPCM"
-# render("Rmarkdown/PPMC_Tests.Rmd", output_file = paste0("Rmarkdown/PPMC_Tests_", setmodel, "_", seed))
+# rmarkdown::render("Rmarkdown/PPMC_Tests.Rmd", output_file = paste0("Rmarkdown/PPMC_Tests_", setmodel, "_", seed))
 ```
 
 In this document, we test the posterior predictive model checking methods that we are developing for the time-varying dynamic partial credit model (TV-DPCM). For this, we simulated data based on the TV-DPCM as well as data that violates some of the assumptions of the model.
@@ -377,7 +376,7 @@ if (setmodel == "PCM") {
 ```
 
 
-```{r stanfit}
+```{r stanfit, eval = !(exists("standata") & exists("fit"))}
 model <- stan_model(file = paste0("../Stan/", modelfile), verbose = FALSE)
 
 datasets <- list(data1, data2, data3, data4, data5, data6)
@@ -419,32 +418,32 @@ diag <- lapply(fit, function (x) {
 })
 
 diag.table <- matrix(NA, nrow = 6, ncol = 6)
-colnames(diag.table)  <- paste0("Data", 1:6)
-row.names(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+row.names(diag.table)  <- paste0("Data", 1:6)
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
                            "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
 
-diag.table[1, ] <- unlist(
+diag.table[, 1] <- unlist(
   lapply(fit, function(x) {
     sum(rhat(x, pars = head(paramsample, -1)) > 1.05)
     }))
 
-diag.table[2, ] <- unlist(
+diag.table[, 2] <- unlist(
   lapply(fit, get_num_divergent)
 )
 
-diag.table[3, ] <- unlist(
+diag.table[, 3] <- unlist(
   lapply(fit, function(x) length(get_low_bfmi_chains(x)))
 )
 
-diag.table[4, ] <- unlist(
+diag.table[, 4] <- unlist(
   lapply(fit, get_num_max_treedepth)
 )
 
-diag.table[5, ] <- unlist(
+diag.table[, 5] <- unlist(
   lapply(diag, function(x) sum(x$Bulk_ESS < 300))
 )
 
-diag.table[6, ] <- unlist(
+diag.table[, 6] <- unlist(
   lapply(diag, function(x) sum(x$Tail_ESS < 300))
 )
 ```
@@ -482,12 +481,13 @@ In what follows, different posterior predictive model checking methods are appli
 
 ## Sumscores Time Series
 
-A popular test level measure to assess model fit of IRT models is the Test Score distribution [@Li2017, @Zhu2011], which compares the test score distribution of the observed data with the replicated data. However, assessing the test score distribution did not seem to be adequate for the TV-DPCM model as it does not take into account the time component. Because of this, we compared the observed and the replicated time series of the test scores instead. In the next Figure, we plotted the observed test scores against the median test score of the replicated data with its 95\% percentile band of the replicated scores. If a large amount of observed scores are out of the 95\% percentile band, it would indicate some sort of model misfit.   
+A popular test level measure to assess model fit of IRT models is the Test Score distribution [@Li2017; @Zhu2011], which compares the test score distribution of the observed data with the replicated data. However, assessing the test score distribution did not seem to be adequate for the TV-DPCM model as it does not take into account the time component. Because of this, we compared the observed and the replicated time series of the test scores instead. In the next Figure, we plotted the observed test scores against the median test score of the replicated data with its 95\% percentile band of the replicated scores. If a large amount of observed scores are out of the 95\% percentile band, it would indicate some sort of model misfit.   
 
 ```{r sums_ts, fig.height = 8}
-par(mfrow = c(6, 1), oma = c(1, 3, 1, 1))
+par(mfrow = c(6, 1), oma = c(1, 3, 1, 1), mar = c(1, 4, 2, 1))
 for(i in 1:6) {
   ppmc.sumscore.ts(fit[[i]], standata[[i]])
+  mtext(paste0("Data", i), side = 2, line = 4.5, xpd = NA)
 }
 rm(i)
 ```
@@ -496,203 +496,331 @@ rm(i)
 
 ## Autocorrelation: 1st, 2nd, and 3rd
 
-```{r acf, fig.height = 8}
-par(mfrow = c(4, 3))
-for(i in 1:4) {
+One of the key features of the TV-DPCM is the assumption that the latent dynamic process follows a first order TV-AR model. Intuitively, we think that the autocorrelation can be a useful statistic to assess model fit via PPMC methods. Because of this, we computed the autocorrelation of the observed test scores up to lag 3. We expect this statistic to show some kind of misfit if the autoregressive order of the real data is larger than 1. However, this does not seem to be the case given the computed ppp-values presented in the following Table.
+
+```{r acf, fig.height = 8, eval = FALSE}
+par(mfrow = c(6, 3))
+for(i in 1:6) {
   ppmc.acf(fit[[i]], standata[[i]], lag.max = 3)
 }
 rm(i)
 ```
 
+```{r acftable, results="hide", fig.show = "hide"}
+acftable <- matrix(NA, ncol = 3, nrow = 6)
+colnames(acftable) <- paste0("ACF", 1:3)
+row.names(acftable) <- paste("Data", 1:6)
+for(i in 1:6) {
+  acftable[i, ] <- ppmc.acf(fit[[i]], standata[[i]], lag.max = 3)
+}
+rm(i)
+kbl(acftable, align = "c", booktabs = TRUE)
+```
+
+\newpage
+
 ## Autocorrelation of the Residuals: 1st
 
+Following the same idea of the autocorrelation, we can instead compute the autocorrelation of the residuals after fitting a regular AR model to the sumscores. In other words, we are looking at the partial autocorrelation at lag 2 of the sumscores. The following Figure presents the histogram and the correspond ppp-value of the test statistic for each data set. 
+
 ```{r racf, fig.height = 8}
-par(mfrow = c(2, 2))
-for(i in 1:4) {
+par(mfrow = c(2, 3), mar = c(2, 4, 5, 1))
+for(i in 1:6) {
   ppmc.racf(fit[[i]], standata[[i]])
+  mtext(paste0("Data", i), side = 3, line = 3.5)
 }
 rm(i)
 ```
 
-## Mean Squared Succesive Differences
+\newpage
 
-```{r racf, fig.height = 8}
-par(mfrow = c(2, 2))
-for(i in 1:4) {
+## Mean Squared Successive Differences
+
+The Mean Squared Successive Differences (MSSD) is a common statistic used to describe time series. This statistic is a measure of dispersion that takes into account the order of the data. It aims to measure how different are successive observations. The MSSD is defined as follows:
+
+$$
+MSSD(X) = \frac{\sum^{n-1}_{i=1}(X_{i+1} - X_{i})^2}{n-1}.
+$$
+
+When used as a PPMC method, we would expect that this statistic will indicate misfit, if the time series of the observed and replicated data are too different. The following Figure shows the histogram of the test statistic for each data set.
+
+```{r mssd, fig.height = 8}
+par(mfrow = c(2, 3), mar = c(2, 4, 5, 1))
+for(i in 1:6) {
   ppmc.mssd(fit[[i]], standata[[i]])
+  mtext(paste0("Data", i), side = 3, line = 3.5)
 }
 rm(i)
 ```
 
+\newpage
 
 ## Items Scores Time Series: Item 1
 
+Similar as with the test scores distribution, the item scores distribution have been used as PPMC methods for IRT models [@Zhu2011]. In this case, we also prefer to compare the observed and replicated time series to take into account the time component. These comparisons are presented in the following for item 5 of each data set.
+
 ```{r item_ts, fig.height = 8}
-par(mfrow = c(4, 1))
-for(i in 1:4) {
-  ppmc.item.ts(fit[[i]], standata[[i]], quiet = TRUE, items = 1)
+par(mfrow = c(6, 1), oma = c(1, 3, 1, 1), mar = c(1, 4, 2, 1))
+for(i in 1:6) {
+  ppmc.item.ts(fit[[i]], standata[[i]], quiet = TRUE, items = 5)
+  mtext(paste0("Data", i), side = 2, line = 4.5, xpd = NA)
 }
 rm(i)
 ```
 
+\newpage
+
 ## Item-Total Correlation: Version 1
-Data1:
-```{r itcor_1, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor(fit[[1]], standata[[1]], quiet = TRUE, method = "pearson")
-```
-Data2:
-```{r itcor_2, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor(fit[[2]], standata[[2]], quiet = TRUE, method = "pearson")
-```
-Data3:
-```{r itcor_3, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor(fit[[3]], standata[[3]], quiet = TRUE, method = "pearson")
-```
-Data4:
-```{r itcor_4, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor(fit[[4]], standata[[4]], quiet = TRUE, method = "pearson")
+
+The item-total correlation is a common statistic used as a PPMC methods for IRT models [@Sinharay2006a; @Zhu2011; @Li2017]. This statistic correlates the scores of an item with the total scores minus the score of the item of interest (rescores). This test statistic allowed identifying model misfit of the Rasch model when the data was simulated with discrimination parameters that varied across items [@Sinharay2006a]. When used to assess model fit of the GRM, it was useful to identify model misfit when the data were multidimensional [@Zhu2011]. Hereby, we try this statistic with the simulated data sets. The following table presents the computed ppp-values for each item and each data set, and the number of items that show misfit.
+
+```{r itcor, resutls = "hide", fig.show='hide'}
+it_cortable <- matrix(NA, ncol = 7, nrow = 6)
+colnames(it_cortable) <- c(paste0("Item", 1:6), "N_misfit")
+row.names(it_cortable) <- paste("Data", 1:6)
+for(i in 1:6) {
+  it_cortable[i, 1:6] <- ppmc.itcor(fit[[i]], 
+                                 standata[[i]], 
+                                 quiet = TRUE, 
+                                 method = "pearson")
+}
+rm(i)
+
+it_cortable[, 7] <- apply(it_cortable[, 1:6], 1, function(x) {
+  sum(x < 0.05 | x > 0.95)
+})
+kbl(it_cortable, align = "c", booktabs = TRUE)
 ```
 
 ## Item-Total Correlation: Version 2
-Data1:
-```{r itcor2_1, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor2(fit[[1]], standata[[1]], quiet = TRUE, method = "polyserial")
-```
-Data2:
-```{r itcor2_2, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor2(fit[[2]], standata[[2]], quiet = TRUE, method = "polyserial")
-```
-Data3:
-```{r itcor2_3, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor2(fit[[3]], standata[[3]], quiet = TRUE, method = "polyserial")
-```
-Data4:
-```{r itcor2_4, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor2(fit[[4]], standata[[4]], quiet = TRUE, method = "polyserial")
+
+Additionally, we proposed two modified versions of the Item-Total Correlation to account for the time component. In this modified version the idea is that instead of correlating the scores of the item with the rescores, we correlate the them with the residuals of an autoregressive model fitted to the rescores. The ppp-values and the number of misfitting items for each data set are presented in the following table:
+
+```{r itcor2, resutls = "hide", fig.show='hide'}
+it_cor2table <- matrix(NA, ncol = 7, nrow = 6)
+colnames(it_cor2table) <- c(paste0("Item", 1:6), "N_misfit")
+row.names(it_cor2table) <- paste("Data", 1:6)
+for(i in 1:6) {
+  it_cor2table[i, 1:6] <- ppmc.itcor2(fit[[i]], 
+                                 standata[[i]], 
+                                 quiet = TRUE, 
+                                 method = "pearson")
+}
+rm(i)
+
+it_cor2table[, 7] <- apply(it_cor2table[, 1:6], 1, function(x) {
+  sum(x < 0.05 | x > 0.95)
+})
+kbl(it_cor2table, align = "c", booktabs = TRUE)
 ```
 
 
 ## Item-Total Correlation: Version 3
-Data1:
-```{r itcor3_1, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor3(fit[[1]], standata[[1]], quiet = TRUE)
+
+The second modification follows the same idea of fitting an autoregressive model but in this case the model is fitted to both the item scores and the rescores. Then the residuals of these two models are correlated. For the ppp-values and number of misfitting items given this test statistic, see the following Table:
+
+```{r itcor3, resutls = "hide", fig.show='hide'}
+it_cor3table <- matrix(NA, ncol = 7, nrow = 6)
+colnames(it_cor3table) <- c(paste0("Item", 1:6), "N_misfit")
+row.names(it_cor3table) <- paste("Data", 1:6)
+for(i in 1:6) {
+  it_cor3table[i, 1:6] <- ppmc.itcor3(fit[[i]], 
+                                 standata[[i]], 
+                                 quiet = TRUE)
+}
+rm(i)
+
+it_cor3table[, 7] <- apply(it_cor3table[, 1:6], 1, function(x) {
+  sum(x < 0.05 | x > 0.95)
+})
+kbl(it_cor3table, align = "c", booktabs = TRUE)
 ```
-Data2:
-```{r itcor3_2, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor3(fit[[2]], standata[[2]], quiet = TRUE)
-```
-Data3:
-```{r itcor3_3, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor3(fit[[3]], standata[[3]], quiet = TRUE)
-```
-Data4:
-```{r itcor3_4, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.itcor3(fit[[4]], standata[[4]], quiet = TRUE)
-```
+
+\newpage
 
 ## Yen's Q1
 
-Data1:
-```{r q1_1, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.Q1(fit[[1]], standata[[1]], quiet = TRUE)
+The Yen's $Q_1$ is an item fit statistic commonly used for IRT models. While it was initially developed for dichotomous items, it was generalized for polytomous items as follows: 
+
+$$
+Q_1 - \chi^2 = \sum_{g=1}^{G}\sum_{x=0}^{m_i}N_{g}\frac{(O_{igx} - E_{igx})^2}{E_{igx}},
+$$
+
+where individuals are divided into $N$ groups (usually 10) for which the proportion of responses of each response category is computed for the observed distribution and the mean probability to endorse each response category is computed for the expected distribution. The groups are defined by the scores in the latent variable. Hence, the latent scores are ordered to create the groups in such a way that the groups consist of people with similar latent trait scores.
+
+We use this discrepancy measure for the TV-DPCM without any modification. The difference is that the groups do not represent participants with a similar latent trait level but the time points for which the participant had a similar latent state disposition. This discrepancy measure is graphically represented with scatterplots and the ppp-value is computed by counting the proportion of pairs that are above the equality line, see the following Figure that shows the pair of Yen's $Q1$ for the observed and replicated data of item 1 of Data1:
+
+```{r q1_1, fig.height = 5, results='hide'}
+ppmc.Q1(fit[[1]], standata[[1]], quiet = TRUE, items = 1)
 ```
 
-Data2:
-```{r q1_2, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.Q1(fit[[2]], standata[[2]], quiet = TRUE)
+Now, to summarize this discrepancy measure for all items and data sets, the next Table present the corresponding ppp-values and the number of misfitting items according to this discrepancy measure for each data set. 
+
+```{r q1table, resutls = "hide", fig.show='hide'}
+q1table <- matrix(NA, ncol = 7, nrow = 6)
+colnames(q1table) <- c(paste0("Item", 1:6), "N_misfit")
+row.names(q1table) <- paste("Data", 1:6)
+for(i in 1:6) {
+  q1table[i, 1:6] <- ppmc.Q1(fit[[i]], standata[[i]], quiet = TRUE)
+}
+rm(i)
+
+q1table[, 7] <- apply(q1table[, 1:6], 1, function(x) {
+  sum(x < 0.05 | x > 0.95)
+})
+kbl(q1table, align = "c", booktabs = TRUE)
 ```
 
-Data3:
-```{r q1_3, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.Q1(fit[[3]], standata[[3]], quiet = TRUE)
-```
-
-Data4:
-```{r q1_4, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.Q1(fit[[4]], standata[[4]], quiet = TRUE)
-```
+\newpage
 
 ## Yen's Q1 modified
 
-Data1:
-```{r q1alt_1, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.Q1.alt(fit[[1]], standata[[1]], quiet = TRUE)
+In this modified version of the Yen's $Q_1$, we define the groups by consecutive observations to take into account the time component. A summary of the ppp-values for each data set is presented in the following Table:
+
+```{r q1alttable, resutls = "hide", fig.show='hide'}
+q1alttable <- matrix(NA, ncol = 7, nrow = 6)
+colnames(q1alttable) <- c(paste0("Item", 1:6), "N_misfit")
+row.names(q1alttable) <- paste("Data", 1:6)
+for(i in 1:6) {
+  q1alttable[i, 1:6] <- ppmc.Q1.alt(fit[[i]], standata[[i]], quiet = TRUE)
+}
+rm(i)
+
+q1alttable[, 7] <- apply(q1alttable[, 1:6], 1, function(x) {
+  sum(x < 0.05 | x > 0.95)
+})
+kbl(q1alttable, align = "c", booktabs = TRUE)
 ```
 
-Data1:
-```{r q1alt_2, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.Q1.alt(fit[[2]], standata[[2]], quiet = TRUE)
-```
+\newpage
 
-Data1:
-```{r q1alt_3, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.Q1.alt(fit[[3]], standata[[3]], quiet = TRUE)
-```
+## Yen's Q3
 
-Data4:
-```{r q1alt_4, fig.height = 6, results='hide'}
-par(mfrow = c(2, 3))
-ppmc.Q1.alt(fit[[4]], standata[[4]], quiet = TRUE)
-```
+The Yen's $Q_3$ is a pair-wise measure that has been effective at identifying violations of unidimensionality with the GRM [@Zhu2011]. This statistics is defined as the correlation between the deviation scores of two items:
 
-# Yen's Q3
+$$
+Q_{3ij} = Cor(d_i, d_j);
+$$
 
-```{r q3_1, fig.height = 6, results='hide'}
-for (i in 1:4) {
-  ppmc.Q3(fit[[i]], standata[[i]])
+for $i \neq j$, where:
+
+$$
+d_{i} = O_i - E_i,
+$$
+
+$O_i$ are the observed scores of item $i$ and $E_i$ are the expected scores given the model. The expected scores are computed as follows:
+
+$$
+E_i = \sum_{x = 1}^{m_i}xP(X_i = x|\hat{\theta_t}).
+$$
+
+In the following plot, we present the ppp-values for each pair of items of each dataset. The ppp-values are represented as pie-charts. If the pie-chart is large, it indicates that the ppp-value is too extreme. 
+
+```{r q3_ppp, results='hide', fig.show='hide'}
+sp_plots <- list()
+for (i in 1:6) {
+  sp_plots[[i]] <- ppmc.Q3(fit[[i]], standata[[i]])$sp
 }
 ```
 
+```{r q3_plots, fig.height = 6, results='hide'}
+ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
+                  sp_plots[[4]], sp_plots[[5]], sp_plots[[6]],
+                  labels = paste0("Data", 1:6), ncol = 3, nrow = 2,
+                  label.x = 0.1)
+```
 
-# OR 
+\newpage
 
-```{r OR_1, fig.height = 6, results='hide'}
-for (i in 1:4) {
-  ppmc.OR(fit[[i]], standata[[i]])
+## OR 
+
+Another discrepancy measure that is commonly used to assess model misfit of IRT model is the odds ratio [@Sinharay2006a; @Li2017; @Zhu2011]. For polytomous items, one can dichotomize the responses to the items and compute the odds ratio with the dichotomized responses. This is known as the "global" odd ratio and is defined like this:
+
+$$
+OR = \frac{n_{11}n_{00}}{n_{10}n_{01}},
+$$
+
+where $n_{ij}$ is the number of participants that scored $i$ and $j$ in a pair of items. Thus, the ppp-values of each pair of items for each data set are presented in the following Figure:
+
+```{r OR_ppp, results='hide', fig.show='hide'}
+sp_plots <- list()
+for (i in 1:6) {
+  sp_plots[[i]] <- ppmc.OR(fit[[i]], standata[[i]])$sp
 }
 ```
 
-# OR Modified
+```{r OR_plots, fig.height = 6, results='hide'}
+ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
+                  sp_plots[[4]], sp_plots[[5]], sp_plots[[6]],
+                  labels = paste0("Data", 1:6), ncol = 3, nrow = 2,
+                  label.x = 0.1)
+```
 
-```{r ORdiff_1, fig.height = 6, results='hide'}
-for (i in 1:4) {
-  ppmc.ORDiff(fit[[i]], standata[[i]])
+
+\newpage
+
+## OR Modified
+
+Here, we present a modified discrepancy measure of the odds ratio. The idea is that the odd ratio are computed for each half of the time series and then the difference between these these odds ratio is used as the discrepancy measure. We expect this measure to be useful to test trend stationarity and longitudinal measurement invariance. The correspoding ppp-values for each pair of items ar presented in the following plot. 
+
+```{r ORdiff_ppp, results='hide', fig.show='hide'}
+sp_plots <- list()
+for (i in 1:6) {
+  sp_plots[[i]] <- ppmc.ORDiff(fit[[i]], standata[[i]])$sp
 }
 ```
 
-# RESID
+```{r ORdiff_plots, fig.height = 6, results='hide'}
+ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
+                  sp_plots[[4]], sp_plots[[5]], sp_plots[[6]],
+                  labels = paste0("Data", 1:6), ncol = 3, nrow = 2, 
+                  label.x = 0.1)
+```
 
-```{r resid_1, fig.height = 6, results='hide'}
-for (i in 1:4) {
-  ppmc.cov.resid(fit[[i]], standata[[i]])
+\newpage
+
+## RESID
+
+The absolute item covariance residual (RESID) was useful to identify violations of unidimensionality and local dependence of the GRM [@Zhu2011]. This statistic is defined as the absolute value of the difference between the observed and the expected item covariances.
+
+$$
+RESID_{ij} = |cov(X_{i}, X_{j}) - cov(E_{i}, E_{j})|
+$$
+
+See in the following Figure, the ppp-values for each pair fo items and each simulated data set. 
+
+```{r resid_ppp, results='hide', fig.show='hide'}
+sp_plots <- list()
+for (i in 1:6) {
+  sp_plots[[i]] <- ppmc.cov.resid(fit[[i]], standata[[i]])$sp
 }
 ```
 
-# RESID Diff
+```{r resid_plots, fig.height = 6, results='hide'}
+ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
+                  sp_plots[[4]], sp_plots[[5]], sp_plots[[6]],
+                  labels = paste0("Data", 1:6), ncol = 3, nrow = 2, 
+                  label.x = 0.1)
+```
 
-```{r resid_1, fig.height = 6, results='hide'}
-for (i in 1:4) {
-  ppmc.cov.rediff(fit[[i]], standata[[i]])
+\newpage
+
+## RESID Diff
+
+Lastly, similarly as we suggested with the odds ratio, we also suggest to compute the absolute item covariance residual of each half of the time series and compute the difference. Then, use the difference as the discrepancy measure.  By doing this, we obtained the following ppp-values for each data set:
+
+```{r rediff_ppp, results='hide', fig.show='hide'}
+sp_plots <- list()
+for (i in 1:6) {
+  sp_plots[[i]] <- ppmc.cov.rediff(fit[[i]], standata[[i]])$sp
 }
+```
+
+```{r rediff_plots, fig.height = 6, results='hide'}
+ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
+                  sp_plots[[4]], sp_plots[[5]], sp_plots[[6]],
+                  labels = paste0("Data", 1:6), ncol = 3, nrow = 2, 
+                  label.x = 0.1)
 ```
 
 

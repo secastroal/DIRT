@@ -741,7 +741,7 @@ ppmc.Q3 <- function(object, data, scatterplots = FALSE) {
           axis.line = element_line(colour = "black"))
   
   print(sp)
-  return(round(out, 3))
+  return(list(ppp = round(out, 3), sp = sp))
 }
 
 # Odds Ratio ----
@@ -876,7 +876,7 @@ ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
           axis.line = element_line(colour = "black"))
   
   print(sp)
-  return(round(out, 3))
+  return(list(ppp = round(out, 3), sp = sp))
 }
 
 # Odds Ratio Difference ----
@@ -972,7 +972,7 @@ ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE) {
           axis.line = element_line(colour = "black"))
   
   print(sp)
-  return(round(out, 3))
+  return(list(ppp = round(out, 3), sp = sp))
 }
 
 # Absolute Item Covariance Residual - RESID ----
@@ -1093,7 +1093,7 @@ ppmc.cov.resid <- function(object, data, scatterplots = FALSE) {
           axis.line = element_line(colour = "black"))
   
   print(sp)
-  return(round(out, 3))
+  return(list(ppp = round(out, 3), sp = sp))
 }
 
 # Absolute Item Covariance Residual Difference ----
@@ -1189,7 +1189,7 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
           axis.line = element_line(colour = "black"))
   
   print(sp)
-  return(round(out, 3))
+  return(list(ppp = round(out, 3), sp = sp))
 }
 
 # rm(list = setdiff(ls(), c(lsf.str(), "object", "data", "fit")))
