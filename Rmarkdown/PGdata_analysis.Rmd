@@ -1,0 +1,140 @@
+---
+title: "Empirical Example TV-DPCM"
+author: "Sebastian Castro-Alvarez"
+date: "`r format(Sys.Date(), '%B %d del %Y')`"
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{float}
+  - \usepackage{amsmath}
+output: 
+  bookdown::pdf_document2:
+    toc: false
+    keep_tex: true
+bibliography: references.bib
+csl: apa7.csl
+link-citations: true
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(bookdown)
+library(kableExtra)
+knitr::opts_chunk$set(echo = FALSE, fig.height = 4, fig.width = 6, fig.pos = "!H",  
+                      warning=FALSE, message=FALSE)
+
+#rmarkdown::render("Rmarkdown/PGdata_analysis.Rmd")
+```
+
+```{r pre-env}
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+library(bayesplot)
+
+source("../R/IRT_models.R")
+source("../R/IRT_plots.R")
+source("../R/tvdpcm2stan.R")
+
+model <- stan_model(file = "../Stan/tv_dpcm_int_v5.1.stan", verbose = FALSE)
+```
+
+## Using the TV-DPCM to Analyze Negative Affect 
+
+To exemplify how to use an interpret the TV-DPCM, in this section, we analyzed mood data from one subject that were collected between August 2012 and April 2013. These data were retrieved from \\citet{Kossakowski2017} and was previously analyzed by \\citet{Wichers2016}. The data come from a 57 years old male (at the time) that had been diagnosed with major depressive disorder. The participant completed up to 10 semi-random assessments per day for 239 days. During this period, the participant also followed a blind gradual reduction of their anti-depressant medication dosage. In what follows, the items of interest and the data collection procedure are described in detail. Then, descriptive statistics concerning the distribution of the items scores are presented. Finally, the TV-DPCM is adjusted to the data in order to study the psychological dynamics of negative affect and the performances of the ESM questionnaire.
+
+```{r data}
+PG_data <- read.csv("../ESMdata/ESMdata.csv")
+PG_data <- PG_data[!is.na(PG_data$pat_restl), ]
+
+# Select variables
+PG_data <- PG_data[, c("date", "phase", "concentrat", "beepno", "resptime_e", 
+                       grep("mood", names(PG_data), value = TRUE)[-13], 
+                       grep("pat", names(PG_data), value = TRUE))]
+```
+
+### Data Collection and Procedure.
+
+As mentioned before, the participant filled in an ESM questionnaire up to 10 times a day for 239 days. The questionnaire was programmed at random moments within 90-minute intervals that were set between 07:30 AM and 10:30 PM. After the beep signal, the participant had a 10-minute window to complete the questionnaire, which consisted of 50 momentary assessment items that measured different emotions (e.g., feeling enthusiastic or feeling lonely), self-esteem, and descriptions of the situation such as whether the participant was alone or doing something. Furthermore, additional items were used at certain beep signals to measure, for example, sleep quality and depressive symptoms. These items were filled up on a daily or weekly basis. In particular, for this analysis, we focused on the momentary items used to measure negative affect, which includes the items "I feel down", "I feel lonely", "I feel anxious", and "I feel guilty". These items were measured on a 7-point Likert scale from -3 to 3 \citep{Kossakowski2017}. The participant completed a total of 1473 assessments. This means that on average 6.2 assessments were completed per day.
+
+### Distribution of the Item Scores
+
+Figure \@ref(fig:itemdist) presents the distribution of the responses to the items of negative affect. Most of the responses are concentrated in the category of the middle.
+
+```{r itemdist, fig.cap = "Item Score Distribution of the Items of Negative Affect"}
+par(mfrow = c(2,2), mar = c(5, 3, 0.5, 1) + 0.1)
+barplot(table(factor(PG_data$mood_down, levels = -3:3)), 
+        ylim = c(0, 1401), las = 1, xlab = "Down")
+barplot(table(factor(PG_data$mood_lonely, levels = -3:3)), 
+        ylim = c(0, 1401), las = 1, xlab = "Lonely")
+barplot(table(factor(PG_data$mood_anxious, levels = -3:3)), 
+        ylim = c(0, 1401), las = 1, xlab = "Anxious")
+barplot(table(factor(PG_data$mood_guilty, levels = -3:3)), 
+        ylim = c(0, 1401), las = 1, xlab = "Guilty")
+
+
+
+```
+
+```{r addNA}
+
+```
+
+
+
+### Fitting the TV-DPCM
+
+
+```{r data2stan}
+
+```
+
+
+
+
+
+
+```{r select-variables}
+PG_PCA <- PG_data[, c(grep("mood", names(PG_data))[-13], grep("pat", names(PG_data)))]
+names(PG_PCA)
+```
+
+
+
+```{r PCA}
+PCA_fit <- prcomp(na.omit(PG_PCA[, -c(1, 2, 8, 15, 16)]), center = TRUE, scale = TRUE)
+PCA_fit2 <- psych::principal(PG_PCA[, -c(1, 2, 8, 15, 16)], nfactors = 3)
+```
+
+```{r PCA2}
+PCA_fit <- prcomp(na.omit(PG_PCA), center = TRUE, scale = TRUE)
+PCA_fit2 <- psych::principal(PG_PCA, nfactors = 3)
+```
+For the following analysis, we focus on the momentary items used to measure negative affect. 
+
+This is the analysis of the data collected by \\citet{Wichers2016}.
+
+\\citep{Kossakowski2017}
+
+Trying a plot a histogram in Figure \@ref(fig:hist).
+
+```{r hist, fig.cap = "Histogram"}
+hist(rnorm(100))
+```
+
+Similarly, trying to show some data in Table \@ref(tab:matrix).
+
+```{r matrix}
+kbl(data.frame(diag(5)), align = "c", booktabs = TRUE, caption = "Diagonal Matrix")
+```
+
+
+\newpage
+
+# References
+
+
+
