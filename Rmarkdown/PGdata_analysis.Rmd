@@ -42,9 +42,9 @@ source("../R/tvdpcm2stan.R")
 model <- stan_model(file = "../Stan/tv_dpcm_int_v5.1.stan", verbose = FALSE)
 ```
 
-## Using the TV-DPCM to Analyze Negative Affect 
+## Using the TV-DPCM to Analyze Mental Unrest 
 
-To exemplify how to use an interpret the TV-DPCM, in this section, we analyzed mood data from one subject that were collected between August 2012 and April 2013. These data were retrieved from \\citet{Kossakowski2017} and was previously analyzed by \\citet{Wichers2016}. The data come from a 57 years old male (at the time) that had been diagnosed with major depressive disorder. The participant completed up to 10 semi-random assessments per day for 239 days. During this period, the participant also followed a blind gradual reduction of their anti-depressant medication dosage. In what follows, the items of interest and the data collection procedure are described in detail. Then, descriptive statistics concerning the distribution of the items scores are presented. Finally, the TV-DPCM is adjusted to the data in order to study the psychological dynamics of negative affect and the performances of the ESM questionnaire.
+To exemplify how to use an interpret the TV-DPCM, in this section, we analyzed mood data from one subject that were collected between August 2012 and April 2013. These data were retrieved from \\citet{Kossakowski2017} and was previously analyzed by \\citet{Wichers2016}. The data come from a 57 years old male (at the time) that had been diagnosed with major depressive disorder. The participant completed up to 10 semi-random assessments per day for 239 days. During this period, the participant also followed a blind gradual reduction of their anti-depressant medication dosage. In what follows, the items of interest and the data collection procedure are described in detail. Then, descriptive statistics concerning the distribution of the items scores are presented. Finally, the TV-DPCM is adjusted to the data in order to study the psychological dynamics of mental unrest and the performances of the items of the ESM questionnaire.
 
 ```{r data}
 PG_data <- read.csv("../ESMdata/ESMdata.csv")
@@ -57,7 +57,6 @@ PG_data <- PG_data[, c("date", "phase", "concentrat", "beepno", "resptime_e",
 ```
 
 ```{r components}
-names(PG_data)
 pa <- c("mood_relaxed", "mood_satisfi", "mood_enthus", 
         "mood_cheerf", "mood_strong")
 na <- c("mood_down", "mood_lonely", "mood_anxious", 
@@ -67,26 +66,27 @@ mu <- c("mood_irritat", "pat_restl", "pat_agitate")
 
 ### Data Collection and Procedure.
 
-As mentioned before, the participant filled in an ESM questionnaire up to 10 times a day for 239 days. The questionnaire was programmed at random moments within 90-minute intervals that were set between 07:30 AM and 10:30 PM. After the beep signal, the participant had a 10-minute window to complete the questionnaire, which consisted of 50 momentary assessment items that measured different emotions (e.g., feeling enthusiastic or feeling lonely), self-esteem, and descriptions of the situation such as whether the participant was alone or doing something. Furthermore, additional items were used at certain beep signals to measure, for example, sleep quality and depressive symptoms. These items were filled up on a daily or weekly basis. In particular, for this analysis, we focused on the momentary items used to measure negative affect, which includes the items "I feel down", "I feel lonely", "I feel anxious", and "I feel guilty". These items were measured on a 7-point Likert scale from -3 to 3 \citep{Kossakowski2017}. The participant completed a total of 1473 assessments. This means that on average 6.2 assessments were completed per day.
+As mentioned before, the participant filled in an ESM questionnaire up to 10 times a day for 239 days. The questionnaire was programmed at random moments within 90-minute intervals that were set between 07:30 AM and 10:30 PM. After the beep signal, the participant had a 10-minute window to complete the questionnaire, which consisted of 50 momentary assessment items that measured different emotions (e.g., feeling enthusiastic or feeling lonely), self-esteem, and descriptions of the situation such as whether the participant was alone or doing something. Furthermore, additional items were used at certain beep signals to measure, for example, sleep quality and depressive symptoms. These items were filled up on a daily or weekly basis. All the momentary assessment items were measured on a 7-point Likert scale from "not feeling the state" to "feeling the state very much". \\citet{Wichers2016} ran a principal component analysis on the momentary assessment items and extracted three components that represented positive affect, negative affect, and mental unrest. For this reason, in the following analysis, we selected the momentary items that measure mental unrest. These items are: "I feel irritated", "I feel restless", and "I feel agitated". The participant completed a total of 1473 assessments. This means that on average 6.2 assessments were completed per day.
 
 ### Distribution of the Item Scores
 
 Figure \@ref(fig:itemdist) presents the distribution of the responses to the items of negative affect. Most of the responses are concentrated in the category of the middle.
 
 ```{r itemdist, fig.cap = "Item Score Distribution of the Items of Negative Affect"}
-par(mfrow = c(2,2), mar = c(5, 3, 0.5, 1) + 0.1)
-barplot(table(factor(PG_data$mood_down, levels = -3:3)), 
-        ylim = c(0, 1401), las = 1, xlab = "Down")
-barplot(table(factor(PG_data$mood_lonely, levels = -3:3)), 
-        ylim = c(0, 1401), las = 1, xlab = "Lonely")
-barplot(table(factor(PG_data$mood_anxious, levels = -3:3)), 
-        ylim = c(0, 1401), las = 1, xlab = "Anxious")
-barplot(table(factor(PG_data$mood_guilty, levels = -3:3)), 
-        ylim = c(0, 1401), las = 1, xlab = "Guilty")
-
-
+par(mfrow = c(3,1), mar = c(5, 3, 0.5, 1) + 0.1)
+barplot(table(factor(PG_data[, mu[1]], levels = 1:7)), 
+        ylim = c(0, 601), las = 1, xlab = "Irritated")
+barplot(table(factor(PG_data[, mu[2]], levels = 1:7)), 
+        ylim = c(0, 601), las = 1, xlab = "Restless")
+barplot(table(factor(PG_data[, mu[3]], levels = 1:7)), 
+        ylim = c(0, 601), las = 1, xlab = "Agitated")
 
 ```
+
+```{r timeseries, fig.cap = "Observed Mean Scores of the Mental Unrest Items"}
+plot(rowMeans(PG_data[, mu]), type = "l")
+```
+
 
 ```{r addNA}
 
@@ -114,6 +114,8 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
 ```
 
 ```{r stanfit}
+rdsfile <- "../Fits/MUnoNA.rds"
+
 tvdpcm_inits <- function() {
               list(lambda = runif(1, -1, 1),
                    beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
@@ -121,25 +123,119 @@ tvdpcm_inits <- function() {
                    sigma  = rlnorm(1, 1))
             }
 
-begin.time <- proc.time()
-fit <- sampling(model,                  # Stan model. 
-                data = standata,        # Data.
-                iter = 2000,            # Number of iterations.
-                chains  = 3,            # Number of chains.
-                warmup  = 500,          # Burn-in samples.
-                init    = tvdpcm_inits, # Initial values
-                seed = 2022,            # Seed
-                pars = c("beta", "theta", "lambda",
-                         "sigma2", "pvar", "attractor"),
-                control = list(adapt_delta   = 0.99,
-                               max_treedepth = 15) # Other parameters to control sampling behavior.
-                ) 
-run.time <- proc.time() - begin.time
-rm(begin.time)
+if (!file.exists(rdsfile)) {
+  begin.time <- proc.time()
+  fit <- sampling(model,                  # Stan model. 
+                  data = standata,        # Data.
+                  iter = 2000,            # Number of iterations.
+                  chains  = 3,            # Number of chains.
+                  warmup  = 500,          # Burn-in samples.
+                  init    = tvdpcm_inits, # Initial values
+                  seed = 2022,            # Seed
+                  pars = c("beta", "theta", "lambda",
+                           "sigma2", "pvar", "attractor"),
+                  control = list(adapt_delta   = 0.99,
+                                 max_treedepth = 15) # Other parameters to control sampling behavior.
+                  ) 
+  run.time <- proc.time() - begin.time
+  rm(begin.time)
+  
+  saveRDS(rdsfile)
+} else {
+  fit <- readRDS(rdsfile)
+}
+```
+
+```{r diag}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
             
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
+                                        "sigma2", "pvar", "attractor"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                  "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+```{r rhats, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the TV-DPCM"}
+mcmc_rhat(rhat(fit))
+```
+
+```{r trace, fig.cap = "Traceplots of Selected Parameters"}
+traceplot(fit, pars = c("beta[1,3]", "theta[50]", "lambda", "sigma2"), inc_warmup = TRUE)
+```
+
+```{r adf-plots, fig.cap = "Autocorrelation Plots of Selected Parameters"}
+fit.array <- as.array(fit)
+
+mcmc_acf(fit.array, 
+         pars = c("beta[1,3]", "theta[50]", "lambda", "sigma2"), 
+         lags = 20)
 ```
 
 
+```{r estimates}
+estimates <- as.data.frame(summary(fit, pars = c("beta", "lambda", "sigma2"))$summary)
+
+estimates <- estimates[, c(1, 3, 4, 8, 9)]
+
+estimates[, 3] <- paste0("(", round(estimates[, 3], 2), ",", round(estimates[, 4], 2), ")")
+
+estimates        <- estimates[, -4]
+estimates[, 1:2] <- round(estimates[, 1:2], 1)
+estimates[, 4]   <- round(estimates[, 4])
+
+names(estimates) <- c("Mean", "SD", "C.I.", "ESS")
+
+row.names(estimates) <- c(paste0("$\\delta_{", 
+                                 rep(1:I, each = K - 1), 
+                                 rep(1:(K - 1), times = I),
+                                 "}$"),
+                          "$\\varphi$", "$\\Psy$")
+
+# Extract all estimates
+sum.fit <- list()
+
+sum.fit$beta   <- summary(fit, pars = "beta")$summary
+sum.fit$theta  <- summary(fit, pars = "theta")$summary
+sum.fit$lambda <- summary(fit, pars = "lambda")$summary
+sum.fit$sigma2 <- summary(fit, pars = "sigma2")$summary
+sum.fit$pvar  <- summary(fit, pars = "pvar")$summary
+sum.fit$attractor <- summary(fit, pars = "attractor")$summary
+```
+
+```{r est-table}
+kbl(estimates, align = "c", booktabs = TRUE, caption = "Estimated Parameters of the TV-DPCM")
+```
+
+```{r est-trend, fig.cap = "Estimated Latent State Dispositions and Trend"}
+plot(sum.fit$theta[, 1], type = "l", ylim = c(-8, 8), col = 2)
+polygon(c(standata$time, rev(standata$time)),
+        c(sum.fit$theta[, 4], rev(sum.fit$theta[, 8])),
+        border = NA,
+        col = rgb(1, 0, 0, 0.25))
+polygon(c(standata$time, rev(standata$time)),
+        c(sum.fit$attractor[, 4], rev(sum.fit$attractor[, 8])),
+        border = NA,
+        col = rgb(0, 0, 1, 0.15))
+lines(standata$time, sum.fit$attractor[, 1], col = "blue", lwd = 2)
+```
+
+```{r ICC, fig.cap = "Item Characteristic Functions for the Mental Unrest Items"}
+par(mfrow = c(3, 1))
+
+plot.ICC(object = fit, data = standata, range = c(-6, 6), quiet = TRUE)
+```
+
+```{r TIF, fig.cap = "Test Information Function of the Items of Mental Unrest"}
+plot.IIF(object = fit, data = standata, range = c(-6, 6), type = "TIF")
+```
 
 
 
