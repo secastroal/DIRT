@@ -56,6 +56,15 @@ PG_data <- PG_data[, c("date", "phase", "concentrat", "beepno", "resptime_e",
                        grep("pat", names(PG_data), value = TRUE))]
 ```
 
+```{r components}
+names(PG_data)
+pa <- c("mood_relaxed", "mood_satisfi", "mood_enthus", 
+        "mood_cheerf", "mood_strong")
+na <- c("mood_down", "mood_lonely", "mood_anxious", 
+        "mood_guilty")
+mu <- c("mood_irritat", "pat_restl", "pat_agitate")
+```
+
 ### Data Collection and Procedure.
 
 As mentioned before, the participant filled in an ESM questionnaire up to 10 times a day for 239 days. The questionnaire was programmed at random moments within 90-minute intervals that were set between 07:30 AM and 10:30 PM. After the beep signal, the participant had a 10-minute window to complete the questionnaire, which consisted of 50 momentary assessment items that measured different emotions (e.g., feeling enthusiastic or feeling lonely), self-esteem, and descriptions of the situation such as whether the participant was alone or doing something. Furthermore, additional items were used at certain beep signals to measure, for example, sleep quality and depressive symptoms. These items were filled up on a daily or weekly basis. In particular, for this analysis, we focused on the momentary items used to measure negative affect, which includes the items "I feel down", "I feel lonely", "I feel anxious", and "I feel guilty". These items were measured on a 7-point Likert scale from -3 to 3 \citep{Kossakowski2017}. The participant completed a total of 1473 assessments. This means that on average 6.2 assessments were completed per day.
@@ -89,9 +98,46 @@ barplot(table(factor(PG_data$mood_guilty, levels = -3:3)),
 
 
 ```{r data2stan}
+responses <- PG_data[, mu]
+responses[responses >= 5] <- 5
 
+I  <- ncol(responses)
+nT <- nrow(responses)
+K  <- max(responses)
+
+standata <- tvdpcm2stan_data(resp = as.matrix(responses),
+                             I    = I,
+                             K    = K,
+                             nT   = nT,
+                             n_knots  = 8,
+                             s_degree = 3)
 ```
 
+```{r stanfit}
+tvdpcm_inits <- function() {
+              list(lambda = runif(1, -1, 1),
+                   beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
+                   inno   = rnorm(nT, 0, 3),
+                   sigma  = rlnorm(1, 1))
+            }
+
+begin.time <- proc.time()
+fit <- sampling(model,                  # Stan model. 
+                data = standata,        # Data.
+                iter = 2000,            # Number of iterations.
+                chains  = 3,            # Number of chains.
+                warmup  = 500,          # Burn-in samples.
+                init    = tvdpcm_inits, # Initial values
+                seed = seed,            # Seed
+                pars = c("beta", "theta", "lambda",
+                         "sigma2", "pvar", "attractor"),
+                control = list(adapt_delta   = 0.99,
+                               max_treedepth = 15) # Other parameters to control sampling behavior.
+                ) 
+run.time <- proc.time() - begin.time
+rm(begin.time)
+            
+```
 
 
 
