@@ -128,7 +128,7 @@ fit <- sampling(model,                  # Stan model.
                 chains  = 3,            # Number of chains.
                 warmup  = 500,          # Burn-in samples.
                 init    = tvdpcm_inits, # Initial values
-                seed = seed,            # Seed
+                seed = 2022,            # Seed
                 pars = c("beta", "theta", "lambda",
                          "sigma2", "pvar", "attractor"),
                 control = list(adapt_delta   = 0.99,
