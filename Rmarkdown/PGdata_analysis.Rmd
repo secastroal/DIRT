@@ -122,7 +122,8 @@ PG_data_na <- esmpack:::expand.esm(data = PG_data,
 One of the assumptions of the TV-DPCM is that the time interval between consecutive observations is the same for the whole duration of the data collection. This was clearly not the case with the data at hand. One way to address this issue is to include missing values in order to make the time interval between observations approximately the same \\citep{Asparouhov2018}. This approach have been shown to be useful to deal with unequal time intervals and the results from these kind of analyses are comparable with results from continuous time models. Given this, we also implemented this approach in the TV-DPCM analysis of the mental unrest items. For this, we divided the days in 90-minute time windows, for a total of 16 time windows per day. Observations within any of these time windows were considered as a representation of the mental unrest state of the participant for that time point. When no observations were available, "missing values" were included in the date set. By doing this, we added `r nrow(PG_data_na) - nrow(PG_data)` row of missing values for a total number of time windows of `r nrow(PG_data_na)`. Furthermore, as mentioned before, we collapsed the response categories from 5 to 7 into one. As a result, there are 5 response categories for each item, which means that 4 threshold parameters are estimated per item. 
 
 ```{r data2stan}
-responses <- PG_data_na[, mu]
+#responses <- PG_data_na[, mu]
+responses <- PG_data[, mu]
 responses[responses >= 5] <- 5
 
 I  <- ncol(responses)
@@ -138,7 +139,7 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
 ```
 
 ```{r stanfit}
-rdsfile <- "../Fits/MUwithNA"
+rdsfile <- "../Fits/MUnoNA"
 
 tvdpcm_inits <- function() {
               list(lambda = runif(1, -1, 1),
@@ -157,7 +158,7 @@ if (!file.exists(paste0(rdsfile, ".rds"))) {
                   init    = tvdpcm_inits, # Initial values
                   seed = 2022,            # Seed
                   pars = c("beta", "theta", "lambda",
-                           "sigma2", "pvar", "attractor"),
+                           "sigma2", "pvar", "attractor", "rep_y"),
                   control = list(adapt_delta   = 0.99,
                                  max_treedepth = 15) # Other parameters to control sampling behavior.
                   ) 
@@ -188,6 +189,15 @@ maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda",
 nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
                                   "sigma2", "pvar", "attractor")) > 1.05)
 ```
+
+```{r diagtable}
+diag.table <- c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
 
 Next, to fit the TV-DPCM to the data, we used the same setup for the Hamiltonian Monte Carlo algorithm as we did in the simulation study. This means that we ran three chains in parallel, each with 2000 iterations, 500 of which were discarded as burnin, and we kept the same values for the *adapt_delta* (0.99) and *max_treedepth* (15) parameters. This analysis took `r ceiling(run.time[3]/60)` minutes to run. To check convergence of the model, we examined the diagnostics provided in Stan for the HMC algorithm. According to these diagnostics, the model converged successfully. This can be seen in Figures \@ref(fig:rhats) and \@ref(fig:trace). On the one hand, Figure \@ref(fig:rhats) presents the corresponding Gelman-Rubin statistics for the parameters in the model, all of which are lower than 1.05. On the other hand, Figure \@ref(fig:trace) presents the trace plots for a few selected parameters. These trace plots form fat caterpillars, which indicate that the different chains sampled from the same posterior distributions.     
 
@@ -300,7 +310,7 @@ plot.IIF(object = fit, data = standata, range = c(-6, 6), type = "TIF")
 rm(estimates, fit, responses, stan.diag, standata,
    sum.fit, fit.array, I, index, K, maxRhat,
    nbfmi, nbulk, ndiv, nRhat, nT, ntail, ntree,
-   parameters, rdsfile, run.time)
+   parameters, rdsfile, run.time, diag.table)
 ```
 
 \newpage
@@ -343,7 +353,7 @@ if (!file.exists(paste0(rdsfile, ".rds"))) {
                   warmup  = 500,          # Burn-in samples.
                   init    = inits, # Initial values
                   seed = 2022,            # Seed
-                  pars = c("beta", "theta"),
+                  pars = c("beta", "theta", "rep_y"),
                   control = list(adapt_delta   = 0.99,
                                  max_treedepth = 15) # Other parameters to control sampling behavior.
                   ) 
@@ -373,6 +383,13 @@ maxRhat <- round(max(rhat(fit, pars = c("beta", "theta"))), 4)
 nRhat   <- sum(rhat(fit, pars = c("beta", "theta")) > 1.05)
 ```
 
+```{r diagtable-pcm}
+diag.table <- c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
 
 ```{r rhats-pcm, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the PCM"}
 mcmc_rhat(rhat(fit))
@@ -467,7 +484,7 @@ plot.IIF(object = fit, data = standatapcm, range = c(-6, 6), type = "TIF")
 rm(estimates, fit, responses, stan.diag, standatapcm,
    sum.fit, fit.array, I, index, K, maxRhat,
    nbfmi, nbulk, ndiv, nRhat, nT, ntail, ntree,
-   parameters, rdsfile, run.time)
+   parameters, rdsfile, run.time, diag.table)
 ```
 
 \newpage
@@ -512,7 +529,7 @@ if (!file.exists(paste0(rdsfile, ".rds"))) {
                   init    = tvdpcm_inits, # Initial values
                   seed = 2022,            # Seed
                   pars = c("beta", "theta", "lambda",
-                           "sigma2", "pvar", "attractor"),
+                           "sigma2", "pvar", "attractor", "rep_y"),
                   control = list(adapt_delta   = 0.99,
                                  max_treedepth = 15) # Other parameters to control sampling behavior.
                   ) 
@@ -542,6 +559,14 @@ maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda",
                                         "sigma2", "pvar", "attractor"))), 4)
 nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
                                   "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+```{r diagtable-na}
+diag.table <- c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
 ```
 
 ```{r rhats-na, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the TV-DPCM"}
@@ -645,7 +670,7 @@ plot.IIF(object = fit, data = standata, range = c(-6, 6), type = "TIF")
 rm(estimates, fit, responses, stan.diag, standata,
    sum.fit, fit.array, I, index, K, maxRhat,
    nbfmi, nbulk, ndiv, nRhat, nT, ntail, ntree,
-   parameters, rdsfile, run.time)
+   parameters, rdsfile, run.time, diag.table)
 ```
 
 \newpage
@@ -690,7 +715,7 @@ if (!file.exists(paste0(rdsfile, ".rds"))) {
                   init    = tvdpcm_inits, # Initial values
                   seed = 2022,            # Seed
                   pars = c("beta", "theta", "lambda",
-                           "sigma2", "pvar", "attractor"),
+                           "sigma2", "pvar", "attractor", "rep_y"),
                   control = list(adapt_delta   = 0.99,
                                  max_treedepth = 15) # Other parameters to control sampling behavior.
                   ) 
@@ -720,6 +745,14 @@ maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda",
                                         "sigma2", "pvar", "attractor"))), 4)
 nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
                                   "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+```{r diagtable-pa}
+diag.table <- c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
 ```
 
 ```{r rhats-pa, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the TV-DPCM"}
@@ -825,7 +858,7 @@ plot.IIF(object = fit, data = standata, range = c(-8, 8), type = "TIF")
 rm(estimates, fit, responses, stan.diag, standata,
    sum.fit, fit.array, I, index, K, maxRhat,
    nbfmi, nbulk, ndiv, nRhat, nT, ntail, ntree,
-   parameters, rdsfile, run.time)
+   parameters, rdsfile, run.time, diag.table)
 ```
 
 \newpage
