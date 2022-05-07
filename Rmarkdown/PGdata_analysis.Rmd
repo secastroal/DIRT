@@ -122,8 +122,8 @@ PG_data_na <- esmpack:::expand.esm(data = PG_data,
 One of the assumptions of the TV-DPCM is that the time interval between consecutive observations is the same for the whole duration of the data collection. This was clearly not the case with the data at hand. One way to address this issue is to include missing values in order to make the time interval between observations approximately the same \\citep{Asparouhov2018}. This approach have been shown to be useful to deal with unequal time intervals and the results from these kind of analyses are comparable with results from continuous time models. Given this, we also implemented this approach in the TV-DPCM analysis of the mental unrest items. For this, we divided the days in 90-minute time windows, for a total of 16 time windows per day. Observations within any of these time windows were considered as a representation of the mental unrest state of the participant for that time point. When no observations were available, "missing values" were included in the date set. By doing this, we added `r nrow(PG_data_na) - nrow(PG_data)` row of missing values for a total number of time windows of `r nrow(PG_data_na)`. Furthermore, as mentioned before, we collapsed the response categories from 5 to 7 into one. As a result, there are 5 response categories for each item, which means that 4 threshold parameters are estimated per item. 
 
 ```{r data2stan}
-#responses <- PG_data_na[, mu]
-responses <- PG_data[, mu]
+responses <- PG_data_na[, mu]
+# responses <- PG_data[, mu]
 responses[responses >= 5] <- 5
 
 I  <- ncol(responses)
@@ -139,7 +139,7 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
 ```
 
 ```{r stanfit}
-rdsfile <- "../Fits/MUnoNA"
+rdsfile <- "../Fits/MUwithNA"
 
 tvdpcm_inits <- function() {
               list(lambda = runif(1, -1, 1),
@@ -191,7 +191,7 @@ nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
 ```
 
 ```{r diagtable}
-diag.table <- c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail)
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
 row.names(diag.table)  <- "Fitted Model"
 colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
                            "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
@@ -384,7 +384,7 @@ nRhat   <- sum(rhat(fit, pars = c("beta", "theta")) > 1.05)
 ```
 
 ```{r diagtable-pcm}
-diag.table <- c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail)
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
 row.names(diag.table)  <- "Fitted Model"
 colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
                            "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
@@ -489,13 +489,13 @@ rm(estimates, fit, responses, stan.diag, standatapcm,
 
 \newpage
 
-## Fitting the TV-DPCM to NA items
+# Fitting the TV-DPCM to NA items
 
 ```{r data2stan-na}
 responses <- PG_data_na[, na]
-responses[responses < -2] <- -2
-responses[responses > 2]  <- 2
-responses <- responses + 3
+responses[responses < -1] <- -1
+responses[responses > 1]  <- 1
+responses <- responses + 2
 
 I  <- ncol(responses)
 nT <- nrow(responses)
@@ -510,7 +510,7 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
 ```
 
 ```{r stanfit-na}
-rdsfile <- "../Fits/NegAwithNA"
+rdsfile <- "../Fits/NegAwithNA_3cat"
 
 tvdpcm_inits <- function() {
               list(lambda = runif(1, -1, 1),
@@ -562,7 +562,7 @@ nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
 ```
 
 ```{r diagtable-na}
-diag.table <- c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail)
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
 row.names(diag.table)  <- "Fitted Model"
 colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
                            "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
@@ -675,7 +675,7 @@ rm(estimates, fit, responses, stan.diag, standata,
 
 \newpage
 
-## Fitting the TV-DPCM to PA items
+# Fitting the TV-DPCM to PA items
 
 ```{r data2stan-pa}
 responses <- PG_data_na[, pa]
@@ -748,7 +748,7 @@ nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
 ```
 
 ```{r diagtable-pa}
-diag.table <- c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail)
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
 row.names(diag.table)  <- "Fitted Model"
 colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
                            "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
@@ -855,6 +855,544 @@ plot.IIF(object = fit, data = standata, range = c(-8, 8), type = "TIF")
 ```
 
 ```{r clean4}
+rm(estimates, fit, responses, stan.diag, standata,
+   sum.fit, fit.array, I, index, K, maxRhat,
+   nbfmi, nbulk, ndiv, nRhat, nT, ntail, ntree,
+   parameters, rdsfile, run.time, diag.table)
+```
+
+\newpage
+
+# Fitting the PCM for Comparison NegA
+
+```{r pcmdata-na}
+modelpcm  <- stan_model(file = "../Stan/irt_pcm_long.stan", verbose = FALSE)
+
+responses <- PG_data[, na]
+responses[responses < -2] <- -2
+responses[responses > 2]  <- 2
+responses <- responses + 3
+
+
+I  <- ncol(responses)
+nT <- nrow(responses)
+K  <- max(responses, na.rm = TRUE)
+
+standatapcm <- tvdpcm2stan_data(resp = as.matrix(responses),
+                                I    = I,
+                                K    = K,
+                                nT   = nT,
+                                n_knots  = 8,
+                                s_degree = 3)
+```
+
+```{r pcmfit-na}
+inits <- function() {
+list(beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
+     theta   = rnorm(nT, 0, 3))
+}
+
+rdsfile <- "../Fits/NegA_PCM"
+
+if (!file.exists(paste0(rdsfile, ".rds"))) {
+  begin.time <- proc.time()
+  fit <- sampling(modelpcm,                  # Stan model. 
+                  data = standatapcm,        # Data.
+                  iter = 2000,            # Number of iterations.
+                  chains  = 3,            # Number of chains.
+                  warmup  = 500,          # Burn-in samples.
+                  init    = inits, # Initial values
+                  seed = 2022,            # Seed
+                  pars = c("beta", "theta", "rep_y"),
+                  control = list(adapt_delta   = 0.99,
+                                 max_treedepth = 15) # Other parameters to control sampling behavior.
+                  ) 
+  run.time <- proc.time() - begin.time
+  rm(begin.time)
+  
+  saveRDS(fit, file = paste0(rdsfile, ".rds"))
+  saveRDS(run.time, file = paste0(rdsfile, "_time.rds"))
+} else {
+  fit      <- readRDS(paste0(rdsfile, ".rds"))
+  run.time <- readRDS(paste0(rdsfile, "_time.rds"))
+}
+```
+
+```{r diag-pcm-na}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
+            
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta")) > 1.05)
+```
+
+```{r diagtable-pcm-na}
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
+```{r rhats-pcm-na, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the PCM"}
+mcmc_rhat(rhat(fit))
+```
+
+```{r trace-pcm-na, fig.cap = "Traceplots of Selected Parameters"}
+parameters <- c(paste0("beta[", sample(1:I, 1), ",", sample(1:(K - 1), 1), "]"),
+                paste0("theta[", sample(which(!is.na(responses[, 1])), 1), "]"))
+fit.array <- as.array(fit, pars = parameters)
+
+parameters[1] = gsub("beta", "delta", parameters[1])
+parameters[1] = gsub(",", "", parameters[1])
+parameters[2] = parameters[2]
+
+dimnames(fit.array) [[3]] <- parameters
+
+mcmc_trace(fit.array, facet_args = list(labeller = "label_parsed"))
+```
+
+```{r acf-plots-na, fig.cap = "Autocorrelation Plots of Selected Parameters"}
+
+mcmc_acf(fit.array, 
+         facet_args = list(labeller = "label_parsed"),
+         lags = 20)
+```
+
+```{r estimates-pcm-na}
+estimates <- as.data.frame(summary(fit, pars = "beta")$summary)
+
+estimates <- estimates[, c(1, 3, 4, 8, 9)]
+
+estimates[, 3] <- paste0("(", round(estimates[, 3], 2), ",", round(estimates[, 4], 2), ")")
+
+estimates        <- estimates[, -4]
+
+names(estimates) <- c("Mean", "SD", "C.I.", "ESS")
+
+row.names(estimates) <- c(paste0("$\\delta_{", 
+                                 rep(1:I, each = K - 1), 
+                                 rep(1:(K - 1), times = I),
+                                 "}$"))
+
+# Extract all estimates
+sum.fit <- list()
+
+sum.fit$beta   <- summary(fit, pars = "beta")$summary
+sum.fit$theta  <- summary(fit, pars = "theta")$summary
+
+# Create index to plot latent dynamics
+index <- trunc(seq(1, standatapcm$nT, length.out = 200))
+```
+
+
+```{r est-table-pcm-na}
+kbl(estimates, align = "c", booktabs = TRUE, caption = "Estimated Parameters of the PCM", escape = FALSE, digits = c(2, 2, NA, 0))
+```
+
+
+```{r est-trend-pcm-na, fig.cap = "Estimated Latent State Dispositions and Trend"}
+plot(standatapcm$time[index], sum.fit$theta[, 1][index],
+     type = "l", ylim = c(-1.5, 3), col = gray(0.5), lwd = 1,
+     ylab = "Latent State Disposition", xlab = "Beep Number")
+# polygon(c(standata$time, rev(standata$time)),
+#         c(sum.fit$theta[, 4], rev(sum.fit$theta[, 8])),
+#         border = NA,
+#         col = rgb(1, 0, 0, 0.25))
+```
+
+
+```{r ICC-pcm-na, fig.height = 6, fig.cap = "Item Characteristic Functions for the Mental Unrest Items given the PCM"}
+par(mfrow = c(4, 1))
+
+plot.ICC(object = fit, data = standatapcm, range = c(-6, 6), quiet = TRUE,
+         item_labels = c("Down", "Lonely", "Anxious", "Guilty"), 
+         col = gray((0:(K - 1))/K))
+```
+
+```{r IIF-pcm-na, fig.cap = "Item Information Functions of the Items of Mental Unrest given the PCM"}
+plot.IIF(object = fit, data = standatapcm, type = "IIF", 
+         item_labels = c("Down", "Lonely", "Anxious", "Guilty"), 
+         col = gray((0:(I-1))/I), range = c(-6, 6))
+
+```
+
+```{r TIF-pcm-na, fig.cap = "Test Information Function of the Items of Mental Unrest"}
+plot.IIF(object = fit, data = standatapcm, range = c(-6, 6), type = "TIF")
+```
+
+```{r clean5}
+rm(estimates, fit, responses, stan.diag, standatapcm,
+   sum.fit, fit.array, I, index, K, maxRhat,
+   nbfmi, nbulk, ndiv, nRhat, nT, ntail, ntree,
+   parameters, rdsfile, run.time, diag.table)
+```
+
+\newpage
+
+# Fitting the PCM for Comparison PosA
+
+```{r pcmdata-pa}
+modelpcm  <- stan_model(file = "../Stan/irt_pcm_long.stan", verbose = FALSE)
+
+responses <- PG_data[, pa]
+responses[responses < 2] <- 2
+responses[responses > 6] <- 6
+responses <- responses - 1
+
+I  <- ncol(responses)
+nT <- nrow(responses)
+K  <- max(responses, na.rm = TRUE)
+
+standatapcm <- tvdpcm2stan_data(resp = as.matrix(responses),
+                                I    = I,
+                                K    = K,
+                                nT   = nT,
+                                n_knots  = 8,
+                                s_degree = 3)
+```
+
+```{r pcmfit-pa}
+inits <- function() {
+list(beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
+     theta   = rnorm(nT, 0, 3))
+}
+
+rdsfile <- "../Fits/PosA_PCM"
+
+if (!file.exists(paste0(rdsfile, ".rds"))) {
+  begin.time <- proc.time()
+  fit <- sampling(modelpcm,                  # Stan model. 
+                  data = standatapcm,        # Data.
+                  iter = 2000,            # Number of iterations.
+                  chains  = 3,            # Number of chains.
+                  warmup  = 500,          # Burn-in samples.
+                  init    = inits, # Initial values
+                  seed = 2022,            # Seed
+                  pars = c("beta", "theta", "rep_y"),
+                  control = list(adapt_delta   = 0.99,
+                                 max_treedepth = 15) # Other parameters to control sampling behavior.
+                  ) 
+  run.time <- proc.time() - begin.time
+  rm(begin.time)
+  
+  saveRDS(fit, file = paste0(rdsfile, ".rds"))
+  saveRDS(run.time, file = paste0(rdsfile, "_time.rds"))
+} else {
+  fit      <- readRDS(paste0(rdsfile, ".rds"))
+  run.time <- readRDS(paste0(rdsfile, "_time.rds"))
+}
+```
+
+```{r diag-pcm-pa}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
+            
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta")) > 1.05)
+```
+
+```{r diagtable-pcm-pa}
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
+```{r rhats-pcm-pa, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the PCM"}
+mcmc_rhat(rhat(fit))
+```
+
+```{r trace-pcm-pa, fig.cap = "Traceplots of Selected Parameters"}
+parameters <- c(paste0("beta[", sample(1:I, 1), ",", sample(1:(K - 1), 1), "]"),
+                paste0("theta[", sample(which(!is.na(responses[, 1])), 1), "]"))
+fit.array <- as.array(fit, pars = parameters)
+
+parameters[1] = gsub("beta", "delta", parameters[1])
+parameters[1] = gsub(",", "", parameters[1])
+parameters[2] = parameters[2]
+
+dimnames(fit.array) [[3]] <- parameters
+
+mcmc_trace(fit.array, facet_args = list(labeller = "label_parsed"))
+```
+
+```{r acf-plots-pa, fig.cap = "Autocorrelation Plots of Selected Parameters"}
+
+mcmc_acf(fit.array, 
+         facet_args = list(labeller = "label_parsed"),
+         lags = 20)
+```
+
+
+```{r estimates-pcm-pa}
+estimates <- as.data.frame(summary(fit, pars = "beta")$summary)
+
+estimates <- estimates[, c(1, 3, 4, 8, 9)]
+
+estimates[, 3] <- paste0("(", round(estimates[, 3], 2), ",", round(estimates[, 4], 2), ")")
+
+estimates        <- estimates[, -4]
+
+names(estimates) <- c("Mean", "SD", "C.I.", "ESS")
+
+row.names(estimates) <- c(paste0("$\\delta_{", 
+                                 rep(1:I, each = K - 1), 
+                                 rep(1:(K - 1), times = I),
+                                 "}$"))
+
+# Extract all estimates
+sum.fit <- list()
+
+sum.fit$beta   <- summary(fit, pars = "beta")$summary
+sum.fit$theta  <- summary(fit, pars = "theta")$summary
+
+# Create index to plot latent dynamics
+index <- trunc(seq(1, standatapcm$nT, length.out = 200))
+```
+
+
+```{r est-table-pcm-pa}
+kbl(estimates, align = "c", booktabs = TRUE, caption = "Estimated Parameters of the PCM", escape = FALSE, digits = c(2, 2, NA, 0))
+```
+
+
+```{r est-trend-pcm-pa, fig.cap = "Estimated Latent State Dispositions and Trend"}
+plot(standatapcm$time[index], sum.fit$theta[, 1][index],
+     type = "l", ylim = c(-1.5, 3), col = gray(0.5), lwd = 1,
+     ylab = "Latent State Disposition", xlab = "Beep Number")
+# polygon(c(standata$time, rev(standata$time)),
+#         c(sum.fit$theta[, 4], rev(sum.fit$theta[, 8])),
+#         border = NA,
+#         col = rgb(1, 0, 0, 0.25))
+```
+
+
+```{r ICC-pcm-pa, fig.height = 6, fig.cap = "Item Characteristic Functions for the Mental Unrest Items given the PCM"}
+par(mfrow = c(5, 1))
+
+plot.ICC(object = fit, data = standatapcm, range = c(-6, 6), quiet = TRUE,
+         item_labels = c("Relaxed", "Satisfied", "Enthusiastic",
+                         "Cheerful", "Strong"), 
+         col = gray((0:(K - 1))/K))
+```
+
+```{r IIF-pcm-pa, fig.cap = "Item Information Functions of the Items of Mental Unrest given the PCM"}
+plot.IIF(object = fit, data = standatapcm, type = "IIF", 
+         item_labels = c("Relaxed", "Satisfied", "Enthusiastic",
+                         "Cheerful", "Strong"), 
+         col = gray((0:(I-1))/I), range = c(-6, 6))
+
+```
+
+
+```{r TIF-pcm-pa, fig.cap = "Test Information Function of the Items of Mental Unrest"}
+plot.IIF(object = fit, data = standatapcm, range = c(-6, 6), type = "TIF")
+```
+
+```{r clean6}
+rm(estimates, fit, responses, stan.diag, standatapcm,
+   sum.fit, fit.array, I, index, K, maxRhat,
+   nbfmi, nbulk, ndiv, nRhat, nT, ntail, ntree,
+   parameters, rdsfile, run.time, diag.table)
+```
+
+\newpage
+
+# Fitting the TV-DPCM to NA and MU items
+
+```{r data2stan-namu}
+responses <- PG_data_na[, c(na, mu)]
+responses[, na][responses[, na] < -2] <- -2
+responses[, na][responses[, na] > 2]  <- 2
+responses[, na] <- responses[, na] + 3
+responses[, mu][responses[, mu] > 5] <- 5 
+
+I  <- ncol(responses)
+nT <- nrow(responses)
+K  <- max(responses, na.rm = TRUE)
+
+standata <- tvdpcm2stan_data(resp = as.matrix(responses),
+                             I    = I,
+                             K    = K,
+                             nT   = nT,
+                             n_knots  = 8,
+                             s_degree = 3)
+```
+
+```{r stanfit-namu}
+rdsfile <- "../Fits/NegAMUwithNA"
+
+tvdpcm_inits <- function() {
+              list(lambda = runif(1, -1, 1),
+                   beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
+                   inno   = rnorm(nT, 0, 3),
+                   sigma  = rlnorm(1, 1))
+            }
+
+if (!file.exists(paste0(rdsfile, ".rds"))) {
+  begin.time <- proc.time()
+  fit <- sampling(model,                  # Stan model. 
+                  data = standata,        # Data.
+                  iter = 2000,            # Number of iterations.
+                  chains  = 3,            # Number of chains.
+                  warmup  = 500,          # Burn-in samples.
+                  init    = tvdpcm_inits, # Initial values
+                  seed = 2022,            # Seed
+                  pars = c("beta", "theta", "lambda",
+                           "sigma2", "pvar", "attractor", "rep_y"),
+                  control = list(adapt_delta   = 0.99,
+                                 max_treedepth = 15) # Other parameters to control sampling behavior.
+                  ) 
+  run.time <- proc.time() - begin.time
+  rm(begin.time)
+  
+  saveRDS(fit, file = paste0(rdsfile, ".rds"))
+  saveRDS(run.time, file = paste0(rdsfile, "_time.rds"))
+} else {
+  fit      <- readRDS(paste0(rdsfile, ".rds"))
+  run.time <- readRDS(paste0(rdsfile, "_time.rds"))
+}
+```
+
+```{r diag-namu}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
+            
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
+                                        "sigma2", "pvar", "attractor"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                  "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+```{r diagtable-namu}
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
+```{r rhats-namu, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the TV-DPCM"}
+mcmc_rhat(rhat(fit))
+```
+
+```{r trace-namu, fig.cap = "Traceplots of Selected Parameters"}
+parameters <- c(paste0("beta[", sample(1:I, 1), ",", sample(1:(K - 1), 1), "]"),
+                paste0("theta[", sample(which(!is.na(responses[, 1])), 1), "]"),
+                "lambda", "sigma2")
+fit.array <- as.array(fit, pars = parameters)
+
+parameters[1] = gsub("beta", "delta", parameters[1])
+parameters[1] = gsub(",", "", parameters[1])
+parameters[2] = parameters[2]
+parameters[3] = 'varphi'
+parameters[4] = 'Psi'
+
+dimnames(fit.array) [[3]] <- parameters
+
+mcmc_trace(fit.array, facet_args = list(labeller = "label_parsed"))
+```
+
+```{r acf-plots-namu, fig.cap = "Autocorrelation Plots of Selected Parameters"}
+mcmc_acf(fit.array, 
+         facet_args = list(labeller = "label_parsed"),
+         lags = 20)
+```
+
+```{r estimates-namu}
+estimates <- as.data.frame(summary(fit, pars = c("beta", "lambda", "sigma2"))$summary)
+
+estimates <- estimates[, c(1, 3, 4, 8, 9)]
+
+estimates[, 3] <- paste0("(", round(estimates[, 3], 2), ",", round(estimates[, 4], 2), ")")
+
+estimates        <- estimates[, -4]
+
+names(estimates) <- c("Mean", "SD", "C.I.", "ESS")
+
+row.names(estimates) <- c(paste0("$\\delta_{", 
+                                 rep(1:I, each = K - 1), 
+                                 rep(1:(K - 1), times = I),
+                                 "}$"),
+                          "$\\varphi$", "$\\Psi$")
+
+# Extract all estimates
+sum.fit <- list()
+
+sum.fit$beta   <- summary(fit, pars = "beta")$summary
+sum.fit$theta  <- summary(fit, pars = "theta")$summary
+sum.fit$lambda <- summary(fit, pars = "lambda")$summary
+sum.fit$sigma2 <- summary(fit, pars = "sigma2")$summary
+sum.fit$pvar  <- summary(fit, pars = "pvar")$summary
+sum.fit$attractor <- summary(fit, pars = "attractor")$summary
+
+# Create index to plot latent dynamics
+index <- trunc(seq(1, standata$nT, length.out = 200))
+```
+
+```{r est-table-namu}
+kbl(estimates, align = "c", booktabs = TRUE, caption = "Estimated Parameters of the TV-DPCM", escape = FALSE, digits = c(2, 2, NA, 0))
+```
+
+```{r est-trend-namu, fig.cap = "Estimated Latent State Dispositions and Trend"}
+plot(standata$time[index], sum.fit$theta[, 1][index],
+     type = "l", ylim = c(-8, 8), col = gray(0.5), lwd = 1,
+     ylab = "Latent State Disposition", xlab = "Beep Number")
+polygon(c(standata$time, rev(standata$time)),
+        c(sum.fit$attractor[, 4], rev(sum.fit$attractor[, 8])),
+        border = NA,
+        col = gray(0.75, 0.25))
+# polygon(c(standata$time, rev(standata$time)),
+#         c(sum.fit$theta[, 4], rev(sum.fit$theta[, 8])),
+#         border = NA,
+#         col = rgb(1, 0, 0, 0.25))
+lines(standata$time, sum.fit$attractor[, 1],
+      col = 1, lwd = 2)
+```
+
+```{r ICC-namu, fig.height = 6, fig.cap = "Item Characteristic Functions for the Mental Unrest Items"}
+par(mfrow = c(4, 1))
+
+plot.ICC(object = fit, data = standata, range = c(-8, 8), quiet = TRUE,
+         item_labels = c("Down", "Lonely", "Anxious", "Guilty"), 
+         col = gray((0:(K - 1))/K))
+```
+
+```{r IIF-namu, fig.cap = "Item Information Functions of the Items of Mental Unrest"}
+plot.IIF(object = fit, data = standata, type = "IIF", 
+         item_labels = c("Irritated", "Restless", "Agitated"), 
+         col = gray((0:(I-1))/I), range = c(-6, 6))
+
+```
+
+```{r TIF-namu, fig.cap = "Test Information Function of the Items of Mental Unrest"}
+plot.IIF(object = fit, data = standata, range = c(-6, 6), type = "TIF")
+```
+
+```{r clean7}
 rm(estimates, fit, responses, stan.diag, standata,
    sum.fit, fit.array, I, index, K, maxRhat,
    nbfmi, nbulk, ndiv, nRhat, nT, ntail, ntree,
