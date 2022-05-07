@@ -1359,7 +1359,7 @@ kbl(estimates, align = "c", booktabs = TRUE, caption = "Estimated Parameters of 
 
 ```{r est-trend-namu, fig.cap = "Estimated Latent State Dispositions and Trend"}
 plot(standata$time[index], sum.fit$theta[, 1][index],
-     type = "l", ylim = c(-8, 8), col = gray(0.5), lwd = 1,
+     type = "l", ylim = c(-5, 5), col = gray(0.5), lwd = 1,
      ylab = "Latent State Disposition", xlab = "Beep Number")
 polygon(c(standata$time, rev(standata$time)),
         c(sum.fit$attractor[, 4], rev(sum.fit$attractor[, 8])),
@@ -1374,16 +1374,18 @@ lines(standata$time, sum.fit$attractor[, 1],
 ```
 
 ```{r ICC-namu, fig.height = 6, fig.cap = "Item Characteristic Functions for the Mental Unrest Items"}
-par(mfrow = c(4, 1))
+par(mfrow = c(7, 1), mar = c(2, 3, 1, 2))
 
 plot.ICC(object = fit, data = standata, range = c(-8, 8), quiet = TRUE,
-         item_labels = c("Down", "Lonely", "Anxious", "Guilty"), 
+         item_labels = c("Down", "Lonely", "Anxious", "Guilty",
+                         "Irritated", "Restless", "Agitated"), 
          col = gray((0:(K - 1))/K))
 ```
 
 ```{r IIF-namu, fig.cap = "Item Information Functions of the Items of Mental Unrest"}
 plot.IIF(object = fit, data = standata, type = "IIF", 
-         item_labels = c("Irritated", "Restless", "Agitated"), 
+         item_labels = c("Down", "Lonely", "Anxious", "Guilty",
+                         "Irritated", "Restless", "Agitated"), 
          col = gray((0:(I-1))/I), range = c(-6, 6))
 
 ```
