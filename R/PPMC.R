@@ -525,7 +525,7 @@ ppmc.Q1 <- function(object, data, items = NULL, quiet = FALSE) {
   
   # Compute posterior predictive p-values
   out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
-  names(out) <- paste0("Item_", items)
+  names(out) <- paste0("Item_", 1:I)
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
@@ -602,7 +602,7 @@ ppmc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE) {
   
   # Compute posterior predictive p-values
   out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
-  names(out) <- paste0("Item_", items)
+  names(out) <- paste0("Item_", 1:I)
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
@@ -784,22 +784,16 @@ odds.ratio <- function(y, nT, I, K, t_index, i_index) {
   
   count <- 1
   for (i in 1:(I - 1)) {
-    j <- i + 1
-    while (i<j) {
+    for (j in (i + 1):I) {
       n    <- rep(NA, 4)
       n[1] <- sum(Y[, i] == 1 & Y[, j] == 1, na.rm = TRUE)
       n[2] <- sum(Y[, i] == 0 & Y[, j] == 0, na.rm = TRUE)
       n[3] <- sum(Y[, i] == 1 & Y[, j] == 0, na.rm = TRUE)
       n[4] <- sum(Y[, i] == 0 & Y[, j] == 1, na.rm = TRUE)
       if (any(n[3:4] == 0)) {n <- n + 0.5}
-      or[count] <- (n[1]*n[2])/(n[3]*n[4])
+      or[count] <- (n[1] * n[2])/(n[3] * n[4])
       names(or)[count] <- paste0('OR(', j, ',', i, ")")
       count <- count + 1
-      if (j == I) {
-        break
-      } else {
-        j <- j + 1
-      }
     }
   }
   
@@ -1191,6 +1185,116 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
   print(sp)
   return(list(ppp = round(out, 3), sp = sp))
 }
+
+# Partial Autocorrelation of the Latent Scores Residuals ----
+
+gpcm.lpacf <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
+  
+  M <- K - 1
+  
+  # Restructure responses in a matrix
+  Y <- matrix(NA, nT, I)
+  
+  for (t in 1:nT) {
+    for (i in 1:I) {
+      Y[t, i] <- y[t_index == t & i_index == i]
+    }
+  }
+  
+  delta       <- rowMeans(thresholds)
+  taus        <- thresholds - delta
+  
+  probs.array <- array(NA, dim = c(length(theta), I, K))
+  
+  for (yy in 0:M) {
+    probs.array[, , yy + 1] <- P.GPCM(y    = yy, 
+                                      alpha = alpha, 
+                                      delta = delta, 
+                                      taus  = taus, 
+                                      theta = theta, 
+                                      M     = M)
+  }
+  
+  E <- apply(probs.array, c(1, 2), function(x) sum(x * 1:K))
+  
+  D <- Y - E
+  
+  out <- apply(D, 2, function(x) {
+    acf(x, lag.max = 1, plot = FALSE, na.action = na.pass)$acf[2, ,]
+    })
+  
+  return(out)
+}
+
+ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE) {
+  
+  betasamples  <- extract(object)[["beta"]]
+  thetasamples <- extract(object)[["theta"]]
+  repy <- extract(object)[["rep_y"]]
+  I    <- data$I
+  K    <- data$K
+  M    <- data$K - 1
+  nT   <- data$nT
+  y    <- data$y_obs
+  
+  if (is.null(items)) {
+    items <- 1:I
+  }
+  
+  # Get the observed timepoints. Relevant if there were missing data.
+  times_obs <- intersect(data$tt, data$tt_obs)
+  
+  # Create array to store the computed partial autocorrelations.
+  discrepancy <- array(NA, dim = c(nrow(repy), I, 2))
+  
+  for (r in 1:nrow(repy)) {
+    # Get estimated parameters for the i-th iteration.
+    thresholds <- betasamples[r, , ]
+    theta      <- thetasamples[r, ][times_obs]
+    
+    # pacf for the observed scores
+    discrepancy[r, , 1] <- gpcm.lpacf(y          = y,
+                                      theta      = theta,
+                                      thresholds = thresholds,
+                                      alpha      = rep(1, I),
+                                      nT         = nT,
+                                      I          = I,
+                                      K          = K,
+                                      t_index    = data$tt_obs,
+                                      i_index    = data$ii_obs)
+    
+    # pacf for the i-th replicated scores
+    discrepancy[r, , 2] <- gpcm.lpacf(y          = repy[r, ],
+                                      theta      = theta,
+                                      thresholds = thresholds,
+                                      alpha      = rep(1, I),
+                                      nT         = nT,
+                                      I          = I,
+                                      K          = K,
+                                      t_index    = data$tt_obs,
+                                      i_index    = data$ii_obs)
+  }
+  rm(r)
+  
+  # Compute posterior predictive p-values
+  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+  names(out) <- paste0("Item_", 1:I)
+  
+  for (i in 1:length(items)) {
+    if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
+    plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], las = 1,
+         main = paste0("Scatterplot PACF of item ", items[i]),
+         ylab = expression(paste("PACF", "(", y^rep, ";", Theta, ")")),
+         xlab = expression(paste("PACF", "(y;", Theta, ")")))
+    abline(a= 0, b = 1, col = "red")
+    mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
+          cex = 0.8, adj = 0)
+  }
+  
+  return(round(out, 3))
+}
+
+
 
 # rm(list = setdiff(ls(), c(lsf.str(), "object", "data", "fit")))
 
