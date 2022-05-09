@@ -27,12 +27,14 @@ ppmc.sumscore.ts <- function(object, data) {
             rev(apply(sumscoresrepy, 1, quantile, probs = 0.975))),
           border = NA,
           col = rgb(1, 0, 0, 0.15))
-  polygon(c(1:nT, rev(1:nT)),
+  polygon(c(sort(unique(data$tt_obs)), 
+            rev(sort(unique(data$tt_obs)))),
           c(apply(sumscoresrepy, 1, quantile, probs = 0.25), 
             rev(apply(sumscoresrepy, 1, quantile, probs = 0.75))),
           border = NA,
           col = rgb(1, 0, 0, 0.25))
-  lines(apply(sumscoresrepy, 1, quantile, probs = 0.5), 
+  lines(sort(unique(data$tt_obs)), 
+        apply(sumscoresrepy, 1, quantile, probs = 0.5), 
         col = "red")
   
   # Count observations out of the 95 percent of the replications
@@ -180,7 +182,8 @@ ppmc.item.ts <- function(object, data, quiet = FALSE, items = NULL) {
               rev(apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.75))),
             border = NA,
             col = rgb(1, 0, 0, 0.25))
-    lines(apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.5), 
+    lines(data$tt_obs[data$ii_obs == items[i]], 
+          apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.5), 
           col = "red")
     
     # Count observations out of the 95 percent of the replications
@@ -188,10 +191,10 @@ ppmc.item.ts <- function(object, data, quiet = FALSE, items = NULL) {
       y[data$ii_obs == items[i]] <= apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.975)
     prop_out[items[i]] <- sum(!out95) / length(out95)
     
-    mtext(paste0("Prop Out = ", prop_out[items[i]]), side = 3, line = -1.5)
+    mtext(paste0("Prop Out = ", round(prop_out[items[i]], 3)), side = 3, line = -1.5)
   }
   
-  return(prop_out)
+  return(round(prop_out, 3))
 }
 
 # Item total correlation (Not modified) ----
@@ -262,8 +265,11 @@ ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items 
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
-    hist(repdat[items[i], ], main = paste0("Histogram Item-Total Correlation Item ", items[i]),
-         xlab = "Item-Total Correlation")
+    hist(repdat[items[i], ], 
+         main = paste0("Histogram Item-Total Correlation Item ", items[i]),
+         xlab = "Item-Total Correlation",
+         xlim = c(min(repdat[items[i], ], polcor[items[i]]),
+                  max(repdat[items[i], ], polcor[items[i]])))
     abline(v = polcor[items[i]], lwd = 3)
     mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
           cex = 0.8, adj = 0)
@@ -348,7 +354,10 @@ ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
-    hist(repdat[items[i], ], main = paste0("Histogram Item-Total Correlation Item ", items[i]),
+    hist(repdat[items[i], ], 
+         main = paste0("Histogram Item-Total Correlation Item ", items[i]),
+         xlim = c(min(repdat[items[i], ], polcor[items[i]]),
+                  max(repdat[items[i], ], polcor[items[i]])),
          xlab = "Item-Total Correlation")
     abline(v = polcor[items[i]], lwd = 3)
     mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
@@ -407,7 +416,10 @@ ppmc.itcor3 <- function(object, data, method = "pearson", items = NULL, quiet = 
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
-    hist(repdat[items[i], ], main = paste0("Histogram Item-Total Correlation Item ", items[i]),
+    hist(repdat[items[i], ], 
+         main = paste0("Histogram Item-Total Correlation Item ", items[i]),
+         xlim = c(min(repdat[items[i], ], polcor[items[i]]),
+                  max(repdat[items[i], ], polcor[items[i]])),
          xlab = "Item-Total Correlation")
     abline(v = polcor[items[i]], lwd = 3)
     mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
@@ -635,7 +647,9 @@ gpcm.Q3 <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
   
   for (t in 1:nT) {
     for (i in 1:I) {
-      Y[t, i] <- y[t_index == t & i_index == i]
+      if (!all(!t_index == t)) {
+        Y[t, i] <- y[t_index == t & i_index == i]
+      }
     }
   }
   
@@ -655,7 +669,7 @@ gpcm.Q3 <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
   
   E <- apply(probs.array, c(1, 2), function(x) sum(x * 1:K))
   
-  D <- Y - E
+  D <- na.omit(Y) - E
   
   CorD <- cor(D, use = "pairwise.complete.obs")
   q3 <- CorD[lower.tri(CorD)]
@@ -983,7 +997,9 @@ cov.resid <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
   
   for (t in 1:nT) {
     for (i in 1:I) {
-      Y[t, i] <- y[t_index == t & i_index == i]
+      if (!all(!t_index == t)) {
+        Y[t, i] <- y[t_index == t & i_index == i]
+      }
     }
   }
   
@@ -1003,7 +1019,7 @@ cov.resid <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
   
   E <- apply(probs.array, c(1, 2), function(x) sum(x * 1:K))
   
-  out <- abs(cov(Y) - cov(E))
+  out <- abs(cov(Y, use = "pairwise.complete.obs") - cov(E))
   out <- out[lower.tri(out)]
   names(out) <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
     paste0("(", paste(x, collapse = ","), ")"))
@@ -1197,7 +1213,9 @@ gpcm.lpacf <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) 
   
   for (t in 1:nT) {
     for (i in 1:I) {
-      Y[t, i] <- y[t_index == t & i_index == i]
+      if (!all(!t_index == t)) {
+        Y[t, i] <- y[t_index == t & i_index == i]
+      }
     }
   }
   
@@ -1217,7 +1235,7 @@ gpcm.lpacf <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) 
   
   E <- apply(probs.array, c(1, 2), function(x) sum(x * 1:K))
   
-  D <- Y - E
+  D <- na.omit(Y) - E
   
   out <- apply(D, 2, function(x) {
     acf(x, lag.max = 1, plot = FALSE, na.action = na.pass)$acf[2, ,]
@@ -1293,8 +1311,6 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE) {
   
   return(round(out, 3))
 }
-
-
 
 # rm(list = setdiff(ls(), c(lsf.str(), "object", "data", "fit")))
 
