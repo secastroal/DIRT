@@ -220,11 +220,24 @@ ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
 
 \newpage
 
+### Yen's Q1
+
+```{r q1, fig.height = 8, results = 'hide', fig.cap = "Yen's Q1 of the items of MU"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1(object = fit, data = standata, quiet = TRUE)
+time1 <- proc.time() - time0
+```
+
+\newpage
+
 ### Partial Autocorrelation of the Observed Item Scores: TV-DPCM Residuals
 
 ```{r lpacf, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores", fig.height = 8}
-par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(3, 4, 2, 2) + 0.1)
 ppmc.lpacf(object = fit, data = standata, quiet = TRUE)
+time1 <- proc.time() - time0
 ```
 
 \newpage

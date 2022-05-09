@@ -509,7 +509,7 @@ ppmc.Q1 <- function(object, data, items = NULL, quiet = FALSE) {
     tmpx <- tmpx[order(tmpx[, 1]), ]
     
     group       <- tmpx[, 2]
-    group_index <- tmpx[data$tt_obs, 2]
+    group_index <- rep(tmpx[, 2], I)
     rm(tmpx)
     
     # Yen's Q1 for the observed scores
@@ -587,7 +587,7 @@ ppmc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE) {
     
     # Create groups for Yen's Q1 given the time order
     group       <- cut(seq_along(theta), 10, labels = FALSE)
-    group_index <- group[data$tt_obs]
+    group_index <- rep(group, I)
     
     # Yen's Q1 for the observed scores
     discrepancy[r, , 1] <- gpcm.Q1(y           = y, 
