@@ -1444,7 +1444,7 @@ proc.time() - time0
 
 Here, we fitted the PCM to the 3 items of mental unrest. Response categories 5 to 7 were merged into one.
 
-```{r data2stan}
+```{r}
 responses <- PG_data[, mu]
 # responses <- PG_data[, mu]
 responses[responses >= 5] <- 5
@@ -1461,19 +1461,19 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
                              s_degree = 3)
 ```
 
-```{r sumscores, fig.cap = "Sumscores of Mental Unrest"}
+```{r, fig.cap = "Sumscores of Mental Unrest"}
 index <- which(!is.na(responses[, 1]))[seq(1, sum(!is.na(responses[, 1])), 20)]
 plot(index, rowMeans(responses)[index], yaxt = 'n', las = 1, type = "l", 
      ylab = "Meanscores MU", xlab = "Beep")
 ```
 
-```{r model-load}
+```{r}
 rdsfile <- "../Fits/MU_PCM"
 
 fit      <- readRDS(paste0(rdsfile, ".rds"))
 ```
 
-```{r diag}
+```{r}
 stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
                                  warmup = 0, print = FALSE)
             
@@ -1492,7 +1492,7 @@ nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
 
 ### Convergence Checks
 
-```{r diagtable}
+```{r}
 diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
 row.names(diag.table)  <- "Fitted Model"
 colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
@@ -1504,7 +1504,7 @@ kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escap
 
 ### Time Series of the Sumscores
 
-```{r sums-ts, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
+```{r, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
 ppmc.sumscore.ts(object = fit, data = standata)
 ```
 
@@ -1512,7 +1512,7 @@ ppmc.sumscore.ts(object = fit, data = standata)
 
 ### Autocorrelation: 1st, 2nd, and 3rd
 
-```{r acf, results = 'hide', fig.cap = "1st, 2nd, and 3rd autocorrelation of the sumscores"}
+```{r, results = 'hide', fig.cap = "1st, 2nd, and 3rd autocorrelation of the sumscores"}
 par(mfrow = c(3, 1), mar = c(2, 3, 2, 2) + 0.1)
 ppmc.acf(object = fit, data = standata, lag.max = 3)
 ```
@@ -1521,7 +1521,7 @@ ppmc.acf(object = fit, data = standata, lag.max = 3)
 
 ### Partial Autocorrelation of the Observed Sumscores: AR(1) Residuals
 
-```{r racf, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
 ppmc.racf(object = fit, data = standata)
 ```
 
@@ -1529,7 +1529,7 @@ ppmc.racf(object = fit, data = standata)
 
 ### Partial Autocorrelation of the Observed Sumscores: TV-DPCM Residuals
 
-```{r lpacf-sum, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
 time0 <- proc.time()
 ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE)
 proc.time() - time0
@@ -1539,7 +1539,7 @@ proc.time() - time0
 
 ### Mean Squared Successive Differences
 
-```{r mssd, results = 'hide', fig.cap = "Mean Squared Succesive Differences of the Sumscores"}
+```{r, results = 'hide', fig.cap = "Mean Squared Succesive Differences of the Sumscores"}
 ppmc.mssd(object = fit, data = standata)
 ```
 
@@ -1547,7 +1547,7 @@ ppmc.mssd(object = fit, data = standata)
 
 ### Item Scores Time Series
 
-```{r item-ts, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
+```{r, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
 par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
 ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
 ```
@@ -1556,7 +1556,7 @@ ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
 
 ### Item-Total Correlation: Version 1
 
-```{r itcor, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation"}
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation"}
 par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
 ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
 ```
@@ -1565,7 +1565,7 @@ ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
 
 ### Item-Total Correlation: Version 2
 
-```{r itcor2, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for the Total"}
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for the Total"}
 par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
 ppmc.itcor2(object = fit, data = standata, quiet = TRUE, method = "pearson")
 ```
@@ -1574,7 +1574,7 @@ ppmc.itcor2(object = fit, data = standata, quiet = TRUE, method = "pearson")
 
 ### Item-Total Correlation: Version 3
 
-```{r itcor3, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for Item and Total Scores"}
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for Item and Total Scores"}
 par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
 ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
 ```
@@ -1583,7 +1583,7 @@ ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
 
 ### Yen's Q1
 
-```{r q1, fig.height = 8, results = 'hide', fig.cap = "Yen's Q1 of the items of MU"}
+```{r, fig.height = 8, results = 'hide', fig.cap = "Yen's Q1 of the items of MU"}
 time0 <- proc.time()
 par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
 ppmc.Q1(object = fit, data = standata, quiet = TRUE)
@@ -1594,7 +1594,7 @@ proc.time() - time0
 
 ### Yen's Q1 Modified
 
-```{r q1-alt, fig.height = 8, results = 'hide', fig.cap = "Modified Yen's Q1 of the items of MU"}
+```{r, fig.height = 8, results = 'hide', fig.cap = "Modified Yen's Q1 of the items of MU"}
 time0 <- proc.time()
 par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
 ppmc.Q1.alt(object = fit, data = standata, quiet = TRUE)
@@ -1605,7 +1605,7 @@ proc.time() - time0
 
 ### Partial Autocorrelation of the Observed Item Scores: TV-DPCM Residuals
 
-```{r lpacf, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Item Scores", fig.height = 8}
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Item Scores", fig.height = 8}
 time0 <- proc.time()
 par(mfrow = c(I, 1), mar = c(3, 4, 2, 2) + 0.1)
 ppmc.lpacf(object = fit, data = standata, quiet = TRUE)
@@ -1616,7 +1616,7 @@ proc.time() - time0
 
 ### Yen's Q3
 
-```{r q3, results = 'hide', fig.cap = "Yen's Q3 for the items of MU"}
+```{r, results = 'hide', fig.cap = "Yen's Q3 for the items of MU"}
 time0 <- proc.time()
 ppmc.Q3(object = fit, data = standata)$ppp
 proc.time() - time0
@@ -1626,7 +1626,7 @@ proc.time() - time0
 
 ### OR
 
-```{r or, results = 'hide', fig.cap = "Odds Ratio for the items of MU"}
+```{r, results = 'hide', fig.cap = "Odds Ratio for the items of MU"}
 time0 <- proc.time()
 ppmc.OR(object = fit, data = standata)$ppp
 proc.time() - time0
@@ -1636,7 +1636,7 @@ proc.time() - time0
 
 ### OR Modified
 
-```{r ORdiff, results = 'hide', fig.cap = "Odds Ratio Difference between Two Halves of the Observations"}
+```{r, results = 'hide', fig.cap = "Odds Ratio Difference between Two Halves of the Observations"}
 time0 <- proc.time()
 ppmc.ORDiff(object = fit, data = standata)$ppp
 proc.time() - time0
@@ -1646,7 +1646,7 @@ proc.time() - time0
 
 ### RESID
 
-```{r resid, results = 'hide', fig.cap = "Absolute Item Covariance Residual of the items of MU"}
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual of the items of MU"}
 time0 <- proc.time()
 ppmc.cov.resid(object = fit, data = standata)$ppp
 proc.time() - time0
@@ -1656,7 +1656,7 @@ proc.time() - time0
 
 ### RESID Difference
 
-```{r rediff, results = 'hide', fig.cap = "Absolute Item Covariance Residual Difference between Two Halves of the Observations"}
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual Difference between Two Halves of the Observations"}
 time0 <- proc.time()
 ppmc.cov.rediff(object = fit, data = standata)$ppp
 proc.time() - time0
