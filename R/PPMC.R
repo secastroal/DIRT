@@ -645,11 +645,9 @@ gpcm.Q3 <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
   # Restructure responses in a matrix
   Y <- matrix(NA, nT, I)
   
-  for (t in 1:nT) {
+  for (t in unique(t_index)) {
     for (i in 1:I) {
-      if (!all(!t_index == t)) {
-        Y[t, i] <- y[t_index == t & i_index == i]
-      }
+      Y[t, i] <- y[t_index == t & i_index == i]
     }
   }
   
@@ -669,7 +667,7 @@ gpcm.Q3 <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
   
   E <- apply(probs.array, c(1, 2), function(x) sum(x * 1:K))
   
-  D <- na.omit(Y) - E
+  D <- Y - E
   
   CorD <- cor(D, use = "pairwise.complete.obs")
   q3 <- CorD[lower.tri(CorD)]
@@ -786,7 +784,7 @@ odds.ratio <- function(y, nT, I, K, t_index, i_index) {
   # Restructure responses in a matrix
   Y <- matrix(NA, nT, I)
   
-  for (t in 1:nT) {
+  for (t in unique(t_index)) {
     for (i in 1:I) {
       Y[t, i] <- y[t_index == t & i_index == i]
     }
@@ -995,11 +993,9 @@ cov.resid <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
   # Restructure responses in a matrix
   Y <- matrix(NA, nT, I)
   
-  for (t in 1:nT) {
+  for (t in unique(t_index)) {
     for (i in 1:I) {
-      if (!all(!t_index == t)) {
-        Y[t, i] <- y[t_index == t & i_index == i]
-      }
+      Y[t, i] <- y[t_index == t & i_index == i]
     }
   }
   
@@ -1204,21 +1200,20 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
 
 # Partial Autocorrelation of the Latent Scores Residuals ----
 
-gpcm.lpacf <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
+gpcm.lpacf <- function(y, theta, thresholds, alpha, nT, I, K, 
+                       t_index, i_index, sumscores = FALSE) {
   
   M <- K - 1
   
   # Restructure responses in a matrix
   Y <- matrix(NA, nT, I)
   
-  for (t in 1:nT) {
+  for (t in unique(t_index)) {
     for (i in 1:I) {
-      if (!all(!t_index == t)) {
-        Y[t, i] <- y[t_index == t & i_index == i]
-      }
+      Y[t, i] <- y[t_index == t & i_index == i]
     }
   }
-  
+
   delta       <- rowMeans(thresholds)
   taus        <- thresholds - delta
   
@@ -1235,16 +1230,24 @@ gpcm.lpacf <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) 
   
   E <- apply(probs.array, c(1, 2), function(x) sum(x * 1:K))
   
-  D <- na.omit(Y) - E
-  
-  out <- apply(D, 2, function(x) {
-    acf(x, lag.max = 1, plot = FALSE, na.action = na.pass)$acf[2, ,]
+  if (sumscores) {
+    D <- rowMeans(na.omit(Y)) - rowMeans(E)
+    
+    out <- acf(D, lag.max = 1, plot = FALSE, na.action = na.pass)$acf[2, ,]
+  } else {
+    D <- na.omit(Y) - E
+    
+    out <- apply(D, 2, function(x) {
+      acf(x, lag.max = 1, plot = FALSE, na.action = na.pass)$acf[2, ,]
     })
+  }
+  
   
   return(out)
 }
 
-ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE) {
+ppmc.lpacf <- function(object, data, items = NULL, 
+                       quiet = FALSE, sumscores = FALSE) {
   
   betasamples  <- extract(object)[["beta"]]
   thetasamples <- extract(object)[["theta"]]
@@ -1263,7 +1266,11 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE) {
   times_obs <- intersect(data$tt, data$tt_obs)
   
   # Create array to store the computed partial autocorrelations.
-  discrepancy <- array(NA, dim = c(nrow(repy), I, 2))
+  if (sumscores) {
+    discrepancy <- array(NA, dim = c(nrow(repy), 1, 2))
+  } else {
+    discrepancy <- array(NA, dim = c(nrow(repy), I, 2))
+  }
   
   for (r in 1:nrow(repy)) {
     # Get estimated parameters for the i-th iteration.
@@ -1279,7 +1286,8 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE) {
                                       I          = I,
                                       K          = K,
                                       t_index    = data$tt_obs,
-                                      i_index    = data$ii_obs)
+                                      i_index    = data$ii_obs,
+                                      sumscores  = sumscores)
     
     # pacf for the i-th replicated scores
     discrepancy[r, , 2] <- gpcm.lpacf(y          = repy[r, ],
@@ -1290,23 +1298,37 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE) {
                                       I          = I,
                                       K          = K,
                                       t_index    = data$tt_obs,
-                                      i_index    = data$ii_obs)
+                                      i_index    = data$ii_obs,
+                                      sumscores  = sumscores)
   }
   rm(r)
   
   # Compute posterior predictive p-values
-  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
-  names(out) <- paste0("Item_", 1:I)
-  
-  for (i in 1:length(items)) {
-    if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
-    plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], las = 1,
-         main = paste0("Scatterplot PACF of item ", items[i]),
+  if (sumscores) {
+    out  <- mean(discrepancy[, 1, 2] > discrepancy[, 1, 1])
+    names(out) <- "ppp"
+    
+    plot(discrepancy[, 1, 1], discrepancy[, 1, 2], las = 1,
+         main = paste0("Scatterplot PACF of Sumscores"),
          ylab = expression(paste("PACF", "(", y^rep, ";", Theta, ")")),
          xlab = expression(paste("PACF", "(y;", Theta, ")")))
     abline(a= 0, b = 1, col = "red")
-    mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
+    mtext(paste0("PPP = ", round(out, 3)), line = -1.5, col = "red", 
           cex = 0.8, adj = 0)
+  } else {
+    out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+    names(out) <- paste0("Item_", 1:I)
+    
+    for (i in 1:length(items)) {
+      if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
+      plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], las = 1,
+           main = paste0("Scatterplot PACF of item ", items[i]),
+           ylab = expression(paste("PACF", "(", y^rep, ";", Theta, ")")),
+           xlab = expression(paste("PACF", "(y;", Theta, ")")))
+      abline(a= 0, b = 1, col = "red")
+      mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
+            cex = 0.8, adj = 0)
+    }
   }
   
   return(round(out, 3))
