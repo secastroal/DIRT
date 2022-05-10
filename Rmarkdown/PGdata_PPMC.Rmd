@@ -27,7 +27,7 @@ library(kableExtra)
 knitr::opts_chunk$set(echo = FALSE, fig.height = 4, fig.width = 6, fig.pos = "!H",  
                       warning=FALSE, message=FALSE)
 
-#rmarkdown::render("Rmarkdown/PGdata_analysis.Rmd")
+#rmarkdown::render("Rmarkdown/PGdata_PPMC.Rmd")
 ```
 
 ```{r pre-env}
@@ -50,7 +50,7 @@ set.seed(2022)
 
 In this document, we apply the posterior predictive model checking methods that we have developed for the TV-DPCM after fitting the TV-DPCM (and also the PCM) to an empirical data set. These data were retrieved from @Kossakowski2017 and was previously analyzed by @Wichers2016. The data come from a 57 years old male (at the time) that had been diagnosed with major depressive disorder. The participant completed up to 10 semi-random assessments per day for 239 days. During this period, the participant also followed a blind gradual reduction of their anti-depressant medication dosage. 
 
-During the study, the participant completed several items that aimed to measure their emotional states. In total there were 12 items that were measured on a 7-point Likert scale. @Wichers2016 found 3 components after analyzing the data with PCA. The extracted components were positive affect, negative affect, and mental unrest. Previously, we fitted the TV-DPCM to each of these sets of items as well as a combination of the items of negative affect with mental unrest. In these analyses, we merged some response categories, given that for some items some response categories were never chosen. In general, after merging the items ended up with 5 response options. However, for positive and negative affect, we also fitted the model one additional time where we merged the response categories into 3 response options. Additionally, we also fitted the PCM to each of the three scales after reducing the number of response options to 5. In what follows, we present display the PPMC methods that were applied to the fitted models.
+During the study, the participant completed several items that aimed to measure their emotional states. In total there were 12 items that were measured on a 7-point Likert scale. @Wichers2016 found 3 components after analyzing the data with PCA. The extracted components were positive affect, negative affect, and mental unrest. Previously, we fitted the TV-DPCM to each of these sets of items as well as a combination of the items of negative affect with mental unrest. In these analyses, we merged some response categories, given that, for some items, some response categories were never chosen. In general, after merging, the items ended up with 5 response options. However, for positive and negative affect, we also fitted the model one additional time where we merged the response categories into 3 response options. Additionally, we also fitted the PCM to each of the three scales after reducing the number of response options to 5. In what follows, we present display the PPMC methods that were applied to the fitted models.
 
 ```{r data}
 PG_data <- read.csv("../ESMdata/ESMdata.csv")
@@ -113,7 +113,7 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
 ```{r sumscores, fig.cap = "Sumscores of Mental Unrest"}
 index <- which(!is.na(responses[, 1]))[seq(1, sum(!is.na(responses[, 1])), 20)]
 plot(index, rowMeans(responses)[index], yaxt = 'n', las = 1, type = "l", 
-     xlab = "Meanscores MU", ylab = "Beep")
+     ylab = "Meanscores MU", xlab = "Beep")
 ```
 
 ```{r model-load}
@@ -153,7 +153,7 @@ kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escap
 
 ### Time Series of the Sumscores
 
-```{r sums_ts, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
+```{r sums-ts, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
 ppmc.sumscore.ts(object = fit, data = standata)
 ```
 
@@ -196,7 +196,7 @@ ppmc.mssd(object = fit, data = standata)
 
 ### Item Scores Time Series
 
-```{r item_ts, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
+```{r item-ts, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
 par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
 ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
 ```
@@ -313,65 +313,1139 @@ proc.time() - time0
 
 \newpage
 
-# Fitting the PCM for Comparison
+## TV-DPCM of Negative Affect (NegA, 5 categories)
 
-```{r pcmdata}
-modelpcm  <- stan_model(file = "../Stan/irt_pcm_long.stan", verbose = FALSE)
+Here, we fitted the TV-DPCM to the 4 items of negative affect. Response categories 1 and 2; and 6 and 7 were merged into two response categories.
 
-responses <- PG_data[, mu]
-responses[responses >= 5] <- 5
+```{r}
+responses <- PG_data_na[, na]
+responses[responses >= 2] <- 2
+responses[responses <= -2] <- -2
+responses <- responses + 3
 
 I  <- ncol(responses)
 nT <- nrow(responses)
 K  <- max(responses, na.rm = TRUE)
 
-standatapcm <- tvdpcm2stan_data(resp = as.matrix(responses),
-                                I    = I,
-                                K    = K,
-                                nT   = nT,
-                                n_knots  = 8,
-                                s_degree = 3)
+standata <- tvdpcm2stan_data(resp = as.matrix(responses),
+                             I    = I,
+                             K    = K,
+                             nT   = nT,
+                             n_knots  = 8,
+                             s_degree = 3)
 ```
 
-
-```{r pcmfit}
-inits <- function() {
-list(beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
-     theta   = rnorm(nT, 0, 3))
-}
-
-rdsfile <- "../Fits/MU_PCM"
-
-if (!file.exists(paste0(rdsfile, ".rds"))) {
-  begin.time <- proc.time()
-  fit <- sampling(modelpcm,                  # Stan model. 
-                  data = standatapcm,        # Data.
-                  iter = 2000,            # Number of iterations.
-                  chains  = 3,            # Number of chains.
-                  warmup  = 500,          # Burn-in samples.
-                  init    = inits, # Initial values
-                  seed = 2022,            # Seed
-                  pars = c("beta", "theta", "rep_y"),
-                  control = list(adapt_delta   = 0.99,
-                                 max_treedepth = 15) # Other parameters to control sampling behavior.
-                  ) 
-  run.time <- proc.time() - begin.time
-  rm(begin.time)
-  
-  saveRDS(fit, file = paste0(rdsfile, ".rds"))
-  saveRDS(run.time, file = paste0(rdsfile, "_time.rds"))
-} else {
-  fit      <- readRDS(paste0(rdsfile, ".rds"))
-  run.time <- readRDS(paste0(rdsfile, "_time.rds"))
-}
+```{r, fig.cap = "Sumscores of Negative Affect"}
+index <- which(!is.na(responses[, 1]))[seq(1, sum(!is.na(responses[, 1])), 20)]
+plot(index, rowMeans(responses)[index], yaxt = 'n', las = 1, type = "l", 
+     ylab = "Meanscores NegA", xlab = "Beep")
 ```
 
-## TV-DPCM of Mental Unrest (MU, 5 categories)
+```{r}
+rdsfile <- "../Fits/NegAwithNA"
 
-Here, we fitted the TV-DPCM to the 3 items of mental unrest. Response categories 5 to 7 were merged into one.
+fit      <- readRDS(paste0(rdsfile, ".rds"))
+```
+
+```{r}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
+            
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
+                                        "sigma2", "pvar", "attractor"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                  "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+### Convergence Checks
+
+```{r}
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
+\newpage
+
+### Time Series of the Sumscores
+
+```{r, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
+ppmc.sumscore.ts(object = fit, data = standata)
+```
+
+\newpage
+
+### Autocorrelation: 1st, 2nd, and 3rd
+
+```{r, results = 'hide', fig.cap = "1st, 2nd, and 3rd autocorrelation of the sumscores"}
+par(mfrow = c(3, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.acf(object = fit, data = standata, lag.max = 3)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: AR(1) Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+ppmc.racf(object = fit, data = standata)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+time0 <- proc.time()
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Mean Squared Successive Differences
+
+```{r, results = 'hide', fig.cap = "Mean Squared Succesive Differences of the Sumscores"}
+ppmc.mssd(object = fit, data = standata)
+```
+
+\newpage
+
+### Item Scores Time Series
+
+```{r, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Item-Total Correlation: Version 1
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 2
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for the Total"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor2(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 3
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for Item and Total Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Yen's Q1
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Yen's Q1 of the items of NegA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q1 Modified
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Modified Yen's Q1 of the items of NegA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1.alt(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Item Scores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Item Scores", fig.height = 8}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(3, 4, 2, 2) + 0.1)
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q3
+
+```{r, results = 'hide', fig.cap = "Yen's Q3 for the items of NegA"}
+time0 <- proc.time()
+ppmc.Q3(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR
+
+```{r, results = 'hide', fig.cap = "Odds Ratio for the items of NegA"}
+time0 <- proc.time()
+ppmc.OR(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR Modified
+
+```{r, results = 'hide', fig.cap = "Odds Ratio Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.ORDiff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual of the items of NegA"}
+time0 <- proc.time()
+ppmc.cov.resid(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID Difference
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.cov.rediff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+## TV-DPCM of Positive Affect (PosA, 5 categories)
+
+Here, we fitted the TV-DPCM to the 5 items of positive affect. Response categories 1 and 2; and 6 and 7 were merged into two response categories.
+
+```{r}
+responses <- PG_data_na[, pa]
+responses[responses >= 6] <- 6
+responses[responses <= 2] <- 2
+responses <- responses - 1
+
+I  <- ncol(responses)
+nT <- nrow(responses)
+K  <- max(responses, na.rm = TRUE)
+
+standata <- tvdpcm2stan_data(resp = as.matrix(responses),
+                             I    = I,
+                             K    = K,
+                             nT   = nT,
+                             n_knots  = 8,
+                             s_degree = 3)
+```
+
+```{r, fig.cap = "Sumscores of Positive Affect"}
+index <- which(!is.na(responses[, 1]))[seq(1, sum(!is.na(responses[, 1])), 20)]
+plot(index, rowMeans(responses)[index], yaxt = 'n', las = 1, type = "l", 
+     ylab = "Meanscores PosA", xlab = "Beep")
+```
+
+```{r}
+rdsfile <- "../Fits/PosAwithNA"
+
+fit      <- readRDS(paste0(rdsfile, ".rds"))
+```
+
+```{r}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
+            
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
+                                        "sigma2", "pvar", "attractor"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                  "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+### Convergence Checks
+
+```{r}
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
+\newpage
+
+### Time Series of the Sumscores
+
+```{r, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
+ppmc.sumscore.ts(object = fit, data = standata)
+```
+
+\newpage
+
+### Autocorrelation: 1st, 2nd, and 3rd
+
+```{r, results = 'hide', fig.cap = "1st, 2nd, and 3rd autocorrelation of the sumscores"}
+par(mfrow = c(3, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.acf(object = fit, data = standata, lag.max = 3)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: AR(1) Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+ppmc.racf(object = fit, data = standata)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+time0 <- proc.time()
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Mean Squared Successive Differences
+
+```{r, results = 'hide', fig.cap = "Mean Squared Succesive Differences of the Sumscores"}
+ppmc.mssd(object = fit, data = standata)
+```
+
+\newpage
+
+### Item Scores Time Series
+
+```{r, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Item-Total Correlation: Version 1
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 2
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for the Total"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor2(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 3
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for Item and Total Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Yen's Q1
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Yen's Q1 of the items of PosA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q1 Modified
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Modified Yen's Q1 of the items of PosA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1.alt(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Item Scores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Item Scores", fig.height = 8}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(3, 4, 2, 2) + 0.1)
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q3
+
+```{r, results = 'hide', fig.cap = "Yen's Q3 for the items of PosA"}
+time0 <- proc.time()
+ppmc.Q3(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR
+
+```{r, results = 'hide', fig.cap = "Odds Ratio for the items of PosA"}
+time0 <- proc.time()
+ppmc.OR(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR Modified
+
+```{r, results = 'hide', fig.cap = "Odds Ratio Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.ORDiff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual of the items of PosA"}
+time0 <- proc.time()
+ppmc.cov.resid(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID Difference
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.cov.rediff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+## TV-DPCM of Negative Affect and Mental Unrest (NAMU, 5 categories)
+
+Here, we fitted the TV-DPCM to a combined scale of negative affect with mental unrest. Response categories 1 and 2; and 6 and 7 of the items of negative affect were merged into two response categories. Response categories 5 to 7 of the items of mental unrest were merged into one.
+
+```{r}
+responses <- PG_data_na[, c(na, mu)]
+responses[, na][responses[, na] >= 2] <- 2
+responses[, na][responses[, na] <= -2] <- -2
+responses[, na] <- responses[, na] + 3
+responses[, mu][responses[, mu] >= 5] <- 5
+
+I  <- ncol(responses)
+nT <- nrow(responses)
+K  <- max(responses, na.rm = TRUE)
+
+standata <- tvdpcm2stan_data(resp = as.matrix(responses),
+                             I    = I,
+                             K    = K,
+                             nT   = nT,
+                             n_knots  = 8,
+                             s_degree = 3)
+```
+
+```{r, fig.cap = "Sumscores of Combined Scale"}
+index <- which(!is.na(responses[, 1]))[seq(1, sum(!is.na(responses[, 1])), 20)]
+plot(index, rowMeans(responses)[index], yaxt = 'n', las = 1, type = "l", 
+     ylab = "Meanscores NAMU", xlab = "Beep")
+```
+
+```{r}
+rdsfile <- "../Fits/NegAMUwithNA"
+
+fit      <- readRDS(paste0(rdsfile, ".rds"))
+```
+
+```{r}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
+            
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
+                                        "sigma2", "pvar", "attractor"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                  "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+### Convergence Checks
+
+```{r}
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
+\newpage
+
+### Time Series of the Sumscores
+
+```{r, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
+ppmc.sumscore.ts(object = fit, data = standata)
+```
+
+\newpage
+
+### Autocorrelation: 1st, 2nd, and 3rd
+
+```{r, results = 'hide', fig.cap = "1st, 2nd, and 3rd autocorrelation of the sumscores"}
+par(mfrow = c(3, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.acf(object = fit, data = standata, lag.max = 3)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: AR(1) Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+ppmc.racf(object = fit, data = standata)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+time0 <- proc.time()
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Mean Squared Successive Differences
+
+```{r, results = 'hide', fig.cap = "Mean Squared Succesive Differences of the Sumscores"}
+ppmc.mssd(object = fit, data = standata)
+```
+
+\newpage
+
+### Item Scores Time Series
+
+```{r, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Item-Total Correlation: Version 1
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 2
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for the Total"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor2(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 3
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for Item and Total Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Yen's Q1
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Yen's Q1 of the items of NAMU"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q1 Modified
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Modified Yen's Q1 of the items of NAMU"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1.alt(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Item Scores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Item Scores", fig.height = 8}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(3, 4, 2, 2) + 0.1)
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q3
+
+```{r, results = 'hide', fig.cap = "Yen's Q3 for the items of NAMU"}
+time0 <- proc.time()
+ppmc.Q3(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR
+
+```{r, results = 'hide', fig.cap = "Odds Ratio for the items of NAMU"}
+time0 <- proc.time()
+ppmc.OR(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR Modified
+
+```{r, results = 'hide', fig.cap = "Odds Ratio Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.ORDiff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual of the items of NAMU"}
+time0 <- proc.time()
+ppmc.cov.resid(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID Difference
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.cov.rediff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+
+## TV-DPCM of Negative Affect (NegA, 3 categories)
+
+Here, we fitted the TV-DPCM to the 4 items of negative affect. Response categories 1 to 3; and 5 to 7 were merged into two response categories.
+
+```{r}
+responses <- PG_data_na[, na]
+responses[responses >= 1] <- 1
+responses[responses <= -1] <- -1
+responses <- responses + 2
+
+I  <- ncol(responses)
+nT <- nrow(responses)
+K  <- max(responses, na.rm = TRUE)
+
+standata <- tvdpcm2stan_data(resp = as.matrix(responses),
+                             I    = I,
+                             K    = K,
+                             nT   = nT,
+                             n_knots  = 8,
+                             s_degree = 3)
+```
+
+```{r, fig.cap = "Sumscores of Negative Affect"}
+index <- which(!is.na(responses[, 1]))[seq(1, sum(!is.na(responses[, 1])), 20)]
+plot(index, rowMeans(responses)[index], yaxt = 'n', las = 1, type = "l", 
+     ylab = "Meanscores NegA", xlab = "Beep")
+```
+
+```{r}
+rdsfile <- "../Fits/NegAwithNA_3cat"
+
+fit      <- readRDS(paste0(rdsfile, ".rds"))
+```
+
+```{r}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
+            
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
+                                        "sigma2", "pvar", "attractor"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                  "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+### Convergence Checks
+
+```{r}
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
+\newpage
+
+### Time Series of the Sumscores
+
+```{r, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
+ppmc.sumscore.ts(object = fit, data = standata)
+```
+
+\newpage
+
+### Autocorrelation: 1st, 2nd, and 3rd
+
+```{r, results = 'hide', fig.cap = "1st, 2nd, and 3rd autocorrelation of the sumscores"}
+par(mfrow = c(3, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.acf(object = fit, data = standata, lag.max = 3)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: AR(1) Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+ppmc.racf(object = fit, data = standata)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+time0 <- proc.time()
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Mean Squared Successive Differences
+
+```{r, results = 'hide', fig.cap = "Mean Squared Succesive Differences of the Sumscores"}
+ppmc.mssd(object = fit, data = standata)
+```
+
+\newpage
+
+### Item Scores Time Series
+
+```{r, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Item-Total Correlation: Version 1
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 2
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for the Total"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor2(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 3
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for Item and Total Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Yen's Q1
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Yen's Q1 of the items of NegA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q1 Modified
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Modified Yen's Q1 of the items of NegA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1.alt(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Item Scores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Item Scores", fig.height = 8}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(3, 4, 2, 2) + 0.1)
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q3
+
+```{r, results = 'hide', fig.cap = "Yen's Q3 for the items of NegA"}
+time0 <- proc.time()
+ppmc.Q3(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR
+
+```{r, results = 'hide', fig.cap = "Odds Ratio for the items of NegA"}
+time0 <- proc.time()
+ppmc.OR(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR Modified
+
+```{r, results = 'hide', fig.cap = "Odds Ratio Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.ORDiff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual of the items of NegA"}
+time0 <- proc.time()
+ppmc.cov.resid(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID Difference
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.cov.rediff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+## TV-DPCM of Positive Affect (PosA, 3 categories)
+
+Here, we fitted the TV-DPCM to the 5 items of positive affect. Response categories 1 to 3; and 5 to 7 were merged into two response categories.
+
+```{r}
+responses <- PG_data_na[, pa]
+responses[responses >= 5] <- 5
+responses[responses <= 3] <- 3
+responses <- responses - 2
+
+I  <- ncol(responses)
+nT <- nrow(responses)
+K  <- max(responses, na.rm = TRUE)
+
+standata <- tvdpcm2stan_data(resp = as.matrix(responses),
+                             I    = I,
+                             K    = K,
+                             nT   = nT,
+                             n_knots  = 8,
+                             s_degree = 3)
+```
+
+```{r, fig.cap = "Sumscores of Positive Affect"}
+index <- which(!is.na(responses[, 1]))[seq(1, sum(!is.na(responses[, 1])), 20)]
+plot(index, rowMeans(responses)[index], yaxt = 'n', las = 1, type = "l", 
+     ylab = "Meanscores PosA", xlab = "Beep")
+```
+
+```{r}
+rdsfile <- "../Fits/PosAwithNA_3cat"
+
+fit      <- readRDS(paste0(rdsfile, ".rds"))
+```
+
+```{r}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
+            
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
+                                        "sigma2", "pvar", "attractor"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                  "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+### Convergence Checks
+
+```{r}
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
+\newpage
+
+### Time Series of the Sumscores
+
+```{r, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
+ppmc.sumscore.ts(object = fit, data = standata)
+```
+
+\newpage
+
+### Autocorrelation: 1st, 2nd, and 3rd
+
+```{r, results = 'hide', fig.cap = "1st, 2nd, and 3rd autocorrelation of the sumscores"}
+par(mfrow = c(3, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.acf(object = fit, data = standata, lag.max = 3)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: AR(1) Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+ppmc.racf(object = fit, data = standata)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+time0 <- proc.time()
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Mean Squared Successive Differences
+
+```{r, results = 'hide', fig.cap = "Mean Squared Succesive Differences of the Sumscores"}
+ppmc.mssd(object = fit, data = standata)
+```
+
+\newpage
+
+### Item Scores Time Series
+
+```{r, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Item-Total Correlation: Version 1
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 2
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for the Total"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor2(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 3
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for Item and Total Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Yen's Q1
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Yen's Q1 of the items of PosA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q1 Modified
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Modified Yen's Q1 of the items of PosA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1.alt(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Item Scores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Item Scores", fig.height = 8}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(3, 4, 2, 2) + 0.1)
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q3
+
+```{r, results = 'hide', fig.cap = "Yen's Q3 for the items of PosA"}
+time0 <- proc.time()
+ppmc.Q3(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR
+
+```{r, results = 'hide', fig.cap = "Odds Ratio for the items of PosA"}
+time0 <- proc.time()
+ppmc.OR(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR Modified
+
+```{r, results = 'hide', fig.cap = "Odds Ratio Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.ORDiff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual of the items of PosA"}
+time0 <- proc.time()
+ppmc.cov.resid(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID Difference
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.cov.rediff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+## PCM of Mental Unrest (MU, 5 categories)
+
+Here, we fitted the PCM to the 3 items of mental unrest. Response categories 5 to 7 were merged into one.
 
 ```{r data2stan}
-responses <- PG_data_na[, mu]
+responses <- PG_data[, mu]
 # responses <- PG_data[, mu]
 responses[responses >= 5] <- 5
 
@@ -390,11 +1464,11 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
 ```{r sumscores, fig.cap = "Sumscores of Mental Unrest"}
 index <- which(!is.na(responses[, 1]))[seq(1, sum(!is.na(responses[, 1])), 20)]
 plot(index, rowMeans(responses)[index], yaxt = 'n', las = 1, type = "l", 
-     xlab = "Meanscores MU", ylab = "Beep")
+     ylab = "Meanscores MU", xlab = "Beep")
 ```
 
 ```{r model-load}
-rdsfile <- "../Fits/MUwithNA"
+rdsfile <- "../Fits/MU_PCM"
 
 fit      <- readRDS(paste0(rdsfile, ".rds"))
 ```
@@ -430,7 +1504,7 @@ kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escap
 
 ### Time Series of the Sumscores
 
-```{r sums_ts, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
+```{r sums-ts, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
 ppmc.sumscore.ts(object = fit, data = standata)
 ```
 
@@ -473,7 +1547,7 @@ ppmc.mssd(object = fit, data = standata)
 
 ### Item Scores Time Series
 
-```{r item_ts, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
+```{r item-ts, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
 par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
 ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
 ```
@@ -590,246 +1664,240 @@ proc.time() - time0
 
 \newpage
 
+## PCM of Negative Affect (NegA, 5 categories)
 
-\newpage
+Here, we fitted the PCM to the 4 items of negative affect. Response categories 1 and 2; and 6 and 7 were merged into two response categories.
 
-# Fitting the TV-DPCM to NA items
-
-```{r data2stan-na}
-responses <- PG_data_na[, na]
-responses[responses < -1] <- -1
-responses[responses > 1]  <- 1
-responses <- responses + 2
-
-I  <- ncol(responses)
-nT <- nrow(responses)
-K  <- max(responses, na.rm = TRUE)
-
-standata <- tvdpcm2stan_data(resp = as.matrix(responses),
-                             I    = I,
-                             K    = K,
-                             nT   = nT,
-                             n_knots  = 8,
-                             s_degree = 3)
-```
-
-```{r stanfit-na}
-rdsfile <- "../Fits/NegAwithNA_3cat"
-
-tvdpcm_inits <- function() {
-              list(lambda = runif(1, -1, 1),
-                   beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
-                   inno   = rnorm(nT, 0, 3),
-                   sigma  = rlnorm(1, 1))
-            }
-
-if (!file.exists(paste0(rdsfile, ".rds"))) {
-  begin.time <- proc.time()
-  fit <- sampling(model,                  # Stan model. 
-                  data = standata,        # Data.
-                  iter = 2000,            # Number of iterations.
-                  chains  = 3,            # Number of chains.
-                  warmup  = 500,          # Burn-in samples.
-                  init    = tvdpcm_inits, # Initial values
-                  seed = 2022,            # Seed
-                  pars = c("beta", "theta", "lambda",
-                           "sigma2", "pvar", "attractor", "rep_y"),
-                  control = list(adapt_delta   = 0.99,
-                                 max_treedepth = 15) # Other parameters to control sampling behavior.
-                  ) 
-  run.time <- proc.time() - begin.time
-  rm(begin.time)
-  
-  saveRDS(fit, file = paste0(rdsfile, ".rds"))
-  saveRDS(run.time, file = paste0(rdsfile, "_time.rds"))
-} else {
-  fit      <- readRDS(paste0(rdsfile, ".rds"))
-  run.time <- readRDS(paste0(rdsfile, "_time.rds"))
-}
-```
-
-
-\newpage
-
-# Fitting the TV-DPCM to PA items
-
-```{r data2stan-pa}
-responses <- PG_data_na[, pa]
-responses[responses < 2] <- 2
-responses[responses > 6] <- 6
-responses <- responses - 1
-
-I  <- ncol(responses)
-nT <- nrow(responses)
-K  <- max(responses, na.rm = TRUE)
-
-standata <- tvdpcm2stan_data(resp = as.matrix(responses),
-                             I    = I,
-                             K    = K,
-                             nT   = nT,
-                             n_knots  = 8,
-                             s_degree = 3)
-```
-
-```{r stanfit-pa}
-rdsfile <- "../Fits/PosAwithNA"
-
-tvdpcm_inits <- function() {
-              list(lambda = runif(1, -1, 1),
-                   beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
-                   inno   = rnorm(nT, 0, 3),
-                   sigma  = rlnorm(1, 1))
-            }
-
-if (!file.exists(paste0(rdsfile, ".rds"))) {
-  begin.time <- proc.time()
-  fit <- sampling(model,                  # Stan model. 
-                  data = standata,        # Data.
-                  iter = 2000,            # Number of iterations.
-                  chains  = 3,            # Number of chains.
-                  warmup  = 500,          # Burn-in samples.
-                  init    = tvdpcm_inits, # Initial values
-                  seed = 2022,            # Seed
-                  pars = c("beta", "theta", "lambda",
-                           "sigma2", "pvar", "attractor", "rep_y"),
-                  control = list(adapt_delta   = 0.99,
-                                 max_treedepth = 15) # Other parameters to control sampling behavior.
-                  ) 
-  run.time <- proc.time() - begin.time
-  rm(begin.time)
-  
-  saveRDS(fit, file = paste0(rdsfile, ".rds"))
-  saveRDS(run.time, file = paste0(rdsfile, "_time.rds"))
-} else {
-  fit      <- readRDS(paste0(rdsfile, ".rds"))
-  run.time <- readRDS(paste0(rdsfile, "_time.rds"))
-}
-```
-
-
-\newpage
-
-# Fitting the PCM for Comparison NegA
-
-```{r pcmdata-na}
-modelpcm  <- stan_model(file = "../Stan/irt_pcm_long.stan", verbose = FALSE)
-
+```{r}
 responses <- PG_data[, na]
-responses[responses < -2] <- -2
-responses[responses > 2]  <- 2
+responses[responses >= 2] <- 2
+responses[responses <= -2] <- -2
 responses <- responses + 3
 
-
 I  <- ncol(responses)
 nT <- nrow(responses)
 K  <- max(responses, na.rm = TRUE)
 
-standatapcm <- tvdpcm2stan_data(resp = as.matrix(responses),
-                                I    = I,
-                                K    = K,
-                                nT   = nT,
-                                n_knots  = 8,
-                                s_degree = 3)
+standata <- tvdpcm2stan_data(resp = as.matrix(responses),
+                             I    = I,
+                             K    = K,
+                             nT   = nT,
+                             n_knots  = 8,
+                             s_degree = 3)
 ```
 
-```{r pcmfit-na}
-inits <- function() {
-list(beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
-     theta   = rnorm(nT, 0, 3))
-}
+```{r, fig.cap = "Sumscores of Negative Affect"}
+index <- which(!is.na(responses[, 1]))[seq(1, sum(!is.na(responses[, 1])), 20)]
+plot(index, rowMeans(responses)[index], yaxt = 'n', las = 1, type = "l", 
+     ylab = "Meanscores NegA", xlab = "Beep")
+```
 
+```{r}
 rdsfile <- "../Fits/NegA_PCM"
 
-if (!file.exists(paste0(rdsfile, ".rds"))) {
-  begin.time <- proc.time()
-  fit <- sampling(modelpcm,                  # Stan model. 
-                  data = standatapcm,        # Data.
-                  iter = 2000,            # Number of iterations.
-                  chains  = 3,            # Number of chains.
-                  warmup  = 500,          # Burn-in samples.
-                  init    = inits, # Initial values
-                  seed = 2022,            # Seed
-                  pars = c("beta", "theta", "rep_y"),
-                  control = list(adapt_delta   = 0.99,
-                                 max_treedepth = 15) # Other parameters to control sampling behavior.
-                  ) 
-  run.time <- proc.time() - begin.time
-  rm(begin.time)
-  
-  saveRDS(fit, file = paste0(rdsfile, ".rds"))
-  saveRDS(run.time, file = paste0(rdsfile, "_time.rds"))
-} else {
-  fit      <- readRDS(paste0(rdsfile, ".rds"))
-  run.time <- readRDS(paste0(rdsfile, "_time.rds"))
-}
+fit      <- readRDS(paste0(rdsfile, ".rds"))
+```
+
+```{r}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
+            
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
+                                        "sigma2", "pvar", "attractor"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                  "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+### Convergence Checks
+
+```{r}
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
 ```
 
 \newpage
 
-# Fitting the PCM for Comparison PosA
+### Time Series of the Sumscores
 
-```{r pcmdata-pa}
-modelpcm  <- stan_model(file = "../Stan/irt_pcm_long.stan", verbose = FALSE)
+```{r, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
+ppmc.sumscore.ts(object = fit, data = standata)
+```
 
+\newpage
+
+### Autocorrelation: 1st, 2nd, and 3rd
+
+```{r, results = 'hide', fig.cap = "1st, 2nd, and 3rd autocorrelation of the sumscores"}
+par(mfrow = c(3, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.acf(object = fit, data = standata, lag.max = 3)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: AR(1) Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+ppmc.racf(object = fit, data = standata)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+time0 <- proc.time()
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Mean Squared Successive Differences
+
+```{r, results = 'hide', fig.cap = "Mean Squared Succesive Differences of the Sumscores"}
+ppmc.mssd(object = fit, data = standata)
+```
+
+\newpage
+
+### Item Scores Time Series
+
+```{r, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Item-Total Correlation: Version 1
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 2
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for the Total"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor2(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 3
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for Item and Total Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Yen's Q1
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Yen's Q1 of the items of NegA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q1 Modified
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Modified Yen's Q1 of the items of NegA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1.alt(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Item Scores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Item Scores", fig.height = 8}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(3, 4, 2, 2) + 0.1)
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q3
+
+```{r, results = 'hide', fig.cap = "Yen's Q3 for the items of NegA"}
+time0 <- proc.time()
+ppmc.Q3(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR
+
+```{r, results = 'hide', fig.cap = "Odds Ratio for the items of NegA"}
+time0 <- proc.time()
+ppmc.OR(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR Modified
+
+```{r, results = 'hide', fig.cap = "Odds Ratio Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.ORDiff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual of the items of NegA"}
+time0 <- proc.time()
+ppmc.cov.resid(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID Difference
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.cov.rediff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+## PCM of Positive Affect (PosA, 5 categories)
+
+Here, we fitted the PCM to the 5 items of positive affect. Response categories 1 and 2; and 6 and 7 were merged into two response categories.
+
+```{r}
 responses <- PG_data[, pa]
-responses[responses < 2] <- 2
-responses[responses > 6] <- 6
+responses[responses >= 6] <- 6
+responses[responses <= 2] <- 2
 responses <- responses - 1
-
-I  <- ncol(responses)
-nT <- nrow(responses)
-K  <- max(responses, na.rm = TRUE)
-
-standatapcm <- tvdpcm2stan_data(resp = as.matrix(responses),
-                                I    = I,
-                                K    = K,
-                                nT   = nT,
-                                n_knots  = 8,
-                                s_degree = 3)
-```
-
-```{r pcmfit-pa}
-inits <- function() {
-list(beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
-     theta   = rnorm(nT, 0, 3))
-}
-
-rdsfile <- "../Fits/PosA_PCM"
-
-if (!file.exists(paste0(rdsfile, ".rds"))) {
-  begin.time <- proc.time()
-  fit <- sampling(modelpcm,                  # Stan model. 
-                  data = standatapcm,        # Data.
-                  iter = 2000,            # Number of iterations.
-                  chains  = 3,            # Number of chains.
-                  warmup  = 500,          # Burn-in samples.
-                  init    = inits, # Initial values
-                  seed = 2022,            # Seed
-                  pars = c("beta", "theta", "rep_y"),
-                  control = list(adapt_delta   = 0.99,
-                                 max_treedepth = 15) # Other parameters to control sampling behavior.
-                  ) 
-  run.time <- proc.time() - begin.time
-  rm(begin.time)
-  
-  saveRDS(fit, file = paste0(rdsfile, ".rds"))
-  saveRDS(run.time, file = paste0(rdsfile, "_time.rds"))
-} else {
-  fit      <- readRDS(paste0(rdsfile, ".rds"))
-  run.time <- readRDS(paste0(rdsfile, "_time.rds"))
-}
-```
-
-\newpage
-
-# Fitting the TV-DPCM to NA and MU items
-
-```{r data2stan-namu}
-responses <- PG_data_na[, c(na, mu)]
-responses[, na][responses[, na] < -2] <- -2
-responses[, na][responses[, na] > 2]  <- 2
-responses[, na] <- responses[, na] + 3
-responses[, mu][responses[, mu] > 5] <- 5 
 
 I  <- ncol(responses)
 nT <- nrow(responses)
@@ -843,39 +1911,205 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
                              s_degree = 3)
 ```
 
-```{r stanfit-namu}
-rdsfile <- "../Fits/NegAMUwithNA"
+```{r, fig.cap = "Sumscores of Positive Affect"}
+index <- which(!is.na(responses[, 1]))[seq(1, sum(!is.na(responses[, 1])), 20)]
+plot(index, rowMeans(responses)[index], yaxt = 'n', las = 1, type = "l", 
+     ylab = "Meanscores PosA", xlab = "Beep")
+```
 
-tvdpcm_inits <- function() {
-              list(lambda = runif(1, -1, 1),
-                   beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
-                   inno   = rnorm(nT, 0, 3),
-                   sigma  = rlnorm(1, 1))
-            }
+```{r}
+rdsfile <- "../Fits/PosA_PCM"
 
-if (!file.exists(paste0(rdsfile, ".rds"))) {
-  begin.time <- proc.time()
-  fit <- sampling(model,                  # Stan model. 
-                  data = standata,        # Data.
-                  iter = 2000,            # Number of iterations.
-                  chains  = 3,            # Number of chains.
-                  warmup  = 500,          # Burn-in samples.
-                  init    = tvdpcm_inits, # Initial values
-                  seed = 2022,            # Seed
-                  pars = c("beta", "theta", "lambda",
-                           "sigma2", "pvar", "attractor", "rep_y"),
-                  control = list(adapt_delta   = 0.99,
-                                 max_treedepth = 15) # Other parameters to control sampling behavior.
-                  ) 
-  run.time <- proc.time() - begin.time
-  rm(begin.time)
-  
-  saveRDS(fit, file = paste0(rdsfile, ".rds"))
-  saveRDS(run.time, file = paste0(rdsfile, "_time.rds"))
-} else {
-  fit      <- readRDS(paste0(rdsfile, ".rds"))
-  run.time <- readRDS(paste0(rdsfile, "_time.rds"))
-}
+fit      <- readRDS(paste0(rdsfile, ".rds"))
+```
+
+```{r}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
+                                 warmup = 0, print = FALSE)
+            
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
+                                        "sigma2", "pvar", "attractor"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                  "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+### Convergence Checks
+
+```{r}
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
+\newpage
+
+### Time Series of the Sumscores
+
+```{r, fig.cap = "Observed vs. Simulated Sumscores", results = 'hide'}
+ppmc.sumscore.ts(object = fit, data = standata)
+```
+
+\newpage
+
+### Autocorrelation: 1st, 2nd, and 3rd
+
+```{r, results = 'hide', fig.cap = "1st, 2nd, and 3rd autocorrelation of the sumscores"}
+par(mfrow = c(3, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.acf(object = fit, data = standata, lag.max = 3)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: AR(1) Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+ppmc.racf(object = fit, data = standata)
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Sumscores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Sumscores"}
+time0 <- proc.time()
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Mean Squared Successive Differences
+
+```{r, results = 'hide', fig.cap = "Mean Squared Succesive Differences of the Sumscores"}
+ppmc.mssd(object = fit, data = standata)
+```
+
+\newpage
+
+### Item Scores Time Series
+
+```{r, fig.height = 8, fig.cap = "Observed vs. Simulated Item Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Item-Total Correlation: Version 1
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 2
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for the Total"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor2(object = fit, data = standata, quiet = TRUE, method = "pearson")
+```
+
+\newpage
+
+### Item-Total Correlation: Version 3
+
+```{r, results = 'hide', fig.height = 8, fig.cap = "Item-Total Correlation with AR(1) Residuals for Item and Total Scores"}
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
+```
+
+\newpage
+
+### Yen's Q1
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Yen's Q1 of the items of PosA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q1 Modified
+
+```{r, fig.height = 8, results = 'hide', fig.cap = "Modified Yen's Q1 of the items of PosA"}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+ppmc.Q1.alt(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Partial Autocorrelation of the Observed Item Scores: TV-DPCM Residuals
+
+```{r, results = 'hide', fig.cap = "1st Partial Autocorrelation of the Item Scores", fig.height = 8}
+time0 <- proc.time()
+par(mfrow = c(I, 1), mar = c(3, 4, 2, 2) + 0.1)
+ppmc.lpacf(object = fit, data = standata, quiet = TRUE)
+proc.time() - time0
+```
+
+\newpage
+
+### Yen's Q3
+
+```{r, results = 'hide', fig.cap = "Yen's Q3 for the items of PosA"}
+time0 <- proc.time()
+ppmc.Q3(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR
+
+```{r, results = 'hide', fig.cap = "Odds Ratio for the items of PosA"}
+time0 <- proc.time()
+ppmc.OR(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### OR Modified
+
+```{r, results = 'hide', fig.cap = "Odds Ratio Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.ORDiff(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual of the items of PosA"}
+time0 <- proc.time()
+ppmc.cov.resid(object = fit, data = standata)$ppp
+proc.time() - time0
+```
+
+\newpage
+
+### RESID Difference
+
+```{r, results = 'hide', fig.cap = "Absolute Item Covariance Residual Difference between Two Halves of the Observations"}
+time0 <- proc.time()
+ppmc.cov.rediff(object = fit, data = standata)$ppp
+proc.time() - time0
 ```
 
 \newpage
