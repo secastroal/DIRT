@@ -13,10 +13,20 @@ ppmc.sumscore.ts <- function(object, data) {
   y    <- data$y_obs
   
   # Compute sumscores
+  # tictoc::tic()
   sumscores <- tapply(y, data$tt_obs, sum)
   sumscoresrepy <- apply(repy, 1, function(x) {
     tapply(x, data$tt_obs, sum)
   })
+  # tictoc::toc()
+  
+  # Compute sumscores
+  # tictoc::tic()
+  # sumscores <- tapply(y, data$tt_obs, sum)
+  # sumscoresrepy <- parallel::mclapply(as.data.frame(t(repy)), function(x) {
+  #   tapply(x, data$tt_obs, sum)
+  # }, mc.cores = parallel::detectCores() - 1)
+  # tictoc::toc()
   
   plot(sort(unique(data$tt_obs)), sumscores, type = "p", pch = 19, las = 1,
        ylim = c(I - 0.5, I * K + 0.5), xlab = "Time",
@@ -42,7 +52,7 @@ ppmc.sumscore.ts <- function(object, data) {
     sumscores <= apply(sumscoresrepy, 1, quantile, probs = 0.975)
   prop_out <- sum(!out95) / length(out95)
   
-  mtext(paste0("Prop Out = ", prop_out), side = 3, line = -1.5)
+  mtext(paste0("Prop Out = ", round(prop_out, 3)), side = 3, line = -1.5)
   
   return(prop_out)
 }
@@ -74,7 +84,9 @@ ppmc.racf <- function(object, data) {
   out <- sum(acorrep <= acor) / length(acorrep)
   
   hist(acorrep, main = "Histogram Residuals Autocorrelation",
-       xlab = "Autocorrelation")
+       xlab = "Autocorrelation",
+       xlim = c(min(acorrep, acor),
+                max(acorrep, acor)))
   abline(v = acor, lwd = 3)
   mtext(paste0("PPP = ", round(out, 3)), line = -1.5, col = "red", 
         cex = 0.8, adj = 0)
@@ -106,7 +118,9 @@ ppmc.acf <- function(object, data, lag.max = 5) {
   
   for (i in 1:lag.max) {
     hist(acorrep[i, ], main = paste0("Histogram Autocorrelation Lag ", i),
-         xlab = "Autocorrelation")
+         xlab = "Autocorrelation",
+         xlim = c(min(acorrep, acor),
+                  max(acorrep, acor)))
     abline(v = acor[i], lwd = 3)
     mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
           cex = 0.8, adj = 0)
@@ -142,7 +156,9 @@ ppmc.mssd <- function(object, data) {
   out <- sum(mssdrep <= mssd) / length(mssdrep)
   
   hist(mssdrep, main = "Histogram MSSD",
-       xlab = "MSSD")
+       xlab = "MSSD",
+       xlim = c(min(mssdrep, mssd),
+                max(mssdrep, mssd)))
   abline(v = mssd, lwd = 3)
   mtext(paste0("PPP = ", round(out, 3)), line = -1.5, col = "red", 
         cex = 0.8, adj = 0)
