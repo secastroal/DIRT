@@ -12,6 +12,9 @@ header-includes:
 output: 
   pdf_document:
     toc: false
+params:
+  seed: 1234
+  setmodel: "TVPCM"
 bibliography: references.bib
 csl: apa7.csl
 link-citations: true
@@ -37,14 +40,19 @@ source("../R/tvdpcm2stan.R")
 ```
 
 ```{r seed}
-seed <- 1005
-set.seed(seed)
+set.seed(params$seed)
 ```
 
 ```{r setmodel}
 # Use TVPCM, ARPCM, or PCM
-setmodel <- "TVPCM"
-# rmarkdown::render("Rmarkdown/PPMC_Tests.Rmd", output_file = paste0("Rmarkdown/PPMC_Tests_", setmodel, "_", seed))
+setmodel <- params$setmodel
+
+# seeds <- 1002:1005
+# setmodel <- "TVPCM"
+# for (i in 1:length(seeds)) {
+#   seed <- seeds[i]
+#   rmarkdown::render("Rmarkdown/PPMC_Tests.Rmd", params = list(seed = seed), output_file = paste0("PPMC_Tests_", setmodel, "_", seed))
+# }
 ```
 
 In this document, we test the posterior predictive model checking methods that we are developing for the time-varying dynamic partial credit model (TV-DPCM). For this, we simulated data based on the TV-DPCM as well as data that violates some of the assumptions of the model.
@@ -414,7 +422,9 @@ rm(begin.time)
 ```{r diagnostics, results='hide'}
 
 diag <- lapply(fit, function (x) {
-  monitor(extract(x, permuted = FALSE, inc_warmup = FALSE), warmup = 0)
+  monitor(extract(x, pars = head(paramsample, -1), 
+                  permuted = FALSE, inc_warmup = FALSE), 
+          warmup = 0)
 })
 
 diag.table <- matrix(NA, nrow = 6, ncol = 6)
@@ -508,7 +518,7 @@ for(i in 1:6) {
 rm(i)
 ```
 
-```{r acftable, results="hide"}
+```{r acftable}
 kbl(acftable, align = "c", booktabs = TRUE)
 ```
 
@@ -522,6 +532,21 @@ Following the same idea of the autocorrelation, we can instead compute the autoc
 par(mfrow = c(2, 3), mar = c(2, 4, 5, 1))
 for(i in 1:6) {
   ppmc.racf(fit[[i]], standata[[i]])
+  mtext(paste0("Data", i), side = 3, line = 3.5)
+}
+rm(i)
+```
+
+\newpage
+
+## Partial Autocorrelation given the TV-DPCM
+
+For this statistic, the first partial autocorrelation given the TV-DPCM is computed. This means, that first, the expected scores given the TV-DPCM are computed. From this, we get the residuals of the model. Lastly, the first autocorrelation is computed for the sumscores. The following Figure presents the scatterplots and the corresponding ppp-value of this discrepancy measure for each data set. 
+
+```{r lpacf, fig.height = 8}
+par(mfrow = c(2, 3), mar = c(2, 4, 5, 1))
+for(i in 1:6) {
+  ppmc.lpacf(fit[[i]], standata[[i]], sumscores = TRUE)
   mtext(paste0("Data", i), side = 3, line = 3.5)
 }
 rm(i)
@@ -569,7 +594,7 @@ rm(i)
 
 The item-total correlation is a common statistic used as a PPMC methods for IRT models [@Sinharay2006a; @Zhu2011; @Li2017]. This statistic correlates the scores of an item with the total scores minus the score of the item of interest (rescores). This test statistic allowed identifying model misfit of the Rasch model when the data was simulated with discrimination parameters that varied across items [@Sinharay2006a]. When used to assess model fit of the GRM, it was useful to identify model misfit when the data were multidimensional [@Zhu2011]. Hereby, we try this statistic with the simulated data sets. The following table presents the computed ppp-values for each item and each data set, and the number of items that show misfit.
 
-```{r itcor, resutls = "hide", fig.show='hide'}
+```{r itcor, fig.show='hide'}
 it_cortable <- matrix(NA, ncol = 7, nrow = 6)
 colnames(it_cortable) <- c(paste0("Item", 1:6), "N_misfit")
 row.names(it_cortable) <- paste("Data", 1:6)
@@ -591,7 +616,7 @@ kbl(it_cortable, align = "c", booktabs = TRUE)
 
 Additionally, we proposed two modified versions of the Item-Total Correlation to account for the time component. In this modified version the idea is that instead of correlating the scores of the item with the rescores, we correlate the them with the residuals of an autoregressive model fitted to the rescores. The ppp-values and the number of misfitting items for each data set are presented in the following table:
 
-```{r itcor2, resutls = "hide", fig.show='hide'}
+```{r itcor2, fig.show='hide'}
 it_cor2table <- matrix(NA, ncol = 7, nrow = 6)
 colnames(it_cor2table) <- c(paste0("Item", 1:6), "N_misfit")
 row.names(it_cor2table) <- paste("Data", 1:6)
@@ -614,7 +639,7 @@ kbl(it_cor2table, align = "c", booktabs = TRUE)
 
 The second modification follows the same idea of fitting an autoregressive model but in this case the model is fitted to both the item scores and the rescores. Then the residuals of these two models are correlated. For the ppp-values and number of misfitting items given this test statistic, see the following Table:
 
-```{r itcor3, resutls = "hide", fig.show='hide'}
+```{r itcor3, fig.show='hide'}
 it_cor3table <- matrix(NA, ncol = 7, nrow = 6)
 colnames(it_cor3table) <- c(paste0("Item", 1:6), "N_misfit")
 row.names(it_cor3table) <- paste("Data", 1:6)
@@ -651,7 +676,7 @@ ppmc.Q1(fit[[1]], standata[[1]], quiet = TRUE, items = 1)
 
 Now, to summarize this discrepancy measure for all items and data sets, the next Table present the corresponding ppp-values and the number of misfitting items according to this discrepancy measure for each data set. 
 
-```{r q1table, resutls = "hide", fig.show='hide'}
+```{r q1table, fig.show='hide'}
 q1table <- matrix(NA, ncol = 7, nrow = 6)
 colnames(q1table) <- c(paste0("Item", 1:6), "N_misfit")
 row.names(q1table) <- paste("Data", 1:6)
@@ -672,7 +697,7 @@ kbl(q1table, align = "c", booktabs = TRUE)
 
 In this modified version of the Yen's $Q_1$, we define the groups by consecutive observations to take into account the time component. A summary of the ppp-values for each data set is presented in the following Table:
 
-```{r q1alttable, resutls = "hide", fig.show='hide'}
+```{r q1alttable, fig.show='hide'}
 q1alttable <- matrix(NA, ncol = 7, nrow = 6)
 colnames(q1alttable) <- c(paste0("Item", 1:6), "N_misfit")
 row.names(q1alttable) <- paste("Data", 1:6)
@@ -685,6 +710,27 @@ q1alttable[, 7] <- apply(q1alttable[, 1:6], 1, function(x) {
   sum(x < 0.05 | x > 0.95)
 })
 kbl(q1alttable, align = "c", booktabs = TRUE)
+```
+
+\newpage
+
+## Partial Autocorrelation per Item given the TV-DPCM
+
+Here, we compute the first partial autocorrelation per item. As previously, we first compute the expected scores per item given the TV-DPCM, then the residuals per item are computed. Lastly, the autocorrelation of the residual becomes the discrepancy measure.A summary of the ppp-values for each data set is presented in the following Table:
+
+```{r lpacftable, fig.show='hide'}
+lpacftable <- matrix(NA, ncol = 7, nrow = 6)
+colnames(lpacftable) <- c(paste0("Item", 1:6), "N_misfit")
+row.names(lpacftable) <- paste("Data", 1:6)
+for(i in 1:6) {
+  lpacftable[i, 1:6] <- ppmc.lpacf(fit[[i]], standata[[i]], quiet = TRUE)
+}
+rm(i)
+
+lpacftable[, 7] <- apply(lpacftable[, 1:6], 1, function(x) {
+  sum(x < 0.05 | x > 0.95)
+})
+kbl(lpacftable, align = "c", booktabs = TRUE)
 ```
 
 \newpage
@@ -820,6 +866,10 @@ ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
 
 # Conclusion
 
-In the present document, we illustrate the ideas that we have about the PPMC methods and some modified versions of these methods that can be used to assess the fit of the TV-DPCM. In this example, we simulated 6 different data sets, 4 of which violated some of the assumptions of the model. Then, we fitted the TV-DPCM model to each data set and we computed the PPMC methods available. From these preliminary analyses, it seems that the pair-wise discrepancy measures such as Yen's $Q_3$ and the odds ratio are to some extend useful to identify violations of unidimensionality. The other PPMC methods presented did not seem to be able to identify model misfit witht he given data sets.
+In the present document, we illustrate the ideas that we have about the PPMC methods and some modified versions of these methods that can be used to assess the fit of the TV-DPCM. In this example, we simulated 6 different data sets, 4 of which violated some of the assumptions of the model. Then, we fitted the TV-DPCM model to each data set and we computed the PPMC methods available. From these preliminary analyses, it seems that the pair-wise discrepancy measures such as Yen's $Q_3$ and the odds ratio are to some extend useful to identify violations of unidimensionality. The other PPMC methods presented did not seem to be able to identify model misfit with the given data sets.
+
+```{r clean}
+rm(list = setdiff(ls(), c(lsf.str(), "i", "seeds", "setmodel", "params")))
+```
 
 # References

@@ -311,6 +311,10 @@ ppmc.cov.rediff(object = fit, data = standata)$ppp
 proc.time() - time0
 ```
 
+```{r}
+knitr::knit_exit()
+```
+
 \newpage
 
 ## TV-DPCM of Negative Affect (NegA, 5 categories)

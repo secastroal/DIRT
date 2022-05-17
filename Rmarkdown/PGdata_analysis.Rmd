@@ -409,7 +409,7 @@ dimnames(fit.array) [[3]] <- parameters
 mcmc_trace(fit.array, facet_args = list(labeller = "label_parsed"))
 ```
 
-```{r acf-plots, fig.cap = "Autocorrelation Plots of Selected Parameters"}
+```{r acf-plots-pcm, fig.cap = "Autocorrelation Plots of Selected Parameters"}
 
 mcmc_acf(fit.array, 
          facet_args = list(labeller = "label_parsed"),
@@ -493,9 +493,9 @@ rm(estimates, fit, responses, stan.diag, standatapcm,
 
 ```{r data2stan-na}
 responses <- PG_data_na[, na]
-responses[responses < -1] <- -1
-responses[responses > 1]  <- 1
-responses <- responses + 2
+responses[responses < -2] <- -2
+responses[responses > 2]  <- 2
+responses <- responses + 3
 
 I  <- ncol(responses)
 nT <- nrow(responses)
@@ -510,7 +510,7 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
 ```
 
 ```{r stanfit-na}
-rdsfile <- "../Fits/NegAwithNA_3cat"
+rdsfile <- "../Fits/NegAwithNA"
 
 tvdpcm_inits <- function() {
               list(lambda = runif(1, -1, 1),
@@ -657,7 +657,7 @@ plot.ICC(object = fit, data = standata, range = c(-8, 8), quiet = TRUE,
 
 ```{r IIF-na, fig.cap = "Item Information Functions of the Items of Mental Unrest"}
 plot.IIF(object = fit, data = standata, type = "IIF", 
-         item_labels = c("Irritated", "Restless", "Agitated"), 
+         item_labels = c("Down", "Lonely", "Anxious", "Guilty"), 
          col = gray((0:(I-1))/I), range = c(-6, 6))
 
 ```
@@ -833,8 +833,8 @@ lines(standata$time, sum.fit$attractor[, 1],
       col = 1, lwd = 2)
 ```
 
-```{r ICC-pa, fig.height = 6, fig.cap = "Item Characteristic Functions for the Mental Unrest Items"}
-par(mfrow = c(5, 1))
+```{r ICC-pa, fig.height = 8, fig.cap = "Item Characteristic Functions for the Mental Unrest Items"}
+par(mfrow = c(5, 1), mar = c(2, 4, 2, 2) + 0.1)
 
 plot.ICC(object = fit, data = standata, range = c(-8, 8), quiet = TRUE,
          item_labels = c("Relaxed", "Satisfied", "Enthusiastic",
@@ -959,7 +959,7 @@ dimnames(fit.array) [[3]] <- parameters
 mcmc_trace(fit.array, facet_args = list(labeller = "label_parsed"))
 ```
 
-```{r acf-plots-na, fig.cap = "Autocorrelation Plots of Selected Parameters"}
+```{r acf-plots-pcm-na, fig.cap = "Autocorrelation Plots of Selected Parameters"}
 
 mcmc_acf(fit.array, 
          facet_args = list(labeller = "label_parsed"),
@@ -1132,7 +1132,7 @@ dimnames(fit.array) [[3]] <- parameters
 mcmc_trace(fit.array, facet_args = list(labeller = "label_parsed"))
 ```
 
-```{r acf-plots-pa, fig.cap = "Autocorrelation Plots of Selected Parameters"}
+```{r acf-plots-pcm-pa, fig.cap = "Autocorrelation Plots of Selected Parameters"}
 
 mcmc_acf(fit.array, 
          facet_args = list(labeller = "label_parsed"),
@@ -1183,8 +1183,8 @@ plot(standatapcm$time[index], sum.fit$theta[, 1][index],
 ```
 
 
-```{r ICC-pcm-pa, fig.height = 6, fig.cap = "Item Characteristic Functions for the Mental Unrest Items given the PCM"}
-par(mfrow = c(5, 1))
+```{r ICC-pcm-pa, fig.height = 8, fig.cap = "Item Characteristic Functions for the Mental Unrest Items given the PCM"}
+par(mfrow = c(5, 1), mar = c(2, 4, 2, 2) + 0.1)
 
 plot.ICC(object = fit, data = standatapcm, range = c(-6, 6), quiet = TRUE,
          item_labels = c("Relaxed", "Satisfied", "Enthusiastic",
@@ -1373,8 +1373,8 @@ lines(standata$time, sum.fit$attractor[, 1],
       col = 1, lwd = 2)
 ```
 
-```{r ICC-namu, fig.height = 6, fig.cap = "Item Characteristic Functions for the Mental Unrest Items"}
-par(mfrow = c(7, 1), mar = c(2, 3, 1, 2))
+```{r ICC-namu, fig.height = 8, fig.cap = "Item Characteristic Functions for the Mental Unrest Items"}
+par(mfrow = c(7, 1), mar = c(2, 4, 2, 2) + 0.1)
 
 plot.ICC(object = fit, data = standata, range = c(-8, 8), quiet = TRUE,
          item_labels = c("Down", "Lonely", "Anxious", "Guilty",
@@ -1401,18 +1401,16 @@ rm(estimates, fit, responses, stan.diag, standata,
    parameters, rdsfile, run.time, diag.table)
 ```
 
-\newpage
-
-```{r select-variables}
+```{r select-variables, eval = FALSE}
 PG_PCA <- PG_data[, c(grep("mood", names(PG_data))[-13], grep("pat", names(PG_data)))]
 ```
 
-```{r PCA}
+```{r PCA, eval = FALSE}
 PCA_fit <- prcomp(na.omit(PG_PCA[, -c(1, 2, 8, 15, 16)]), center = TRUE, scale = TRUE)
 PCA_fit2 <- psych::principal(PG_PCA[, -c(1, 2, 8, 15, 16)], nfactors = 3)
 ```
 
-```{r PCA2}
+```{r PCA2, eval = FALSE}
 PCA_fit <- prcomp(na.omit(PG_PCA), center = TRUE, scale = TRUE)
 PCA_fit2 <- psych::principal(PG_PCA, nfactors = 3)
 ```
