@@ -137,7 +137,7 @@ plot(rowSums(data2), type = "l", ylab = "sumscores", xlab = "Time",
      las = 1, lwd = 2)
 ```
 
-The next data set (Data3) assumes that the factor structure is bidimensional instead of unidimensional. The two factors are correlated ($r = 0.5$). The latent process of these two factors was also simulated based on an autoregressive model without time varying parameters. Thus, the simulated time series of the sumscores of each factor and the whole scale are presented in the following figure:
+The next data set (Data3) assumes that the factor structure is bidimensional instead of unidimensional. The two factors are correlated ($r = 0.5$). The latent process of these two factors was also simulated based on an autoregressive model without time varying parameters. The first three items are one factor and the other three are the other factor. Thus, the simulated time series of the sumscores of each factor and the whole scale are presented in the following figure:
 
 ```{r data3}
 # Now, theta is a matrix with two factors that are weakly correlated.
@@ -263,7 +263,7 @@ plot(rowSums(data4[1:100, ]), type = "l", ylab = "sumscores", xlab = "Time",
 lines(100:200, rowSums(data4[100:200, ]), col = "darkgreen", lwd = 2)
 ```
 
-The fifth dataset (Data5) simulates data using the GPCM instead of the PCM for the measurement equation. This means that the discrimination parameters vary across items. The discrimination parameters are generated based on a lognormal distribution with mean 0 and standard deviation 0.25. The simulated data is presented in following Figure:
+The fifth dataset (Data5) simulates data using the GPCM instead of the PCM for the measurement equation. This means that the discrimination parameters vary across items. The discrimination parameters are 1 for items 1 to 4, 0.5 for item 5 and 1.5 for item 6. The simulated data is presented in following Figure:
 
 ```{r data5}
 # Generate Data based on the TV-DPCM using the GPCM for the measurement model.
@@ -274,11 +274,12 @@ data5 <- gen.TVDPCM(nT = nT,
                                      sigma2 = dataTRUE$sigma2.gen,
                                      thresholds = dataTRUE$thresholds.gen,
                                      theta = dataTRUE$theta.gen,
-                                     alpha = rlnorm(I, 0, 0.25)), 
+                                     alpha = c(1, 1, 1, 1, 0.5, 1.5)), 
                     seed = seed, 
                     FUN  = "sinusoidal",
                     maxAbsValue = 1)
 
+alpha <- data5$alpha.gen
 data5 <- data5$data
 ```
 
