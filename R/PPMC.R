@@ -933,7 +933,7 @@ ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE) {
                                    nT = tmp.nT,
                                    I  = I,
                                    K  = K,
-                                   t_index = data$tt_obs[timesplit == s] - tmp.nT * s,
+                                   t_index = data$tt_obs[timesplit == s] - ceiling(nT/2) * s,
                                    i_index = data$ii_obs[timesplit == s])
   }
   
@@ -955,7 +955,7 @@ ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE) {
                                         nT = tmp.nT,
                                         I  = I,
                                         K  = K,
-                                        t_index = data$tt_obs[timesplit == s] - tmp.nT * s,
+                                        t_index = data$tt_obs[timesplit == s] - ceiling(nT/2) * s,
                                         i_index = data$ii_obs[timesplit == s])
     }
     
@@ -1158,7 +1158,7 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
                                    nT         = tmp.nT,
                                    I          = I,
                                    K          = K,
-                                   t_index    = data$tt_obs[timesplit == s] - tmp.nT * s,
+                                   t_index    = data$tt_obs[timesplit == s] - ceiling(nT/2) * s,
                                    i_index    = data$ii_obs[timesplit == s])
       
       # RESID difference of the replicated scores
@@ -1169,7 +1169,7 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
                                    nT         = tmp.nT,
                                    I          = I,
                                    K          = K,
-                                   t_index    = data$tt_obs[timesplit == s] - tmp.nT * s,
+                                   t_index    = data$tt_obs[timesplit == s] - ceiling(nT/2) * s,
                                    i_index    = data$ii_obs[timesplit == s])
     }
     
