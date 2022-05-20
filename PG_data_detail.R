@@ -8,21 +8,22 @@ for (i in 1:5) {
 }
 
 for (i in 1:5) {
-  print(cor(PG_data[PG_data$phase == i, mu]))
+  print(cor(PG_data[PG_data$phase == i, pa]))
 }
 
 
 out <- c()
 
 window <- 100
+X      <- PG_data[, pa] 
 
-for (i in window:nrow(PG_data)) {
-  tmp <- cor(PG_data[(i - (window - 1)):i, mu])[lower.tri(diag(3))] 
+for (i in window:nrow(X)) {
+  tmp <- cor(X[(i - (window - 1)):i, ])[lower.tri(diag(ncol(X)))] 
   out <- rbind(out, tmp)
 }
 
-plot(out[, 1], type = "l", col = PG_data$phase[1:1444], las = 1, 
-     xlab = "Beep", ylab = "Correlation", ylim = c(0, 1),
+plot(out[, 1], type = "l", col = PG_data$phase[1:(nrow(PG_data) - (window - 1))], 
+     las = 1, xlab = "Beep", ylab = "Correlation", ylim = c(0, 1),
      main = "Correlation Irritated - Restless")
 plot(out[, 2], type = "l", col = PG_data$phase[1:1444], las = 1, 
      xlab = "Beep", ylab = "Correlation", ylim = c(0, 1),
