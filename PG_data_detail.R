@@ -14,18 +14,20 @@ for (i in 1:5) {
 
 out <- c()
 
-for (i in 30:nrow(PG_data)) {
-  tmp <- cor(PG_data[(i - 29):i, mu])[lower.tri(diag(3))] 
+window <- 100
+
+for (i in window:nrow(PG_data)) {
+  tmp <- cor(PG_data[(i - (window - 1)):i, mu])[lower.tri(diag(3))] 
   out <- rbind(out, tmp)
 }
 
-plot(out[, 1], type = "p", col = PG_data$phase[1:1444], las = 1, 
+plot(out[, 1], type = "l", col = PG_data$phase[1:1444], las = 1, 
      xlab = "Beep", ylab = "Correlation", ylim = c(0, 1),
      main = "Correlation Irritated - Restless")
-plot(out[, 2], type = "p", col = PG_data$phase[1:1444], las = 1, 
+plot(out[, 2], type = "l", col = PG_data$phase[1:1444], las = 1, 
      xlab = "Beep", ylab = "Correlation", ylim = c(0, 1),
      main = "Correlation Irritated - Agitated")
-plot(out[, 3], type = "p", col = PG_data$phase[1:1444], las = 1, 
+plot(out[, 3], type = "l", col = PG_data$phase[1:1444], las = 1, 
      xlab = "Beep", ylab = "Correlation", ylim = c(0, 1),
      main = "Correlation Restless - Agitated")
 
@@ -96,3 +98,35 @@ for (i in 30:nrow(PG_data)) {
 plot(out, type = "p", col = PG_data$phase[1:1444], las = 1, 
      xlab = "Beep", ylab = "Variance", ylim = c(0, 2),
      main = "Sumscore")
+
+out <- c()
+
+window <- 100
+
+for (i in window:nrow(responses)) {
+  tmp <- cor(responses[(i - (window - 1)):i, ])[lower.tri(diag(ncol(responses)))] 
+  out <- rbind(out, tmp)
+}
+
+plot(out[, 1], type = "l", ylim = c(0, 1))
+plot(out[, 5], type = "l", ylim = c(-1, 1))
+plot(out[, 3], type = "l", ylim = c(0, 1))
+plot(out[, 4], type = "l", ylim = c(0, 1))
+plot(out[, 5], type = "l", ylim = c(0, 1))
+
+plot(out[, 1], type = "p", col = PG_data$phase[1:1444], las = 1, 
+     xlab = "Beep", ylab = "Correlation", ylim = c(0, 1),
+     main = "Correlation Irritated - Restless")
+plot(out[, 2], type = "p", col = PG_data$phase[1:1444], las = 1, 
+     xlab = "Beep", ylab = "Correlation", ylim = c(0, 1),
+     main = "Correlation Irritated - Agitated")
+plot(out[, 3], type = "p", col = PG_data$phase[1:1444], las = 1, 
+     xlab = "Beep", ylab = "Correlation", ylim = c(0, 1),
+     main = "Correlation Restless - Agitated")
+
+# Restless seems to be a problematic item.
+# Simulate less extreme cases of the change of meaning
+# maybe the problem is collinearity... collinearity in IRT
+# Our items are too correlated.
+# See the Item fit for the other scales.
+# Choose other items based on theory.

@@ -139,7 +139,8 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
 ```
 
 ```{r stanfit}
-rdsfile <- "../Fits/MUwithNA"
+# rdsfile <- "../Fits/MUwithNA"
+rdsfile <- "../Fits/MUwithNA_Ph2-3"
 
 tvdpcm_inits <- function() {
               list(lambda = runif(1, -1, 1),
@@ -174,8 +175,11 @@ if (!file.exists(paste0(rdsfile, ".rds"))) {
 ```
 
 ```{r diag}
-stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE), 
-                                 warmup = 0, print = FALSE)
+stan.diag <- monitor(extract(fit, 
+                             pars = c("beta", "theta", "lambda",
+                                      "sigma2", "pvar", "attractor"),
+                             permuted = FALSE, inc_warmup = FALSE),
+                     warmup = 0, print = FALSE)
             
 ndiv  <- get_num_divergent(fit)     # number of divergent transitions
 nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
