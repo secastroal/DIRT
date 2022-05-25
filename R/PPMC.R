@@ -1131,17 +1131,11 @@ ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE,
 # threshold, and discrimination parameters, the number of time points, 
 # the number of items, the number of responses categories, and index variables 
 # for the time points and the items.
-cov.resid <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
+cov.resid <- function(y, theta, thresholds, alpha, I, K, t_index) {
   M <- K - 1
   
   # Restructure responses in a matrix
-  Y <- matrix(NA, nT, I)
-  
-  for (t in unique(t_index)) {
-    for (i in 1:I) {
-      Y[t, i] <- y[t_index == t & i_index == i]
-    }
-  }
+  Y <- matrix(y, length(unique(t_index)), I)
   
   delta       <- rowMeans(thresholds)
   taus        <- thresholds - delta
@@ -1167,7 +1161,10 @@ cov.resid <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
   return(out)
 }
 
-ppmc.cov.resid <- function(object, data, scatterplots = FALSE) {
+ppmc.cov.resid <- function(object, data, scatterplots = FALSE, 
+                           mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
   
   betasamples  <- extract(object)[["beta"]]
   thetasamples <- extract(object)[["theta"]]
@@ -1178,37 +1175,41 @@ ppmc.cov.resid <- function(object, data, scatterplots = FALSE) {
   nT   <- data$nT
   y    <- data$y_obs
   
-  # Create array to store the computed absolute covariance residuals.
-  discrepancy <- array(NA, dim = c(nrow(repy), (I * (I - 1))/2, 2))
+  # Parallel foreach loop
+  cl <- makeCluster(cores, outfile = "")
+  registerDoParallel(cl, cores = cores)
   
-  for (r in 1:nrow(repy)) {
+  discrepancy <- foreach(r = 1:nrow(repy), .combine = "acomb",
+                         .export = c("cov.resid", "P.GPCM")) %dopar% {
     # Get estimated parameters for the i-th iteration.
     thresholds <- betasamples[r, , ]
     theta      <- thetasamples[r, ]
     
+    result <- matrix(NA, (I * (I - 1))/2, 2)
+    
     # RESID for the observed scores
-    discrepancy[r, , 1] <- cov.resid(y          = y,
-                                     theta      = theta,
-                                     thresholds = thresholds,
-                                     alpha      = rep(1, I),
-                                     nT         = nT,
-                                     I          = I,
-                                     K          = K,
-                                     t_index    = data$tt_obs,
-                                     i_index    = data$ii_obs)
+    result[, 1] <- cov.resid(y          = y,
+                             theta      = theta,
+                             thresholds = thresholds,
+                             alpha      = rep(1, I),
+                             I          = I,
+                             K          = K,
+                             t_index    = data$tt_obs)
     
     # RESID for the i-th replicated scores
-    discrepancy[r, , 2] <- cov.resid(y          = repy[r, ],
-                                     theta      = theta,
-                                     thresholds = thresholds,
-                                     alpha      = rep(1, I),
-                                     nT         = nT,
-                                     I          = I,
-                                     K          = K,
-                                     t_index    = data$tt_obs,
-                                     i_index    = data$ii_obs)
+    result[, 2] <- cov.resid(y          = repy[r, ],
+                             theta      = theta,
+                             thresholds = thresholds,
+                             alpha      = rep(1, I),
+                             I          = I,
+                             K          = K,
+                             t_index    = data$tt_obs)
+    result
   }
-  rm(r)
+  
+  stopCluster(cl = cl)
+  
+  discrepancy <- aperm(discrepancy, c(3, 1, 2))
   
   # Compute posterior predictive p-values
   out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
@@ -1246,7 +1247,10 @@ ppmc.cov.resid <- function(object, data, scatterplots = FALSE) {
 
 # Absolute Item Covariance Residual Difference ----
 
-ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
+ppmc.cov.rediff <- function(object, data, scatterplots = FALSE,
+                            mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
   
   betasamples  <- extract(object)[["beta"]]
   thetasamples <- extract(object)[["theta"]]
@@ -1260,10 +1264,12 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
   # Create dummy variable to split observations in two halves
   timesplit <- ifelse(data$tt_obs <= ceiling(nT/2), 0, 1)
   
-  # Create array to store the computed absolute covariance residuals.
-  discrepancy <- array(NA, dim = c(nrow(repy), (I * (I - 1))/2, 2))
+  # Parallel foreach loop
+  cl <- makeCluster(cores, outfile = "")
+  registerDoParallel(cl, cores = cores)
   
-  for (r in 1:nrow(repy)) {
+  discrepancy <- foreach(r = 1:nrow(repy), .combine = "acomb",
+                         .export = c("cov.resid", "P.GPCM")) %dopar% {
     # Get estimated parameters for the i-th iteration.
     thresholds <- betasamples[r, , ]
     theta      <- thetasamples[r, ]
@@ -1279,30 +1285,33 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
                                    theta      = theta,
                                    thresholds = thresholds,
                                    alpha      = rep(1, I),
-                                   nT         = tmp.nT,
                                    I          = I,
                                    K          = K,
-                                   t_index    = data$tt_obs[timesplit == s] - ceiling(nT/2) * s,
-                                   i_index    = data$ii_obs[timesplit == s])
+                                   t_index    = data$tt_obs[timesplit == s] - 
+                                     ceiling(nT/2) * s)
       
       # RESID difference of the replicated scores
       tmp[, 2, s + 1] <- cov.resid(y          = repy[r, ][timesplit == s],
                                    theta      = theta,
                                    thresholds = thresholds,
                                    alpha      = rep(1, I),
-                                   nT         = tmp.nT,
                                    I          = I,
                                    K          = K,
-                                   t_index    = data$tt_obs[timesplit == s] - ceiling(nT/2) * s,
-                                   i_index    = data$ii_obs[timesplit == s])
+                                   t_index    = data$tt_obs[timesplit == s] - 
+                                     ceiling(nT/2) * s)
     }
     
-    discrepancy[r, , 1] <- c(diff(t(tmp[, 1, ])))
+    result <- matrix(NA, (I * (I - 1))/2, 2)
     
-    discrepancy[r, , 2] <- c(diff(t(tmp[, 2, ])))
+    result[, 1] <- c(diff(t(tmp[, 1, ])))
+    result[, 2] <- c(diff(t(tmp[, 2, ])))
+    
+    result
   }
-  rm(r)
     
+  stopCluster(cl = cl)
+  
+  discrepancy <- aperm(discrepancy, c(3, 1, 2))
   
   # Compute posterior predictive p-values
   out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
@@ -1340,20 +1349,14 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
 
 # Partial Autocorrelation of the Latent Scores Residuals ----
 
-gpcm.lpacf <- function(y, theta, thresholds, alpha, nT, I, K, 
-                       t_index, i_index, sumscores = FALSE) {
+gpcm.lpacf <- function(y, theta, thresholds, alpha, I, K, 
+                       t_index, sumscores = FALSE) {
   
   M <- K - 1
   
   # Restructure responses in a matrix
-  Y <- matrix(NA, nT, I)
+  Y <- matrix(y, length(unique(t_index)), I)
   
-  for (t in unique(t_index)) {
-    for (i in 1:I) {
-      Y[t, i] <- y[t_index == t & i_index == i]
-    }
-  }
-
   delta       <- rowMeans(thresholds)
   taus        <- thresholds - delta
   

@@ -33,7 +33,7 @@ knitr::opts_chunk$set(echo = FALSE, fig.height = 4, fig.width = 6, fig.pos = "!H
 ```{r pre-env}
 library(rstan)
 rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores())
+options(mc.cores = parallel::detectCores() - 1)
 library(bayesplot)
 color_scheme_set("darkgray")
 
