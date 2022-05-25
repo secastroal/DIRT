@@ -915,17 +915,10 @@ dicho <- function(y, I, K, i_index, cutoff = ceiling(K/2) + 1) {
 # This function computes the odd ratio of a matrix. If any if the counts of the 
 # denominator is equal to 0, the Haldane-Anscombe correction correction is 
 # used (i.e., add 0.5 to each cell of the 2X2 matrix).
-odds.ratio <- function(y, nT, I, K, t_index, i_index) {
+odds.ratio <- function(y, I, K, t_index) {
   
   # Restructure responses in a matrix
-  Y <- matrix(NA, nT, I)
-  
-  for (t in unique(t_index)) {
-    for (i in 1:I) {
-      Y[t, i] <- y[t_index == t & i_index == i]
-    }
-  }
-  rm(t, i)
+  Y <- matrix(y, length(unique(t_index)), I)
   
   # Vector to store Odds ratio
   or <- rep(NA, (I * (I - 1))/2)
@@ -948,7 +941,18 @@ odds.ratio <- function(y, nT, I, K, t_index, i_index) {
   return(or)
 }
 
-ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
+ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE,
+                    mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
+  
+  if (cores < 1L)
+    stop("'mc.cores' must be >= 1")
+  
+  if (Sys.info()["sysname"] == "Windows") {
+    if (cores > 1L)
+      stop("'mc.cores' > 1 is not supported on Windows")
+  }
   
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
@@ -965,31 +969,28 @@ ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
                  i_index = data$ii_obs, 
                  cutoff  = cutoff)
   or    <- odds.ratio(y  = ydich, 
-                      nT = nT, 
                       I  = I, 
                       K  = K, 
-                      t_index = data$tt_obs, 
-                      i_index = data$ii_obs)
+                      t_index = data$tt_obs)
   
   
-  orrep <- apply(repy, 1, function(x) {
+  orrep <- mclapply(as.data.frame(t(repy)), function(x) {
     repyd <- dicho(y = x, 
                    I = I, 
                    K = K, 
                    i_index = data$ii_obs, 
                    cutoff  = cutoff)
     out   <- odds.ratio(y  = repyd, 
-                        nT = nT, 
                         I  = I, 
                         K  = K, 
-                        t_index = data$tt_obs, 
-                        i_index = data$ii_obs)
+                        t_index = data$tt_obs)
     return(out)
-  })
+  }, mc.cores = cores)
+  
+  orrep <- as.matrix(as.data.frame(orrep))
   
   # Compute posterior predictive p-values
   out <- apply(orrep <= or, 1, function(x) sum(x)/dim(orrep)[2])
-  
   
   if (histograms) {
     for (i in 1:length(or)) {
@@ -1021,7 +1022,18 @@ ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
 
 # Odds Ratio Difference ----
 
-ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE) {
+ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE,
+                        mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
+  
+  if (cores < 1L)
+    stop("'mc.cores' must be >= 1")
+  
+  if (Sys.info()["sysname"] == "Windows") {
+    if (cores > 1L)
+      stop("'mc.cores' > 1 is not supported on Windows")
+  }
   
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
@@ -1046,16 +1058,15 @@ ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE) {
     tmp.nT <- ifelse(nT/2 - ceiling(nT/2) == 0, nT/2, ceiling(nT/2) - s)
     
     orsplit[, s + 1] <- odds.ratio(y  = ydich[timesplit == s],
-                                   nT = tmp.nT,
                                    I  = I,
                                    K  = K,
-                                   t_index = data$tt_obs[timesplit == s] - ceiling(nT/2) * s,
-                                   i_index = data$ii_obs[timesplit == s])
+                                   t_index = data$tt_obs[timesplit == s] - 
+                                     ceiling(nT/2) * s)
   }
   
   ordiff <- c(diff(t(orsplit)))
   
-  ordiffrep <- apply(repy, 1, function(x) {
+  ordiffrep <- mclapply(as.data.frame(t(repy)), function(x) {
     repyd  <- dicho(y = x, 
                     I = I, 
                     K = K, 
@@ -1068,16 +1079,17 @@ ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE) {
       tmp.nT <- ifelse(nT/2 - ceiling(nT/2) == 0, nT/2, ceiling(nT/2) - s)
       
       orsplitrep[, s + 1] <- odds.ratio(y  = repyd[timesplit == s],
-                                        nT = tmp.nT,
                                         I  = I,
                                         K  = K,
-                                        t_index = data$tt_obs[timesplit == s] - ceiling(nT/2) * s,
-                                        i_index = data$ii_obs[timesplit == s])
+                                        t_index = data$tt_obs[timesplit == s] - 
+                                          ceiling(nT/2) * s)
     }
     
-    out <- diff(t(orsplitrep))
+    out <- as.vector(diff(t(orsplitrep)))
     return(out)
-  })
+  }, mc.cores = cores)
+  
+  ordiffrep <- as.matrix(as.data.frame(ordiffrep))
   
   # Compute posterior predictive p-values
   out <- apply(ordiffrep <= ordiff, 1, function(x) sum(x)/dim(ordiffrep)[2])
