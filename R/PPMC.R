@@ -36,7 +36,7 @@ ppmc.sumscore.ts <- function(object, data, mc.cores = getOption("mc.cores", 2L))
     tapply(x, data$tt_obs, sum)
   }, mc.cores = cores)
   
-  sumscoresrepy <- as.data.frame(sumscoresrepy)
+  sumscoresrepy <- as.matrix(as.data.frame(sumscoresrepy))
 
   plot(sort(unique(data$tt_obs)), sumscores, type = "p", pch = 19, las = 1,
        ylim = c(I - 0.5, I * K + 0.5), xlab = "Time",
@@ -167,7 +167,18 @@ ppmc.acf <- function(object, data, lag.max = 5, mc.cores = getOption("mc.cores",
 
 # Mean Square Successive Difference ----
 
-ppmc.mssd <- function(object, data) {
+ppmc.mssd <- function(object, data, mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
+  
+  if (cores < 1L)
+    stop("'mc.cores' must be >= 1")
+  
+  if (Sys.info()["sysname"] == "Windows") {
+    if (cores > 1L)
+      stop("'mc.cores' > 1 is not supported on Windows")
+  }
+  
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -176,17 +187,19 @@ ppmc.mssd <- function(object, data) {
   
   # Compute sumscores
   sumscores <- tapply(y, data$tt_obs, sum)
-  sumscoresrepy <- apply(repy, 1, function(x) {
+  sumscoresrepy <- mclapply(as.data.frame(t(repy)), function(x) {
     tapply(x, data$tt_obs, sum)
-  })
+  }, mc.cores = cores)
   
   # Compute mssd
   mssd <- sum(diff(sumscores) ^ 2)/(nT - 1)
   
-  mssdrep <- apply(sumscoresrepy, 2, function(x) {
+  mssdrep <- mclapply(sumscoresrepy, function(x) {
     out <- sum(diff(x) ^ 2)/(nT - 1)
     return(out)
-  })
+  }, mc.cores = cores)
+  
+  mssdrep <- unlist(mssdrep)
   
   # Compute posterior predictive p-values
   out <- sum(mssdrep <= mssd) / length(mssdrep)
