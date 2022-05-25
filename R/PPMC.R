@@ -3,9 +3,27 @@
 # All the functions have as input the stanfit object, the data list as
 # it is required for stan functions, and some extra arguments to control
 # other parameters.
+require(parallel)
+require(scatterpie)
+
+# Load saved fit for testing.
+# fit    <- readRDS("Fits/ppmc.fit.Rdata")
+# object <- fit$fit
+# data   <- fit$standata
 
 # Sumscores time series ----
-ppmc.sumscore.ts <- function(object, data) {
+ppmc.sumscore.ts <- function(object, data, mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
+  
+  if (cores < 1L)
+    stop("'mc.cores' must be >= 1")
+  
+  if (Sys.info()["sysname"] == "Windows") {
+    if (cores > 1L)
+      stop("'mc.cores' > 1 is not supported on Windows")
+  }
+  
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -13,21 +31,13 @@ ppmc.sumscore.ts <- function(object, data) {
   y    <- data$y_obs
   
   # Compute sumscores
-  # tictoc::tic()
   sumscores <- tapply(y, data$tt_obs, sum)
-  sumscoresrepy <- apply(repy, 1, function(x) {
+  sumscoresrepy <- mclapply(as.data.frame(t(repy)), function(x) {
     tapply(x, data$tt_obs, sum)
-  })
-  # tictoc::toc()
+  }, mc.cores = cores)
   
-  # Compute sumscores
-  # tictoc::tic()
-  # sumscores <- tapply(y, data$tt_obs, sum)
-  # sumscoresrepy <- parallel::mclapply(as.data.frame(t(repy)), function(x) {
-  #   tapply(x, data$tt_obs, sum)
-  # }, mc.cores = parallel::detectCores() - 1)
-  # tictoc::toc()
-  
+  sumscoresrepy <- as.data.frame(sumscoresrepy)
+
   plot(sort(unique(data$tt_obs)), sumscores, type = "p", pch = 19, las = 1,
        ylim = c(I - 0.5, I * K + 0.5), xlab = "Time",
        ylab = "Sum Scores")
@@ -58,7 +68,18 @@ ppmc.sumscore.ts <- function(object, data) {
 }
 
 # Autocorrelation of the residuals ----
-ppmc.racf <- function(object, data) {
+ppmc.racf <- function(object, data, mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
+  
+  if (cores < 1L)
+    stop("'mc.cores' must be >= 1")
+  
+  if (Sys.info()["sysname"] == "Windows") {
+    if (cores > 1L)
+      stop("'mc.cores' > 1 is not supported on Windows")
+  }
+  
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -67,18 +88,20 @@ ppmc.racf <- function(object, data) {
   
   # Compute sumscores
   sumscores <- tapply(y, data$tt_obs, sum)
-  sumscoresrepy <- apply(repy, 1, function(x) {
+  sumscoresrepy <- mclapply(as.data.frame(t(repy)), function(x) {
     tapply(x, data$tt_obs, sum)
-  })
+  }, mc.cores = cores)
   
   res  <- rstandard(lm(sumscores[-1] ~ head(sumscores, -1))) 
   acor <- acf(res, lag.max = 1, plot = FALSE)$acf[2, ,]
   
-  acorrep <- apply(sumscoresrepy, 2, function(x) {
+  acorrep <- mclapply(sumscoresrepy, function(x) {
     res <- rstandard(lm(x[-1] ~ head(x, -1)))
     out <- acf(res, lag.max = 1, plot = FALSE)$acf[2, ,]
     return(out)
-  })
+  }, mc.cores = cores)
+  
+  acorrep <- unlist(acorrep)
   
   # Compute posterior predictive p-values
   out <- sum(acorrep <= acor) / length(acorrep)
@@ -95,7 +118,18 @@ ppmc.racf <- function(object, data) {
 }
 
 # Autocorrelation of the sumscores ----
-ppmc.acf <- function(object, data, lag.max = 5) {
+ppmc.acf <- function(object, data, lag.max = 5, mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
+  
+  if (cores < 1L)
+    stop("'mc.cores' must be >= 1")
+  
+  if (Sys.info()["sysname"] == "Windows") {
+    if (cores > 1L)
+      stop("'mc.cores' > 1 is not supported on Windows")
+  }
+  
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -104,14 +138,16 @@ ppmc.acf <- function(object, data, lag.max = 5) {
   
   # Compute sumscores
   sumscores <- tapply(y, data$tt_obs, sum)
-  sumscoresrepy <- apply(repy, 1, function(x) {
+  sumscoresrepy <- mclapply(as.data.frame(t(repy)), function(x) {
     tapply(x, data$tt_obs, sum)
-  })
+  }, mc.cores = cores)
   
   acor <- acf(sumscores, lag.max = lag.max, plot = FALSE)$acf[2:(lag.max + 1), ,]
-  acorrep <- apply(sumscoresrepy, 2, function(x) {
+  acorrep <- mclapply(sumscoresrepy, function(x) {
     acf(x, lag.max = lag.max, plot = FALSE)$acf[2:(lag.max + 1), ,]
-  })
+  }, mc.cores = cores)
+  
+  acorrep <- as.matrix(as.data.frame(acorrep))
   
   # Compute posterior predictive p-values
   out <- apply(acorrep <= acor, 1, function(x) sum(x)/dim(acorrep)[2])
@@ -695,8 +731,6 @@ gpcm.Q3 <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
 
 ppmc.Q3 <- function(object, data, scatterplots = FALSE) {
   
-  require(scatterpie)
-  
   betasamples  <- extract(object)[["beta"]]
   thetasamples <- extract(object)[["theta"]]
   repy <- extract(object)[["rep_y"]]
@@ -830,8 +864,6 @@ odds.ratio <- function(y, nT, I, K, t_index, i_index) {
 
 ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
   
-  require(scatterpie)
-  
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -904,8 +936,6 @@ ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE) {
 # Odds Ratio Difference ----
 
 ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE) {
-  
-  require(scatterpie)
   
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
@@ -1041,8 +1071,6 @@ cov.resid <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
 
 ppmc.cov.resid <- function(object, data, scatterplots = FALSE) {
   
-  require(scatterpie)
-  
   betasamples  <- extract(object)[["beta"]]
   thetasamples <- extract(object)[["theta"]]
   repy <- extract(object)[["rep_y"]]
@@ -1121,8 +1149,6 @@ ppmc.cov.resid <- function(object, data, scatterplots = FALSE) {
 # Absolute Item Covariance Residual Difference ----
 
 ppmc.cov.rediff <- function(object, data, scatterplots = FALSE) {
-  
-  require(scatterpie)
   
   betasamples  <- extract(object)[["beta"]]
   thetasamples <- extract(object)[["theta"]]
