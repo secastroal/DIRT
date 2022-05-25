@@ -271,7 +271,19 @@ ppmc.item.ts <- function(object, data, quiet = FALSE, items = NULL) {
 # There might be warning messages with the polyserial correlation because the 
 # estimated correlation is larger than 1. For example, "initial correlation 
 # inadmissible, 1.01866242085942, set to 0.9999"
-ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items = NULL, quiet = FALSE) {
+ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items = NULL, 
+                       quiet = FALSE, mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
+  
+  if (cores < 1L)
+    stop("'mc.cores' must be >= 1")
+  
+  if (Sys.info()["sysname"] == "Windows") {
+    if (cores > 1L)
+      stop("'mc.cores' > 1 is not supported on Windows")
+  }
+  
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -291,7 +303,7 @@ ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items 
                                               y[data$ii_obs == items[i]])
     }
     
-    repdat <- apply(repy, 1, function(x){
+    repdat <- mclapply(as.data.frame(t(repy)), function(x){
       out  <- rep(NA, length(items))
       for (i in 1:length(items)) {
         out[items[i]] <- polycor::polyserial(tapply(x[data$ii_obs != items[i]], 
@@ -300,7 +312,7 @@ ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items 
                                              x[data$ii_obs == items[i]])
       }
       return(out)
-    })
+    }, mc.cores = cores)
   }
   
   if (method == "pearson") {
@@ -312,7 +324,7 @@ ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items 
                               y[data$ii_obs == items[i]])
     }
     
-    repdat <- apply(repy, 1, function(x){
+    repdat <- mclapply(as.data.frame(t(repy)), function(x){
       out  <- rep(NA, length(items))
       for (i in 1:length(items)) {
         out[items[i]] <- cor(tapply(x[data$ii_obs != items[i]],
@@ -321,8 +333,10 @@ ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items 
                              x[data$ii_obs == items[i]])
       }
       return(out)
-    })
+    }, mc.cores = cores)
   }
+  
+  repdat <- as.matrix(as.data.frame(repdat))
   
   # Compute posterior predictive p-values
   out <- apply(repdat <= polcor, 1, function(x) sum(x)/dim(repdat)[2])
@@ -352,7 +366,19 @@ ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items 
 # Again, one can use either polyserial or pearson correlation.
 # Apparently with this methods, we do not get the warnings about correlations 
 # larger than 1, when using polyserial correlation.
-ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items = NULL, quiet = FALSE) {
+ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items = NULL, 
+                        quiet = FALSE, mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
+  
+  if (cores < 1L)
+    stop("'mc.cores' must be >= 1")
+  
+  if (Sys.info()["sysname"] == "Windows") {
+    if (cores > 1L)
+      stop("'mc.cores' > 1 is not supported on Windows")
+  }
+  
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -374,7 +400,7 @@ ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items
                                               y[data$ii_obs == items[i]][-1])
     }
     
-    repdat <- apply(repy, 1, function(x){
+    repdat <- mclapply(as.data.frame(t(repy)), function(x){
       out  <- rep(NA, length(items))
       for (i in 1:length(items)) {
         sums <- tapply(x[data$ii_obs != items[i]], 
@@ -385,7 +411,7 @@ ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items
                                              x[data$ii_obs == items[i]][-1])
       }
       return(out)
-    })
+    }, mc.cores = cores)
   }
 
   if (method == "pearson") {
@@ -399,7 +425,7 @@ ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items
                               y[data$ii_obs == items[i]][-1])
     }
     
-    repdat <- apply(repy, 1, function(x){
+    repdat <- mclapply(as.data.frame(t(repy)), function(x){
       out  <- rep(NA, length(items))
       for (i in 1:length(items)) {
         sums <- tapply(x[data$ii_obs != items[i]], 
@@ -410,8 +436,10 @@ ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items
                              x[data$ii_obs == items[i]][-1])
       }
       return(out)
-    })
+    }, mc.cores = cores)
   }
+  
+  repdat <- as.matrix(as.data.frame(repdat))
   
   # Compute posterior predictive p-values
   out <- apply(repdat <= polcor, 1, function(x) sum(x)/dim(repdat)[2])
@@ -437,7 +465,19 @@ ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items
 # Item-total Correlation Version 3 ----
 # In this version, we fit a autoregressive model to both the item scores and 
 # the rescores. Then, the residuals from these model are correlated.
-ppmc.itcor3 <- function(object, data, method = "pearson", items = NULL, quiet = FALSE) {
+ppmc.itcor3 <- function(object, data, method = "pearson", items = NULL, 
+                        quiet = FALSE, mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
+  
+  if (cores < 1L)
+    stop("'mc.cores' must be >= 1")
+  
+  if (Sys.info()["sysname"] == "Windows") {
+    if (cores > 1L)
+      stop("'mc.cores' > 1 is not supported on Windows")
+  }
+  
   repy <- extract(object)[["rep_y"]]
   I    <- data$I
   K    <- data$K
@@ -460,7 +500,7 @@ ppmc.itcor3 <- function(object, data, method = "pearson", items = NULL, quiet = 
       polcor[items[i]] <- cor(res, ires)
     }
     
-    repdat <- apply(repy, 1, function(x){
+    repdat <- mclapply(as.data.frame(t(repy)), function(x){
       out  <- rep(NA, length(items))
       for (i in 1:length(items)) {
         sums <- tapply(x[data$ii_obs != items[i]], 
@@ -472,8 +512,10 @@ ppmc.itcor3 <- function(object, data, method = "pearson", items = NULL, quiet = 
         out[items[i]] <- cor(res, ires)
       }
       return(out)
-    })
+    }, mc.cores = cores)
   }
+  
+  repdat <- as.matrix(as.data.frame(repdat))
   
   # Compute posterior predictive p-values
   out <- apply(repdat <= polcor, 1, function(x) sum(x)/dim(repdat)[2])
