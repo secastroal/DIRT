@@ -131,3 +131,6 @@ plot(out[, 3], type = "p", col = PG_data$phase[1:1444], las = 1,
 # Our items are too correlated.
 # See the Item fit for the other scales.
 # Choose other items based on theory.
+# make a slide to show what works ...
+# compare 6 and 3 items...
+# data that varies more.

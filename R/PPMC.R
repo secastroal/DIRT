@@ -775,18 +775,12 @@ ppmc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE,
 # response categories, and two index variables t_index for time and i_index 
 # for items given that the data is in long format.
 
-gpcm.Q3 <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
+gpcm.Q3 <- function(y, theta, thresholds, alpha, I, K, t_index) {
   
   M <- K - 1
   
   # Restructure responses in a matrix
-  Y <- matrix(NA, nT, I)
-  
-  for (t in unique(t_index)) {
-    for (i in 1:I) {
-      Y[t, i] <- y[t_index == t & i_index == i]
-    }
-  }
+  Y <- matrix(y, length(unique(t_index)), I)
   
   delta       <- rowMeans(thresholds)
   taus        <- thresholds - delta
@@ -814,7 +808,10 @@ gpcm.Q3 <- function(y, theta, thresholds, alpha, nT, I, K, t_index, i_index) {
   return(q3)
 }
 
-ppmc.Q3 <- function(object, data, scatterplots = FALSE) {
+ppmc.Q3 <- function(object, data, scatterplots = FALSE,
+                    mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
   
   betasamples  <- extract(object)[["beta"]]
   thetasamples <- extract(object)[["theta"]]
@@ -825,37 +822,41 @@ ppmc.Q3 <- function(object, data, scatterplots = FALSE) {
   nT   <- data$nT
   y    <- data$y_obs
   
-  # Create array to store the computed Yen's Q3.
-  discrepancy <- array(NA, dim = c(nrow(repy), (I * (I - 1))/2, 2))
+  # Parallel foreach loop
+  cl <- makeCluster(cores, outfile = "")
+  registerDoParallel(cl, cores = cores)
   
-  for (r in 1:nrow(repy)) {
+  discrepancy <- foreach(r = 1:nrow(repy), .combine = "acomb",
+                         .export = c("gpcm.Q3", "P.GPCM")) %dopar% {
     # Get estimated parameters for the i-th iteration.
     thresholds <- betasamples[r, , ]
     theta      <- thetasamples[r, ]
     
+    result <- matrix(NA, (I * (I - 1))/2, 2)
+    
     # Yen's Q3 for the observed scores
-    discrepancy[r, , 1] <- gpcm.Q3(y          = y,
-                                   theta      = theta,
-                                   thresholds = thresholds,
-                                   alpha      = rep(1, I),
-                                   nT         = nT,
-                                   I          = I,
-                                   K          = K,
-                                   t_index    = data$tt_obs,
-                                   i_index    = data$ii_obs)
+    result[, 1] <- gpcm.Q3(y          = y,
+                           theta      = theta,
+                           thresholds = thresholds,
+                           alpha      = rep(1, I),
+                           I          = I,
+                           K          = K,
+                           t_index    = data$tt_obs)
     
     # Yen's Q3 for the i-th replicated scores
-    discrepancy[r, , 2] <- gpcm.Q3(y          = repy[r, ],
-                                   theta      = theta,
-                                   thresholds = thresholds,
-                                   alpha      = rep(1, I),
-                                   nT         = nT,
-                                   I          = I,
-                                   K          = K,
-                                   t_index    = data$tt_obs,
-                                   i_index    = data$ii_obs)
+    result[, 2] <- gpcm.Q3(y          = repy[r, ],
+                           theta      = theta,
+                           thresholds = thresholds,
+                           alpha      = rep(1, I),
+                           I          = I,
+                           K          = K,
+                           t_index    = data$tt_obs)
+    result
   }
-  rm(r)
+  
+  stopCluster(cl = cl)
+  
+  discrepancy <- aperm(discrepancy, c(3, 1, 2))
   
   # Compute posterior predictive p-values
   out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
