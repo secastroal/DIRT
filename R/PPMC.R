@@ -785,6 +785,8 @@ gpcm.Q3 <- function(y, theta, thresholds, alpha, I, K, t_index) {
   delta       <- rowMeans(thresholds)
   taus        <- thresholds - delta
   
+  theta <- theta[unique(t_index)]
+  
   probs.array <- array(NA, dim = c(length(theta), I, K))
   
   for (yy in 0:M) {
@@ -1137,6 +1139,8 @@ cov.resid <- function(y, theta, thresholds, alpha, I, K, t_index) {
   # Restructure responses in a matrix
   Y <- matrix(y, length(unique(t_index)), I)
   
+  theta <- theta[unique(t_index)]
+  
   delta       <- rowMeans(thresholds)
   taus        <- thresholds - delta
   
@@ -1384,13 +1388,14 @@ gpcm.lpacf <- function(y, theta, thresholds, alpha, I, K,
       acf(x, lag.max = 1, plot = FALSE, na.action = na.pass)$acf[2, ,]
     })
   }
-  
-  
+ 
   return(out)
 }
 
-ppmc.lpacf <- function(object, data, items = NULL, 
-                       quiet = FALSE, sumscores = FALSE) {
+ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, 
+                       sumscores = FALSE, mc.cores = getOption("mc.cores", 2L)) {
+  
+  cores <- as.integer(mc.cores)
   
   betasamples  <- extract(object)[["beta"]]
   thetasamples <- extract(object)[["theta"]]
@@ -1408,43 +1413,47 @@ ppmc.lpacf <- function(object, data, items = NULL,
   # Get the observed timepoints. Relevant if there were missing data.
   times_obs <- intersect(data$tt, data$tt_obs)
   
-  # Create array to store the computed partial autocorrelations.
-  if (sumscores) {
-    discrepancy <- array(NA, dim = c(nrow(repy), 1, 2))
-  } else {
-    discrepancy <- array(NA, dim = c(nrow(repy), I, 2))
-  }
+  # Parallel foreach loop
+  cl <- makeCluster(cores, outfile = "")
+  registerDoParallel(cl, cores = cores)
   
-  for (r in 1:nrow(repy)) {
+  discrepancy <- foreach(r = 1:nrow(repy), .combine = "acomb",
+                         .export = c("gpcm.lpacf", "P.GPCM")) %dopar% {
     # Get estimated parameters for the i-th iteration.
     thresholds <- betasamples[r, , ]
     theta      <- thetasamples[r, ][times_obs]
     
+    if (sumscores) {
+      result <- matrix(NA, 1, 2)
+    } else {
+      result <- matrix(NA, I, 2)
+    }
+    
     # pacf for the observed scores
-    discrepancy[r, , 1] <- gpcm.lpacf(y          = y,
-                                      theta      = theta,
-                                      thresholds = thresholds,
-                                      alpha      = rep(1, I),
-                                      nT         = nT,
-                                      I          = I,
-                                      K          = K,
-                                      t_index    = data$tt_obs,
-                                      i_index    = data$ii_obs,
-                                      sumscores  = sumscores)
+    result[, 1] <- gpcm.lpacf(y          = y,
+                              theta      = theta,
+                              thresholds = thresholds,
+                              alpha      = rep(1, I),
+                              I          = I,
+                              K          = K,
+                              t_index    = data$tt_obs,
+                              sumscores  = sumscores)
     
     # pacf for the i-th replicated scores
-    discrepancy[r, , 2] <- gpcm.lpacf(y          = repy[r, ],
-                                      theta      = theta,
-                                      thresholds = thresholds,
-                                      alpha      = rep(1, I),
-                                      nT         = nT,
-                                      I          = I,
-                                      K          = K,
-                                      t_index    = data$tt_obs,
-                                      i_index    = data$ii_obs,
-                                      sumscores  = sumscores)
+    result[, 2] <- gpcm.lpacf(y          = repy[r, ],
+                              theta      = theta,
+                              thresholds = thresholds,
+                              alpha      = rep(1, I),
+                              I          = I,
+                              K          = K,
+                              t_index    = data$tt_obs,
+                              sumscores  = sumscores)
+    result
   }
-  rm(r)
+  
+  stopCluster(cl = cl)
+  
+  discrepancy <- aperm(discrepancy, c(3, 1, 2))
   
   # Compute posterior predictive p-values
   if (sumscores) {
