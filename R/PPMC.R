@@ -50,8 +50,8 @@ ppmc.sumscore.ts <- function(object, data, mc.cores = getOption("mc.cores", 2L))
        ylab = "Sum Scores")
   polygon(c(sort(unique(data$tt_obs)), 
             rev(sort(unique(data$tt_obs)))),
-          c(apply(sumscoresrepy, 1, quantile, probs = 0.025), 
-            rev(apply(sumscoresrepy, 1, quantile, probs = 0.975))),
+          c(apply(sumscoresrepy, 1, quantile, probs = 0.05), 
+            rev(apply(sumscoresrepy, 1, quantile, probs = 0.95))),
           border = NA,
           col = rgb(1, 0, 0, 0.15))
   polygon(c(sort(unique(data$tt_obs)), 
@@ -65,8 +65,8 @@ ppmc.sumscore.ts <- function(object, data, mc.cores = getOption("mc.cores", 2L))
         col = "red")
   
   # Count observations out of the 95 percent of the replications
-  out95 <- apply(sumscoresrepy, 1, quantile, probs = 0.025) <= sumscores &
-    sumscores <= apply(sumscoresrepy, 1, quantile, probs = 0.975)
+  out95 <- apply(sumscoresrepy, 1, quantile, probs = 0.05) <= sumscores &
+    sumscores <= apply(sumscoresrepy, 1, quantile, probs = 0.95)
   prop_out <- sum(!out95) / length(out95)
   
   mtext(paste0("Prop Out = ", round(prop_out, 3)), side = 3, line = -1.5)
@@ -244,8 +244,8 @@ ppmc.item.ts <- function(object, data, quiet = FALSE, items = NULL) {
          ylab = paste0("Scores of Item ", i))
     polygon(c(data$tt_obs[data$ii_obs == items[i]], 
               rev(data$tt_obs[data$ii_obs == items[i]])),
-            c(apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.025), 
-              rev(apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.975))),
+            c(apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.05), 
+              rev(apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.95))),
             border = NA,
             col = rgb(1, 0, 0, 0.15))
     polygon(c(data$tt_obs[data$ii_obs == items[i]], 
@@ -259,8 +259,8 @@ ppmc.item.ts <- function(object, data, quiet = FALSE, items = NULL) {
           col = "red")
     
     # Count observations out of the 95 percent of the replications
-    out95 <- apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.025) <= y[data$ii_obs == items[i]] &
-      y[data$ii_obs == items[i]] <= apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.975)
+    out95 <- apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.05) <= y[data$ii_obs == items[i]] &
+      y[data$ii_obs == items[i]] <= apply(repy[, data$ii_obs == items[i]], 2, quantile, probs = 0.95)
     prop_out[items[i]] <- sum(!out95) / length(out95)
     
     mtext(paste0("Prop Out = ", round(prop_out[items[i]], 3)), side = 3, line = -1.5)
@@ -879,7 +879,7 @@ ppmc.Q3 <- function(object, data, scatterplots = FALSE,
   
   tmp <- data.frame(which(lower.tri(diag(I)), arr.ind = TRUE), out)
   tmp$out2   <- 1 - out
-  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2)
+  tmp$radius <- ifelse(tmp$out <= 0.05 | tmp$out >= 0.95, 0.4, 0.2)
   
   sp <- ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
                              cols=c("out","out2"), color = NA,
@@ -1007,7 +1007,7 @@ ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE,
   
   tmp <- data.frame(which(lower.tri(diag(I)), arr.ind = TRUE), out)
   tmp$out2   <- 1 - out
-  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2)
+  tmp$radius <- ifelse(tmp$out <= 0.05 | tmp$out >= 0.95, 0.4, 0.2)
   
   sp <- ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
                                    cols=c("out","out2"), color = NA,
@@ -1112,7 +1112,7 @@ ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE,
   
   tmp <- data.frame(which(lower.tri(diag(I)), arr.ind = TRUE), out)
   tmp$out2   <- 1 - out
-  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2)
+  tmp$radius <- ifelse(tmp$out <= 0.05 | tmp$out >= 0.95, 0.4, 0.2)
   
   sp <- ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
                                    cols=c("out","out2"), color = NA,
@@ -1234,7 +1234,7 @@ ppmc.cov.resid <- function(object, data, scatterplots = FALSE,
   
   tmp <- data.frame(which(lower.tri(diag(I)), arr.ind = TRUE), out)
   tmp$out2   <- 1 - out
-  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2)
+  tmp$radius <- ifelse(tmp$out <= 0.05 | tmp$out >= 0.95, 0.4, 0.2)
   
   sp <- ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
                                    cols=c("out","out2"), color = NA,
@@ -1336,7 +1336,7 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE,
   
   tmp <- data.frame(which(lower.tri(diag(I)), arr.ind = TRUE), out)
   tmp$out2   <- 1 - out
-  tmp$radius <- ifelse(tmp$out < 0.05 | tmp$out > 0.95, 0.4, 0.2)
+  tmp$radius <- ifelse(tmp$out <= 0.05 | tmp$out >= 0.95, 0.4, 0.2)
   
   sp <- ggplot() + geom_scatterpie(aes(x=row, y=col, r = radius), data = tmp,
                                    cols=c("out","out2"), color = NA,
