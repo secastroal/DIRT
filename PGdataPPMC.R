@@ -79,6 +79,97 @@ for (i in 1:length(filenames)) {
      stan.diag, standata, fit)
 }
 
+
+# Checking the number of misfit given the computed ppp
+
+outMU <- read.table("Fits/MU_PPMC.dat")
+outSE <- read.table("Fits/SelfE_PPMC.dat")
+
+apply(outMU[, -(1:6)], 1, function(x) sum(x <= 0.05 | x >= 0.95))
+apply(outMU[, 1:6], 1, function(x) sum(x != 0))
+apply(outSE[, -(1:6)], 1, function(x) sum(x <= 0.05 | x >= 0.95))
+apply(outSE[, 1:6], 1, function(x) sum(x != 0))
+
+datanames <- c("Fits/MUwithNA_data.rds", "Fits/MUwithNA_ph2-3_data.rds",
+               "Fits/SelfEwithNA_3items_data.rds", "Fits/SelfEwithNA_3items_ph1-2_data.rds")
+
+pdf(file = "Figures/RawdataMUandSelfE.pdf")
+for (i in 1:length(datanames)) {
+  tmp.data <- readRDS(datanames[i])
+  
+  tmp.matrix <- matrix(tmp.data$y_obs, 
+                       nrow = length(unique(tmp.data$tt_obs)), 
+                       ncol = tmp.data$I)
+  
+  matplot(tmp.matrix[round(seq(1, nrow(tmp.matrix), length.out = 100)),],
+          lty = 1, type = "l",
+          ylab = "Responses")
+  
+  window <- max(round(nrow(tmp.matrix)/10), 50)
+  out <- c()
+  
+  for (j in window:nrow(tmp.matrix)) {
+    tmp <- cor(tmp.matrix[(j - (window - 1)):j, ])[lower.tri(diag(ncol(tmp.matrix)))] 
+    out <- rbind(out, tmp)
+  }
+  rm(j, tmp)
+  
+  matplot(out, lty = 1, type = "l", 
+          ylab = "Correlation", ylim = c(-1, 1))
+  
+  
+  window <- max(round(nrow(tmp.matrix)/10), 50)
+  out <- c()
+  
+  for (j in window:nrow(tmp.matrix)) {
+    tmp <- apply(tmp.matrix[(j - (window - 1)):j, ], 2, mean) 
+    out <- rbind(out, tmp)
+  }
+  rm(j, tmp)
+  
+  matplot(out, lty = 1, type = "l", 
+          ylab = "Mean")
+  
+  
+  window <- max(round(nrow(tmp.matrix)/10), 50)
+  out <- c()
+  
+  for (j in window:nrow(tmp.matrix)) {
+    tmp <- apply(tmp.matrix[(j - (window - 1)):j, ], 2, var) 
+    out <- rbind(out, tmp)
+  }
+  rm(j, tmp)
+  
+  matplot(out, lty = 1, type = "l", 
+          ylab = "Variance")
+  
+  rpatterns <- sort(table(apply(tmp.matrix, 1, paste, collapse="")), decreasing = TRUE)
+  
+  plot(1:length(rpatterns), 
+       as.vector(rpatterns),
+       ylab = "Number of Times the RP was Observed",
+       xaxt = "n",
+       xlab = "Response Patterns",
+       pch = "")
+  text(1:length(rpatterns), 
+       as.vector(rpatterns), 
+       labels= names(rpatterns), 
+       cex=0.75, font=0, adj = 0.5, srt = 90)
+  
+  psych::pairs.panels(tmp.matrix,
+                      smooth   = FALSE,
+                      density  = FALSE,
+                      ellipses = FALSE,
+                      cex.cor  = 0.5,
+                      lm       = TRUE,
+                      hist.col = gray(1/2),
+                      rug      = FALSE,
+                      labels = paste0("Item", 1:tmp.data$I))
+  rm(tmp.data, tmp.matrix, window, rpatterns, out)
+}
+rm(i)
+dev.off()
+
 sumscores <- tapply(standata$y_obs, standata$tt_obs, sum)
 
 threshold <- summary(fit, pars = "beta")$summary
