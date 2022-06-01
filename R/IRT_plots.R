@@ -6,7 +6,7 @@ plot.ICC <- function(object, data, range = c(-5, 5), items = NULL,
   tmp      <- list()
   tmp$beta <- summary(object, pars = "beta")$summary
   if (scale) {
-    tmp$sigma2 <- summary(object, pars = "sigma2")$summary
+    tmp$pvar <- summary(object, pars = "pvar")$summary
   }
   
   I <- data$I
@@ -23,9 +23,12 @@ plot.ICC <- function(object, data, range = c(-5, 5), items = NULL,
   
   theta <- seq(range[1], range[2], length = 300)
   
-  thresholds  <- matrix(tmp$beta[, 6], nrow = I, ncol = M, byrow = TRUE)
   if (scale) {
-    thresholds <- matrix(tmp$beta[, 6]/tmp$sigma2[, 6], nrow = I, ncol = M, byrow = TRUE)
+    thresholds <- matrix(tmp$beta[, 6]/sqrt(tmp$pvar[, 6]), nrow = I, ncol = M, byrow = TRUE)
+    alpha      <- rep(sqrt(tmp$pvar[, 6]), I)
+  } else {
+    thresholds <- matrix(tmp$beta[, 6], nrow = I, ncol = M, byrow = TRUE)
+    alpha      <- rep(1, I) 
   }
   delta       <- rowMeans(thresholds)
   taus        <- thresholds - delta
@@ -34,7 +37,7 @@ plot.ICC <- function(object, data, range = c(-5, 5), items = NULL,
   
   for (y in 0:M) {
     probs.array[, , y + 1] <- P.GPCM(y     = y, 
-                                     alpha = rep(1, I), 
+                                     alpha = alpha, 
                                      delta = delta, 
                                      taus  = taus, 
                                      theta = theta, 
@@ -59,7 +62,7 @@ plot.IIF <- function(object, data, range = c(-5, 5), item_labels = NULL,
   tmp      <- list()
   tmp$beta <- summary(object, pars = "beta")$summary
   if (scale) {
-    tmp$sigma2 <- summary(object, pars = "sigma2")$summary
+    tmp$pvar <- summary(object, pars = "pvar")$summary
   }
   
   I <- data$I
@@ -72,9 +75,12 @@ plot.IIF <- function(object, data, range = c(-5, 5), item_labels = NULL,
   
   theta <- seq(range[1], range[2], length = 300)
   
-  thresholds  <- matrix(tmp$beta[, 1], nrow = I, ncol = M, byrow = TRUE)
   if (scale) {
-    thresholds <- matrix(tmp$beta[, 6]/tmp$sigma2[, 6], nrow = I, ncol = M, byrow = TRUE)
+    thresholds <- matrix(tmp$beta[, 6]/sqrt(tmp$pvar[, 6]), nrow = I, ncol = M, byrow = TRUE)
+    alpha      <- rep(sqrt(tmp$pvar[, 6]), I)
+  } else {
+    thresholds <- matrix(tmp$beta[, 1], nrow = I, ncol = M, byrow = TRUE)
+    alpha      <- rep(1, I)
   }
   delta       <- rowMeans(thresholds)
   taus        <- thresholds - delta
@@ -83,7 +89,7 @@ plot.IIF <- function(object, data, range = c(-5, 5), item_labels = NULL,
   
   for (y in 0:M) {
     probs.array[, , y + 1] <- P.GPCM(y     = y, 
-                                     alpha = rep(1, I), 
+                                     alpha = alpha, 
                                      delta = delta, 
                                      taus  = taus, 
                                      theta = theta, 

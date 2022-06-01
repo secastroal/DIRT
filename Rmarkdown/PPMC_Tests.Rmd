@@ -15,6 +15,7 @@ output:
 params:
   seed: 1234
   setmodel: "TVPCM"
+  nitems: 6
 bibliography: references.bib
 csl: apa7.csl
 link-citations: true
@@ -29,7 +30,7 @@ knitr::opts_chunk$set(echo = FALSE, fig.height = 5, fig.width = 8,
 
 library(rstan)
 rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores() - 1)
+options(mc.cores = parallel::detectCores() * (1/2))
 library(bayesplot)
 
 source("../R/IRT_models.R")
@@ -49,10 +50,15 @@ setmodel <- params$setmodel
 
 # seeds <- 1002:1005
 # setmodel <- "TVPCM"
+# nitems <- c(3, 6)
 # for (i in 1:length(seeds)) {
+#    for (j in 1:length(nitems)) {
 #   seed <- seeds[i]
-#   rmarkdown::render("Rmarkdown/PPMC_Tests.Rmd", params = list(seed = seed), output_file = paste0("PPMC_Tests_", setmodel, "_", seed))
-# }
+#   nitems <- nitems[j]
+#   rmarkdown::render("Rmarkdown/PPMC_Tests.Rmd", params = list(seed = seed, 
+#                                                               nitems = nitems), 
+#                     output_file = paste0("PPMC_Tests_", setmodel, "_", seed, "_", nitems))
+# }}
 ```
 
 In this document, we test the posterior predictive model checking methods that we are developing for the time-varying dynamic partial credit model (TV-DPCM). For this, we simulated data based on the TV-DPCM as well as data that violates some of the assumptions of the model.
@@ -88,12 +94,12 @@ where $b_j(t)$ is a function of time, which is known as a basis function. These 
 In this example, we simulated six data sets. The first data set perfectly matches the proposed TV-DPCM. The second data set is a constrained version of the TV-DPCM model in which the intercept does not vary over time. A third data set assumes that the latent structure is bidimensional instead of unidimensional. The fourth data set assumes that there is item parameter drift (i.e., the item parameters change over time). The fifth data set simulates data based on the generalized PCM, in other words, it allows the discrimination parameters to vary across items. Lastly, the last data set simulates a TV-DPCM of order 3 (i.e., the latent state disposition is regressed on the three previous time points). For these data sets, we simulated 200 time points of 6 items each with 5 response options. Moreover, the autoregressive effect is set at 0.5 and the variance of the innovations is set to 1.  
 
 ```{r fixvalues}
-nT     <- 200   # Number of time points
-I      <- 6     # Number of items
-K      <- 5     # Number of categories per item
-M      <- K - 1 # Number of thresholds per item
-lambda <- 0.5   # Size of the autoregressive effect
-in_var <- 1     # Variance of the innovations
+nT     <- 200           # Number of time points
+I      <- params$nitems # Number of items
+K      <- 5             # Number of categories per item
+M      <- K - 1         # Number of thresholds per item
+lambda <- 0.5           # Size of the autoregressive effect
+in_var <- 1             # Variance of the innovations
 ```
 
 Data1 perfectly matches the TV-DPCM. In this case, we simulate the time-varying intercept based on sinusoidal trend with one and a half period. The simulated time series of the sumscores are presented in following figure: 
@@ -105,8 +111,8 @@ dataTRUE <- gen.TVDPCM(nT = nT,
                        K  = K, 
                        pop.param = list(lambda = lambda), 
                        seed = seed, 
-                       FUN  = "sinusoidal",
-                       maxAbsValue = 1)
+                       FUN  = "logarithmic",
+                       maxAbsValue = 0.5)
 
 data1 <- dataTRUE$data
 ```
@@ -276,8 +282,8 @@ data5 <- gen.TVDPCM(nT = nT,
                                      theta = dataTRUE$theta.gen,
                                      alpha = c(1, 1, 1, 1, 0.5, 1.5)), 
                     seed = seed, 
-                    FUN  = "sinusoidal",
-                    maxAbsValue = 1)
+                    FUN  = "logarithmic",
+                    maxAbsValue = 0.5)
 
 alpha <- data5$alpha.gen
 data5 <- data5$data
@@ -324,8 +330,8 @@ data6 <- gen.TVDPCM(nT = nT,
                                      thresholds = dataTRUE$thresholds.gen,
                                      theta = theta), 
                     seed = seed, 
-                    FUN  = "sinusoidal",
-                    maxAbsValue = 1)
+                    FUN  = "logarithmic",
+                    maxAbsValue = 0.5)
 
 data6 <- data6$data
 ```
@@ -583,7 +589,7 @@ Similar as with the test scores distribution, the item scores distribution have 
 ```{r item_ts, fig.height = 8}
 par(mfrow = c(6, 1), oma = c(1, 3, 1, 1), mar = c(1, 4, 2, 1))
 for(i in 1:6) {
-  ppmc.item.ts(fit[[i]], standata[[i]], quiet = TRUE, items = 5)
+  ppmc.item.ts(fit[[i]], standata[[i]], quiet = TRUE, items = I - 1)
   mtext(paste0("Data", i), side = 2, line = 4.5, xpd = NA)
 }
 rm(i)
@@ -596,18 +602,18 @@ rm(i)
 The item-total correlation is a common statistic used as a PPMC methods for IRT models [@Sinharay2006a; @Zhu2011; @Li2017]. This statistic correlates the scores of an item with the total scores minus the score of the item of interest (rescores). This test statistic allowed identifying model misfit of the Rasch model when the data was simulated with discrimination parameters that varied across items [@Sinharay2006a]. When used to assess model fit of the GRM, it was useful to identify model misfit when the data were multidimensional [@Zhu2011]. Hereby, we try this statistic with the simulated data sets. The following table presents the computed ppp-values for each item and each data set, and the number of items that show misfit.
 
 ```{r itcor, fig.show='hide'}
-it_cortable <- matrix(NA, ncol = 7, nrow = 6)
-colnames(it_cortable) <- c(paste0("Item", 1:6), "N_misfit")
+it_cortable <- matrix(NA, ncol = I + 1, nrow = 6)
+colnames(it_cortable) <- c(paste0("Item", 1:I), "N_misfit")
 row.names(it_cortable) <- paste("Data", 1:6)
 for(i in 1:6) {
-  it_cortable[i, 1:6] <- ppmc.itcor(fit[[i]], 
+  it_cortable[i, 1:I] <- ppmc.itcor(fit[[i]], 
                                  standata[[i]], 
                                  quiet = TRUE, 
                                  method = "pearson")
 }
 rm(i)
 
-it_cortable[, 7] <- apply(it_cortable[, 1:6], 1, function(x) {
+it_cortable[, I + 1] <- apply(it_cortable[, 1:I], 1, function(x) {
   sum(x < 0.05 | x > 0.95)
 })
 kbl(it_cortable, align = "c", booktabs = TRUE)
@@ -618,18 +624,18 @@ kbl(it_cortable, align = "c", booktabs = TRUE)
 Additionally, we proposed two modified versions of the Item-Total Correlation to account for the time component. In this modified version the idea is that instead of correlating the scores of the item with the rescores, we correlate the them with the residuals of an autoregressive model fitted to the rescores. The ppp-values and the number of misfitting items for each data set are presented in the following table:
 
 ```{r itcor2, fig.show='hide'}
-it_cor2table <- matrix(NA, ncol = 7, nrow = 6)
-colnames(it_cor2table) <- c(paste0("Item", 1:6), "N_misfit")
+it_cor2table <- matrix(NA, ncol = I + 1, nrow = 6)
+colnames(it_cor2table) <- c(paste0("Item", 1:I), "N_misfit")
 row.names(it_cor2table) <- paste("Data", 1:6)
 for(i in 1:6) {
-  it_cor2table[i, 1:6] <- ppmc.itcor2(fit[[i]], 
+  it_cor2table[i, 1:I] <- ppmc.itcor2(fit[[i]], 
                                  standata[[i]], 
                                  quiet = TRUE, 
                                  method = "pearson")
 }
 rm(i)
 
-it_cor2table[, 7] <- apply(it_cor2table[, 1:6], 1, function(x) {
+it_cor2table[, I + 1] <- apply(it_cor2table[, 1:I], 1, function(x) {
   sum(x < 0.05 | x > 0.95)
 })
 kbl(it_cor2table, align = "c", booktabs = TRUE)
@@ -641,17 +647,17 @@ kbl(it_cor2table, align = "c", booktabs = TRUE)
 The second modification follows the same idea of fitting an autoregressive model but in this case the model is fitted to both the item scores and the rescores. Then the residuals of these two models are correlated. For the ppp-values and number of misfitting items given this test statistic, see the following Table:
 
 ```{r itcor3, fig.show='hide'}
-it_cor3table <- matrix(NA, ncol = 7, nrow = 6)
-colnames(it_cor3table) <- c(paste0("Item", 1:6), "N_misfit")
+it_cor3table <- matrix(NA, ncol = I + 1, nrow = 6)
+colnames(it_cor3table) <- c(paste0("Item", 1:I), "N_misfit")
 row.names(it_cor3table) <- paste("Data", 1:6)
 for(i in 1:6) {
-  it_cor3table[i, 1:6] <- ppmc.itcor3(fit[[i]], 
+  it_cor3table[i, 1:I] <- ppmc.itcor3(fit[[i]], 
                                  standata[[i]], 
                                  quiet = TRUE)
 }
 rm(i)
 
-it_cor3table[, 7] <- apply(it_cor3table[, 1:6], 1, function(x) {
+it_cor3table[, I + 1] <- apply(it_cor3table[, 1:I], 1, function(x) {
   sum(x < 0.05 | x > 0.95)
 })
 kbl(it_cor3table, align = "c", booktabs = TRUE)
@@ -672,21 +678,21 @@ where individuals are divided into $N$ groups (usually 10) for which the proport
 We use this discrepancy measure for the TV-DPCM without any modification. The difference is that the groups do not represent participants with a similar latent trait level but the time points for which the participant had a similar latent state disposition. This discrepancy measure is graphically represented with scatterplots and the ppp-value is computed by counting the proportion of pairs that are above the equality line, see the following Figure that shows the pair of Yen's $Q1$ for the observed and replicated data of item 1 of Data1:
 
 ```{r q1_1, fig.height = 5, results='hide'}
-ppmc.Q1(fit[[1]], standata[[1]], quiet = TRUE, items = 1)
+ppmc.Q1(fit[[1]], standata[[1]], quiet = TRUE, items = I - 1)
 ```
 
 Now, to summarize this discrepancy measure for all items and data sets, the next Table present the corresponding ppp-values and the number of misfitting items according to this discrepancy measure for each data set. 
 
 ```{r q1table, fig.show='hide'}
-q1table <- matrix(NA, ncol = 7, nrow = 6)
-colnames(q1table) <- c(paste0("Item", 1:6), "N_misfit")
+q1table <- matrix(NA, ncol = I + 1, nrow = 6)
+colnames(q1table) <- c(paste0("Item", 1:I), "N_misfit")
 row.names(q1table) <- paste("Data", 1:6)
 for(i in 1:6) {
-  q1table[i, 1:6] <- ppmc.Q1(fit[[i]], standata[[i]], quiet = TRUE)
+  q1table[i, 1:I] <- ppmc.Q1(fit[[i]], standata[[i]], quiet = TRUE)
 }
 rm(i)
 
-q1table[, 7] <- apply(q1table[, 1:6], 1, function(x) {
+q1table[, I + 1] <- apply(q1table[, 1:I], 1, function(x) {
   sum(x < 0.05 | x > 0.95)
 })
 kbl(q1table, align = "c", booktabs = TRUE)
@@ -699,15 +705,15 @@ kbl(q1table, align = "c", booktabs = TRUE)
 In this modified version of the Yen's $Q_1$, we define the groups by consecutive observations to take into account the time component. A summary of the ppp-values for each data set is presented in the following Table:
 
 ```{r q1alttable, fig.show='hide'}
-q1alttable <- matrix(NA, ncol = 7, nrow = 6)
-colnames(q1alttable) <- c(paste0("Item", 1:6), "N_misfit")
+q1alttable <- matrix(NA, ncol = I + 1, nrow = 6)
+colnames(q1alttable) <- c(paste0("Item", 1:I), "N_misfit")
 row.names(q1alttable) <- paste("Data", 1:6)
 for(i in 1:6) {
-  q1alttable[i, 1:6] <- ppmc.Q1.alt(fit[[i]], standata[[i]], quiet = TRUE)
+  q1alttable[i, 1:I] <- ppmc.Q1.alt(fit[[i]], standata[[i]], quiet = TRUE)
 }
 rm(i)
 
-q1alttable[, 7] <- apply(q1alttable[, 1:6], 1, function(x) {
+q1alttable[, I + 1] <- apply(q1alttable[, 1:I], 1, function(x) {
   sum(x < 0.05 | x > 0.95)
 })
 kbl(q1alttable, align = "c", booktabs = TRUE)
@@ -720,15 +726,15 @@ kbl(q1alttable, align = "c", booktabs = TRUE)
 Here, we compute the first partial autocorrelation per item. As previously, we first compute the expected scores per item given the TV-DPCM, then the residuals per item are computed. Lastly, the autocorrelation of the residual becomes the discrepancy measure.A summary of the ppp-values for each data set is presented in the following Table:
 
 ```{r lpacftable, fig.show='hide'}
-lpacftable <- matrix(NA, ncol = 7, nrow = 6)
-colnames(lpacftable) <- c(paste0("Item", 1:6), "N_misfit")
+lpacftable <- matrix(NA, ncol = I + 1, nrow = 6)
+colnames(lpacftable) <- c(paste0("Item", 1:I), "N_misfit")
 row.names(lpacftable) <- paste("Data", 1:6)
 for(i in 1:6) {
-  lpacftable[i, 1:6] <- ppmc.lpacf(fit[[i]], standata[[i]], quiet = TRUE)
+  lpacftable[i, 1:I] <- ppmc.lpacf(fit[[i]], standata[[i]], quiet = TRUE)
 }
 rm(i)
 
-lpacftable[, 7] <- apply(lpacftable[, 1:6], 1, function(x) {
+lpacftable[, I + 1] <- apply(lpacftable[, 1:I], 1, function(x) {
   sum(x < 0.05 | x > 0.95)
 })
 kbl(lpacftable, align = "c", booktabs = TRUE)
@@ -870,7 +876,7 @@ ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
 In the present document, we illustrate the ideas that we have about the PPMC methods and some modified versions of these methods that can be used to assess the fit of the TV-DPCM. In this example, we simulated 6 different data sets, 4 of which violated some of the assumptions of the model. Then, we fitted the TV-DPCM model to each data set and we computed the PPMC methods available. From these preliminary analyses, it seems that the pair-wise discrepancy measures such as Yen's $Q_3$ and the odds ratio are to some extend useful to identify violations of unidimensionality. The other PPMC methods presented did not seem to be able to identify model misfit with the given data sets.
 
 ```{r clean}
-rm(list = setdiff(ls(), c(lsf.str(), "i", "seeds", "setmodel", "params")))
+rm(list = setdiff(ls(), c(lsf.str(), "i", "seeds", "setmodel", "params", "nitems")))
 ```
 
 # References

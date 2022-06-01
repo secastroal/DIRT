@@ -8,7 +8,8 @@ color_scheme_set("darkgray")
 
 source("R/IRT_models.R")
 source("R/IRT_plots.R")
-source("R/PPMC.R")
+# source("R/PPMC.R")
+source("R/PPMC2.R")
 source("R/genTVDPCM.R")
 source("R/tvdpcm2stan.R")
 
@@ -34,8 +35,9 @@ names(out) <-  c("nRhat", "ndiv", "nbfmi", "ntree", "nbulk", "ntail",
                  paste0("ppp-rediff", pairsindex))
 row.names(out) <- filenames
 
+tictoc::tic()
 for (i in 1:length(filenames)) {
-  cat(filenames[i])
+  cat(paste0(filenames[i], "\n"))
   standata <- readRDS(paste0(filenames[i], "_data.rds"))
   fit      <- readRDS(paste0(filenames[i], ".rds"))
   
@@ -78,7 +80,7 @@ for (i in 1:length(filenames)) {
      ppmc10, ppmc11, ppmc12, ppmc13, ppmc14, ppmc15, 
      stan.diag, standata, fit)
 }
-
+tictoc::toc()
 
 # Checking the number of misfit given the computed ppp
 
