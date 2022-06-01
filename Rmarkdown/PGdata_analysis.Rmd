@@ -33,7 +33,7 @@ knitr::opts_chunk$set(echo = FALSE, fig.height = 4, fig.width = 6, fig.pos = "!H
 ```{r pre-env}
 library(rstan)
 rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores() - 1)
+options(mc.cores = parallel::detectCores() * (1/2))
 library(bayesplot)
 color_scheme_set("darkgray")
 
@@ -54,6 +54,7 @@ To exemplify how to use an interpret the TV-DPCM, in this section, we analyzed m
 PG_data <- read.csv("../ESMdata/ESMdata.csv")
 PG_data <- PG_data[PG_data$resp_abort == 0, ]
 PG_data <- PG_data[!is.na(PG_data$mood_down), ]
+# PG_data <- PG_data[!is.na(PG_data$pat_restl), ]
 
 # Select variables
 PG_data <- PG_data[, c("date", "phase", "concentrat", "beepno", "resptime_s", 
@@ -72,7 +73,7 @@ pa <- c("mood_relaxed", "mood_satisfi", "mood_enthus",
 na <- c("mood_down", "mood_lonely", "mood_anxious", 
         "mood_guilty")
 mu <- c("mood_irritat", "pat_restl", "pat_agitate")
-se <- c("se_selflike", "se_ashamed", "se_selfdoub", "se_handle")
+se <- c("se_selflike", "se_ashamed", "se_selfdoub", "se_handle")[-4]
 ```
 
 ## Data Collection and Procedure.
@@ -122,6 +123,8 @@ PG_data_na <- esmpack:::expand.esm(data = PG_data,
                                    include   = c(mu, na, pa, se))
 ```
 
+## Temporal Heading
+
 One of the assumptions of the TV-DPCM is that the time interval between consecutive observations is the same for the whole duration of the data collection. This was clearly not the case with the data at hand. One way to address this issue is to include missing values in order to make the time interval between observations approximately the same \\citep{Asparouhov2018}. This approach have been shown to be useful to deal with unequal time intervals and the results from these kind of analyses are comparable with results from continuous time models. Given this, we also implemented this approach in the TV-DPCM analysis of the mental unrest items. For this, we divided the days in 90-minute time windows, for a total of 16 time windows per day. Observations within any of these time windows were considered as a representation of the mental unrest state of the participant for that time point. When no observations were available, "missing values" were included in the date set. By doing this, we added `r nrow(PG_data_na) - nrow(PG_data)` row of missing values for a total number of time windows of `r nrow(PG_data_na)`. Furthermore, as mentioned before, we collapsed the response categories from 5 to 7 into one. As a result, there are 5 response categories for each item, which means that 4 threshold parameters are estimated per item. 
 
 ```{r data2stan}
@@ -143,7 +146,7 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
 
 ```{r stanfit}
 # rdsfile <- "../Fits/MUwithNA"
-rdsfile <- "../Fits/MUwithNA_fixvar"
+rdsfile <- "../Fits/MUwithNA_ph5"
 
 tvdpcm_inits <- function() {
               list(lambda = runif(1, -1, 1),
@@ -1430,6 +1433,23 @@ rm(estimates, fit, responses, stan.diag, standata,
 
 # Fitting the TV-DPCM to SE items
 
+```{r addNA}
+PG_data <- PG_dataComplete[PG_dataComplete$phase >= 5 & 
+                             PG_dataComplete$phase <= 5, ]
+# Add ID dummy and time as numeric
+PG_data$id   <- 1
+# Create and ordered variable of the day number
+PG_data$dayno <- as.numeric(PG_data$date) - as.numeric(PG_data$date[1])
+# Combine the day number and the beep number
+PG_data$time  <- PG_data$beepno + 16 * PG_data$dayno
+# Include NA
+PG_data_na <- esmpack:::expand.esm(data = PG_data, 
+                                   id   = "id", 
+                                   time = "time",
+                                   tinterval = 1, 
+                                   include   = c(mu, na, pa, se))
+```
+
 ```{r data2stan-se}
 responses <- PG_data_na[, se]
 responses$se_ashamed  <- 6 - responses$se_ashamed
@@ -1451,7 +1471,7 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
 ```
 
 ```{r stanfit-se}
-rdsfile <- "../Fits/SelfEwithNA_3items"
+rdsfile <- "../Fits/SelfEwithNA_3items_ph5"
 
 tvdpcm_inits <- function() {
               list(lambda = runif(1, -1, 1),
@@ -1477,6 +1497,7 @@ if (!file.exists(paste0(rdsfile, ".rds"))) {
   run.time <- proc.time() - begin.time
   rm(begin.time)
   
+  saveRDS(standata, file = paste0(rdsfile, "_data.rds"))
   saveRDS(fit, file = paste0(rdsfile, ".rds"))
   saveRDS(run.time, file = paste0(rdsfile, "_time.rds"))
 } else {

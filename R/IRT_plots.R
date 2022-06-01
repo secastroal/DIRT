@@ -1,10 +1,13 @@
 #JT# Please offer the option to only plot the ICCs for the desired items.
 #JT# I actually wanted to plot one item at a time, to compare with ltm's ICCs.
 plot.ICC <- function(object, data, range = c(-5, 5), items = NULL, 
-                     item_labels = NULL, quiet = FALSE, ...) {
+                     item_labels = NULL, quiet = FALSE, scale = FALSE, ...) {
   
   tmp      <- list()
   tmp$beta <- summary(object, pars = "beta")$summary
+  if (scale) {
+    tmp$sigma2 <- summary(object, pars = "sigma2")$summary
+  }
   
   I <- data$I
   K <- data$K
@@ -20,7 +23,10 @@ plot.ICC <- function(object, data, range = c(-5, 5), items = NULL,
   
   theta <- seq(range[1], range[2], length = 300)
   
-  thresholds  <- matrix(tmp$beta[, 1], nrow = I, ncol = M, byrow = TRUE)
+  thresholds  <- matrix(tmp$beta[, 6], nrow = I, ncol = M, byrow = TRUE)
+  if (scale) {
+    thresholds <- matrix(tmp$beta[, 6]/tmp$sigma2[, 6], nrow = I, ncol = M, byrow = TRUE)
+  }
   delta       <- rowMeans(thresholds)
   taus        <- thresholds - delta
   
@@ -47,10 +53,14 @@ plot.ICC <- function(object, data, range = c(-5, 5), items = NULL,
 
 
 plot.IIF <- function(object, data, range = c(-5, 5), item_labels = NULL, 
-                     type = c("IIF", "TIF"), legend = TRUE, ...) {
+                     type = c("IIF", "TIF"), legend = TRUE, 
+                     scale = FALSE,  ...) {
   
   tmp      <- list()
   tmp$beta <- summary(object, pars = "beta")$summary
+  if (scale) {
+    tmp$sigma2 <- summary(object, pars = "sigma2")$summary
+  }
   
   I <- data$I
   K <- data$K
@@ -63,6 +73,9 @@ plot.IIF <- function(object, data, range = c(-5, 5), item_labels = NULL,
   theta <- seq(range[1], range[2], length = 300)
   
   thresholds  <- matrix(tmp$beta[, 1], nrow = I, ncol = M, byrow = TRUE)
+  if (scale) {
+    thresholds <- matrix(tmp$beta[, 6]/tmp$sigma2[, 6], nrow = I, ncol = M, byrow = TRUE)
+  }
   delta       <- rowMeans(thresholds)
   taus        <- thresholds - delta
   
