@@ -1,0 +1,112 @@
+# Run PPMC methods on all the fits of MU or SE
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores() * (1/2))
+# options(mc.cores = 2)
+library(bayesplot)
+color_scheme_set("darkgray")
+
+source("R/IRT_models.R")
+source("R/IRT_plots.R")
+source("R/PPMC.R")
+source("R/genTVDPCM.R")
+source("R/tvdpcm2stan.R")
+
+I <- 3
+
+pairsindex <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
+  paste0("(", paste(x, collapse = ","), ")"))
+
+filenames <- paste0("Fits/SelfEwithNA_3items", 
+                    c("", "_ph1-2", "_ph1-3", "_ph1-4", "_ph2-3",
+                      "_ph2-4", "_ph2-5", "_ph3-4", "_ph3-5",
+                      "_ph4-5", "_ph3", "_ph4", "_ph5") )
+
+out <- as.data.frame(matrix(NA, nrow = length(filenames), 
+              ncol = 6 + 6 + I * 6 + 5 * ((I * (I - 1))/2)))
+names(out) <-  c("nRhat", "ndiv", "nbfmi", "ntree", "nbulk", "ntail",
+                 paste0("ppp-ac", 1:3), "ppp-pac", "ppp-lpac", "ppp-mssd",
+                 paste0("ppp-itcor", 1:I), paste0("ppp-itcor2", 1:I), 
+                 paste0("ppp-itcor3", 1:I), paste0("ppp-q1", 1:I),
+                 paste0("ppp-q1alt", 1:I), paste0("ppp-ilpac", 1:I),
+                 paste0("ppp-q3", pairsindex), paste0("ppp-or", pairsindex),
+                 paste0("ppp-ordiff", pairsindex), paste0("ppp-resid", pairsindex),
+                 paste0("ppp-rediff", pairsindex))
+row.names(out) <- filenames
+
+for (i in 1:length(filenames)) {
+  cat(filenames[i])
+  standata <- readRDS(paste0(filenames[i], "_data.rds"))
+  fit      <- readRDS(paste0(filenames[i], ".rds"))
+  
+  stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE,
+                               pars = c("beta", "theta", "lambda", 
+                                        "sigma2", "pvar", "attractor")), 
+                       warmup = 0, print = FALSE)
+  
+  nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                    "sigma2", "pvar", "attractor")) > 1.05)
+  ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+  nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+  ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+  nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+  ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+  
+  if (length(nbfmi) == 0) {nbfmi <- 0}
+  
+  ppmc01 <- ppmc.acf(object = fit, data = standata, lag.max = 3)
+  ppmc02 <- ppmc.racf(object = fit, data = standata)
+  ppmc03 <- ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE)
+  ppmc04 <- ppmc.mssd(object = fit, data = standata)
+  ppmc05 <- ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
+  ppmc06 <- ppmc.itcor2(object = fit, data = standata, quiet = TRUE, method = "pearson")
+  ppmc07 <- ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
+  ppmc08 <- ppmc.Q1(object = fit, data = standata, quiet = TRUE)
+  ppmc09 <- ppmc.Q1.alt(object = fit, data = standata, quiet = TRUE)
+  ppmc10 <- ppmc.lpacf(object = fit, data = standata, quiet = TRUE)
+  ppmc11 <- ppmc.Q3(object = fit, data = standata)$ppp
+  ppmc12 <- ppmc.OR(object = fit, data = standata)$ppp
+  ppmc13 <- ppmc.ORDiff(object = fit, data = standata)$ppp
+  ppmc14 <- ppmc.cov.resid(object = fit, data = standata)$ppp
+  ppmc15 <- ppmc.cov.rediff(object = fit, data = standata)$ppp
+  
+  out[i, ] <- c(nRhat, ndiv, nbfmi, ntree, nbulk, ntail, ppmc01, ppmc02,
+                ppmc03, ppmc04, ppmc05, ppmc06, ppmc07, ppmc08, ppmc09, 
+                ppmc10, ppmc11, ppmc12, ppmc13, ppmc14, ppmc15)
+  rm(nRhat, ndiv, nbfmi, ntree, nbulk, ntail, ppmc01, ppmc02,
+     ppmc03, ppmc04, ppmc05, ppmc06, ppmc07, ppmc08, ppmc09, 
+     ppmc10, ppmc11, ppmc12, ppmc13, ppmc14, ppmc15, 
+     stan.diag, standata, fit)
+}
+
+sumscores <- tapply(standata$y_obs, standata$tt_obs, sum)
+
+threshold <- summary(fit, pars = "beta")$summary
+theta     <- summary(fit, pars = "theta")$summary
+attractor <- summary(fit, pars = "attractor")$summary
+sigma2    <- summary(fit, pars = "sigma2")$summary
+
+plot(theta[unique(standata$tt_obs), 6], sumscores)
+plot(thetaT[unique(standata$tt_obs)], sumscores)
+
+thresholdT <- threshold[, 6]/sqrt(sigma2[, 6])
+thetaT     <- theta[, 6]/sqrt(sigma2[, 6])
+attractorT <- attractor[, 6]/sqrt(sigma2[, 6])
+
+plot(theta[, 6], type = "l")
+lines(attractor[, 6], col = "red", lwd = 2)
+
+plot(thetaT, type = "l")
+lines(attractorT, col = "red", lwd = 2)
+
+plot.ICC(fit, standata, quiet = TRUE)
+plot.ICC(fit, standata, quiet = TRUE, scale = TRUE)
+
+plot.IIF(fit, standata, type = "IIF")
+plot.IIF(fit, standata, type = "IIF", scale = TRUE)
+plot.IIF(fit, standata, type = "IIF", scale = TRUE, range = c(-2, 2))
+
+plot.IIF(fit, standata, type = "TIF")
+plot.IIF(fit, standata, type = "TIF", scale = TRUE)
+plot.IIF(fit, standata, type = "TIF", scale = TRUE, range = c(-2, 2))
+
