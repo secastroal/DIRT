@@ -8,8 +8,8 @@ color_scheme_set("darkgray")
 
 source("R/IRT_models.R")
 source("R/IRT_plots.R")
-# source("R/PPMC.R")
-source("R/PPMC2.R")
+source("R/PPMC.R")
+# source("R/PPMC2.R")
 source("R/genTVDPCM.R")
 source("R/tvdpcm2stan.R")
 
@@ -172,19 +172,25 @@ for (i in 1:length(datanames)) {
 rm(i)
 dev.off()
 
+fit      <- readRDS(gsub("_data", "", datanames[4]))
+standata <- readRDS(datanames[4])
+
 sumscores <- tapply(standata$y_obs, standata$tt_obs, sum)
 
 threshold <- summary(fit, pars = "beta")$summary
 theta     <- summary(fit, pars = "theta")$summary
 attractor <- summary(fit, pars = "attractor")$summary
 sigma2    <- summary(fit, pars = "sigma2")$summary
+pvar      <- summary(fit, pars = "pvar")$summary
+lambda    <- summary(fit, pars = "lambda")$summary
+
+thresholdT <- threshold[, 6]/sqrt(pvar[, 6])
+thetaT     <- theta[, 6]/sqrt(pvar[, 6])
+attractorT <- attractor[, 6]/sqrt(pvar[, 6])
 
 plot(theta[unique(standata$tt_obs), 6], sumscores)
 plot(thetaT[unique(standata$tt_obs)], sumscores)
 
-thresholdT <- threshold[, 6]/sqrt(sigma2[, 6])
-thetaT     <- theta[, 6]/sqrt(sigma2[, 6])
-attractorT <- attractor[, 6]/sqrt(sigma2[, 6])
 
 plot(theta[, 6], type = "l")
 lines(attractor[, 6], col = "red", lwd = 2)
@@ -192,14 +198,14 @@ lines(attractor[, 6], col = "red", lwd = 2)
 plot(thetaT, type = "l")
 lines(attractorT, col = "red", lwd = 2)
 
+par(mfrow = c(I, 1), mar = c(4, 4, 2, 1) + 0.1)
 plot.ICC(fit, standata, quiet = TRUE)
 plot.ICC(fit, standata, quiet = TRUE, scale = TRUE)
 
+par(mfrow = c(1, 1))
 plot.IIF(fit, standata, type = "IIF")
 plot.IIF(fit, standata, type = "IIF", scale = TRUE)
-plot.IIF(fit, standata, type = "IIF", scale = TRUE, range = c(-2, 2))
 
 plot.IIF(fit, standata, type = "TIF")
 plot.IIF(fit, standata, type = "TIF", scale = TRUE)
-plot.IIF(fit, standata, type = "TIF", scale = TRUE, range = c(-2, 2))
 
