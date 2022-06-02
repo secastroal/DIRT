@@ -34,7 +34,7 @@ select_trend <- function(nT, FUN, ...) {
   return(out)
 }
 
-# gen.TVDPCM
+# gen.TVDPCM ----
 # Function to simulate data for the TV-DPCM
 # The required arguments are the number of time points nT; the number of items I;
 # the number of response categories K; the population parameters pop.param,
@@ -88,7 +88,11 @@ gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
   # Generate the latent dynamic process if theta is missing ----
   
   # Create time varying intercept
-  tv_int <- select_trend(nT, FUN, ...)
+  if (is.null(pop.param$attractor)) {
+    tv_int <- select_trend(nT, FUN, ...)
+  } else {
+    tv_int <- pop.param$attractor/(1 - pop.param$lambda)
+  }
   
   if (is.null(pop.param$theta)) {
     # Create latent state disposition scores
@@ -109,8 +113,17 @@ gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
   }
   
   # Compute the attractor and the variance of the dynamic process
-  attractor <- tv_int / (1 - pop.param$lambda)
-  pvar      <- pop.param$sigma2 / (1 - pop.param$lambda ^ 2)
+  if (is.null(pop.param$attractor)) {
+    attractor <- tv_int / (1 - pop.param$lambda)
+  } else {
+    attractor <- pop.param$attractor
+  }
+  
+  if (is.null(pop.param$pvar)) {
+    pvar      <- pop.param$sigma2 / (1 - pop.param$lambda ^ 2)
+  }else{
+    pvar <- pop.param$pvar
+  }
   
   # Generate item responses given the PCM ----
   # The function used to generate the responses uses another parameterization 
@@ -151,6 +164,57 @@ gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
   
   return(out)
 }
+
+# sim.TVDPCM.fit ----
+# Function to simulate TV-DPCM data based on the estimated parameters from 
+# fitting the TV-DPCM to observed data. The function returns a list of lists.
+# The first list is the simulated data with the populations parameters. The 
+# second list is the data ready to be input in Stan.
+
+sim.TVDPCM.fit <- function(object, data, seed, n_knots = NULL, s_degree = NULL) {
+  
+  nT <- data$nT
+  I  <- data$I
+  K  <- data$K
+  M  <- K - 1 
+  
+  if (is.null(n_knots)) {n_knots <- 8}
+  if (is.null(s_degree)) {s_degree <- 3}
+  
+  pop.param <- list()
+  
+  pop.param$thresholds <- matrix(summary(object, pars = "beta")$summary[, 6], 
+                                 nrow = I, ncol = M, byrow = TRUE)
+  pop.param$theta      <- summary(object, pars = "theta")$summary[, 6]
+  pop.param$attractor  <- summary(object, pars = "attractor")$summary[, 6]
+  pop.param$lambda     <- summary(object, pars = "lambda")$summary[, 6]
+  pop.param$sigma2     <- summary(object, pars = "sigma2")$summary[, 6]
+  pop.param$pvar       <- summary(object, pars = "pvar")$summary[, 6]
+  
+  simdata <- gen.TVDPCM(nT = nT,
+                        I  = I,
+                        K  = K,
+                        pop.param = pop.param,
+                        seed = seed,
+                        FUN  = NULL)
+  
+  dataNA <- simdata$data 
+  if (length(setdiff(1:nT, unique(data$tt_obs))) > 0) {
+    dataNA[setdiff(1:nT, unique(data$tt_obs)), ] <- NA 
+  }
+  
+  standata <- tvdpcm2stan_data(resp = dataNA,
+                               I    = I,
+                               K    = K,
+                               nT   = nT,
+                               n_knots  = n_knots,
+                               s_degree = s_degree)
+  
+  out <- list(simdata  = simdata,
+              standata = standata)
+  
+  return(out)
+} 
 
 
 
