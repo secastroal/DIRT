@@ -1,0 +1,285 @@
+---
+title: "Simulating the TV-DPCM based on Empirical Fitted Model"
+author: "Sebastian Castro-Alvarez"
+date: "`r format(Sys.Date(), '%B %d del %Y')`"
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{float}
+  - \usepackage{amsmath}
+output: 
+  bookdown::pdf_document2:
+    toc: false
+    keep_tex: false
+    number_section: false
+params:
+  seed: 1001
+  filename: "../Fits/SelfEwithNA_3items_ph1-2"
+bibliography: references.bib
+csl: apa7.csl
+link-citations: true
+always_allow_html: true
+---
+  
+```{r setup, include=FALSE}
+library(knitr)
+library(bookdown)
+library(kableExtra)
+knitr::opts_chunk$set(echo = FALSE, fig.height = 5, fig.width = 8,  
+                      warning=FALSE, message=FALSE)
+
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores() * (1/2))
+# options(mc.cores = 2)
+library(bayesplot)
+color_scheme_set("darkgray")
+
+source("../R/IRT_models.R")
+source("../R/IRT_plots.R")
+source("../R/PPMC.R")
+source("../R/genTVDPCM.R")
+source("../R/tvdpcm2stan.R")
+
+model <- stan_model(file = "../Stan/tv_dpcm_int_v5.1.stan", verbose = FALSE)
+```
+
+```{r params}
+filename <- params$filename
+seed     <- params$seed
+```
+
+```{r intext}
+if (filename == "../Fits/SelfEwithNA_3items_ph1-2") {
+  intext <- "the three items of self-esteem from phases 1 and 2."
+}
+
+if (filename == "../Fits/SelfEwithNA_3items") {
+  intext <- "the three items of self-esteem from phases 1 through 5."
+}
+
+if (filename == "../Fits/MUwithNA_ph2-3") {
+  intext <- "the three items of mental unrest from phases 2 and 3."
+}
+
+if (filename == "../Fits/MUwithNA") {
+  intext <- "the three items of mental unrest from phases 1 through 5."
+}
+```
+
+In this document, we simulated data based on the estimated parameters from fitting the TV-DPCM to part of the empirical data available in @Kossakowski2017. In particular, the simulation was based on the results from fitting the model to the observed responses on `r intext` In what follows, we present some plots of the raw simulated data, then we fit the TV-DPCM model, and lastly, we compute severe posterior predictive model checking methods to the fitted model.
+
+```{r loadfit}
+standata.original <- readRDS(paste0(filename, "_data.rds"))
+fit.original      <- readRDS(paste0(filename, ".rds"))
+```
+
+```{r simdata}
+simdata <- sim.TVDPCM.fit(fit.original, standata.original, seed = seed)
+
+standata <- simdata$standata
+
+I  <- standata$I
+K  <- standata$K
+nT <- standata$nT
+```
+
+## Raw Data
+
+The purpose of these analyses was to assess if the there are particular characteristics of the raw data that predict the performance of the TV-DPCM when assessed by means of the PPMC methods that we have developed. For this, we focused on the change of certain statistics (i.e., correlation of the item scores, mean, and variances) given a moving window, the frequency in which each response pattern was observed, and the correlation of the item scores. The change of the statistics and the frequency of the response patterns are presented in Figure \@ref(fig:dataplots). The overall correlations between the item scores are presented in Figure \@ref(fig:corplot).   
+
+```{r dataplots, fig.cap = "Moving Window Plots for the Correlation, the Mean, and the Variance. Also, Frequency of the Response Patterns and General Correlation Matrix."}
+par(mfrow = c(2, 2), mar = c(2, 4, 1, 1) + 0.1)
+  tmp.data <- standata
+  
+  tmp.matrix <- matrix(tmp.data$y_obs, 
+                       nrow = length(unique(tmp.data$tt_obs)), 
+                       ncol = tmp.data$I)
+  
+  window <- max(round(nrow(tmp.matrix)/10), 50)
+  out <- c()
+  
+  for (j in window:nrow(tmp.matrix)) {
+    tmp <- cor(tmp.matrix[(j - (window - 1)):j, ])[lower.tri(diag(ncol(tmp.matrix)))] 
+    out <- rbind(out, tmp)
+  }
+  rm(j, tmp)
+  
+  matplot(out, lty = 1, type = "l", 
+          ylab = "Correlation", ylim = c(-1, 1))
+  
+  
+  window <- max(round(nrow(tmp.matrix)/10), 50)
+  out <- c()
+  
+  for (j in window:nrow(tmp.matrix)) {
+    tmp <- apply(tmp.matrix[(j - (window - 1)):j, ], 2, mean) 
+    out <- rbind(out, tmp)
+  }
+  rm(j, tmp)
+  
+  matplot(out, lty = 1, type = "l", 
+          ylab = "Mean")
+  
+  
+  window <- max(round(nrow(tmp.matrix)/10), 50)
+  out <- c()
+  
+  for (j in window:nrow(tmp.matrix)) {
+    tmp <- apply(tmp.matrix[(j - (window - 1)):j, ], 2, var) 
+    out <- rbind(out, tmp)
+  }
+  rm(j, tmp)
+  
+  matplot(out, lty = 1, type = "l", 
+          ylab = "Variance")
+  
+  rpatterns <- sort(table(apply(tmp.matrix, 1, paste, collapse="")), decreasing = TRUE)
+  
+  plot(1:length(rpatterns), 
+       as.vector(rpatterns),
+       ylab = "Number of Times the RP was Observed",
+       xaxt = "n",
+       xlab = "Response Patterns",
+       pch = "")
+  text(1:length(rpatterns), 
+       as.vector(rpatterns), 
+       labels= names(rpatterns), 
+       cex=0.75, font=0, adj = 0.5, srt = 90)
+```
+
+```{r corplot, fig.cap = "Overall Correlation of the Item Scores"}
+psych::pairs.panels(tmp.matrix,
+                      smooth   = FALSE,
+                      density  = FALSE,
+                      ellipses = FALSE,
+                      cex.cor  = 0.5,
+                      lm       = TRUE,
+                      hist.col = gray(1/2),
+                      rug      = FALSE,
+                      labels = paste0("Item", 1:tmp.data$I))
+  rm(tmp.data, tmp.matrix, window, rpatterns, out)
+```
+
+## Fitting the Model and Computing the PPMC Methods
+
+After simulating the data based on results of the empirical data, we fitted the TV-DPCM and computed the PPMC methods available. First, we checked whether the model converged without any issues. For this, we evaluated the Gelman-Rubin statistic (lower than 1.05 for all parameters of interest) and the warning messages available in Stan. These diagnostics are presented in Table \@ref(tab:diagtable).
+
+```{r stanfit, results = 'hide'}
+tvdpcm_inits <- function() {
+  list(lambda = runif(1, -1, 1),
+       beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
+       inno   = rnorm(nT, 0, 3),
+       sigma  = rlnorm(1, 1))
+}
+
+begin.time <- proc.time()
+fit <- sampling(model,                  # Stan model. 
+                data = standata,        # Data.
+                iter = 2000,            # Number of iterations.
+                chains  = 3,            # Number of chains.
+                warmup  = 500,          # Burn-in samples.
+                init    = tvdpcm_inits, # Initial values
+                seed = 2022,            # Seed
+                pars = c("beta", "theta", "lambda",
+                         "sigma2", "pvar", "attractor", "rep_y"),
+                control = list(adapt_delta   = 0.99,
+                               max_treedepth = 15) # Other parameters to control sampling behavior.
+) 
+run.time <- proc.time() - begin.time
+rm(begin.time)
+```
+
+```{r diag, results = 'hide'}
+stan.diag <- monitor(extract(fit, permuted = FALSE, inc_warmup = FALSE,
+                             pars = c("beta", "theta", "lambda", 
+                                      "sigma2", "pvar", "attractor")), 
+                     warmup = 0, print = FALSE)
+
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                  "sigma2", "pvar", "attractor")) > 1.05)
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+
+if (length(nbfmi) == 0) {nbfmi <- 0}
+```
+
+```{r diagtable}
+diag.table <- matrix(c(nRhat, ndiv, nbfmi, ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
+```{r ppmc, results = "hide", fig.show = "hide"}
+ppmc01 <- ppmc.acf(object = fit, data = standata, lag.max = 3)
+ppmc02 <- ppmc.racf(object = fit, data = standata)
+ppmc03 <- ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE)
+ppmc04 <- ppmc.mssd(object = fit, data = standata)
+ppmc05 <- ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
+ppmc06 <- ppmc.itcor2(object = fit, data = standata, quiet = TRUE, method = "pearson")
+ppmc07 <- ppmc.itcor3(object = fit, data = standata, quiet = TRUE)
+ppmc08 <- ppmc.Q1(object = fit, data = standata, quiet = TRUE)
+ppmc09 <- ppmc.Q1.alt(object = fit, data = standata, quiet = TRUE)
+ppmc10 <- ppmc.lpacf(object = fit, data = standata, quiet = TRUE)
+ppmc11 <- ppmc.Q3(object = fit, data = standata)$ppp
+ppmc12 <- ppmc.OR(object = fit, data = standata)$ppp
+ppmc13 <- ppmc.ORDiff(object = fit, data = standata)$ppp
+ppmc14 <- ppmc.cov.resid(object = fit, data = standata)$ppp
+ppmc15 <- ppmc.cov.rediff(object = fit, data = standata)$ppp
+```
+
+Next, we computed the PPMC methods that we have developed for the TV-DPCM. These methods can be grouped in three different levels: Test level, Item level, and Item pairs level. The posterior predictive p-values of each type of PPMC methods are presented in Tables \@ref(tab:ppmctest) to \@ref(tab:ppmcpairs).
+
+```{r ppmctest}
+ppmctest <- matrix(c(ppmc01, ppmc02, ppmc03, ppmc04, rep(NA, 6)), ncol = 2)
+ppmctest[, 2] <- as.numeric(ppmctest[, 1] <= 0.05 | ppmctest[, 1] >= 0.95)
+row.names(ppmctest)  <- c("ACF-1", "ACF-2", "ACF-3", "PACF", "LPACF", "MSSD")
+colnames(ppmctest) <- c("ppp", "Misfit")
+kbl(ppmctest, align = "c", booktabs = TRUE, caption = "PPMC Methods at the Test Level", escape = FALSE)
+```
+
+```{r ppmcitem}
+ppmcitem <- matrix(c(ppmc05, ppmc06, ppmc07, 
+                     ppmc08, ppmc09, ppmc10), ncol = I, byrow = TRUE)
+misfit   <- apply(ppmcitem, 1, function(x) sum(x <= 0.05 | x >= 0.95)) 
+ppmcitem <- cbind(ppmcitem, misfit)
+row.names(ppmcitem)  <- c("IT-cor", "IT-cor2", "IT-cor3", 
+                          "Yens Q1", "Yens Q1 Alt", "ILPACF")
+colnames(ppmcitem) <- c(paste0("Item", 1:I), "Misfit")
+kbl(ppmcitem, align = "c", booktabs = TRUE, caption = "PPMC Methods at the Item Level", escape = FALSE)
+```
+
+```{r ppmcpairs}
+ppmcpairs <- matrix(c(ppmc11, ppmc12, ppmc13, 
+                      ppmc14, ppmc15), ncol = (I * (I - 1))/2, byrow = TRUE)
+misfit   <- apply(ppmcpairs, 1, function(x) sum(x <= 0.05 | x >= 0.95)) 
+ppmcpairs <- cbind(ppmcpairs, misfit)
+row.names(ppmcpairs)  <- c("Yens Q3", "OR", "OR-Diff", 
+                          "RESID", "REDIFF")
+pairs.index <- which(lower.tri(diag(I)), arr.ind = TRUE)
+pairs.index <- apply(pairs.index, 1, function(x) paste(rev(x), collapse = ","))
+colnames(ppmcpairs) <- c(paste0("Items(", pairs.index, ")"), "Misfit")
+kbl(ppmcpairs, align = "c", booktabs = TRUE, caption = "PPMC Methods at the Item-Pairs Level", escape = FALSE)
+```
+
+```{r clean}
+rm(diag.table, fit, fit.original, ppmcitem, ppmcpairs, ppmctest, 
+   simdata, stan.diag, standata, standata.original, filename, I, K,
+   misfit, nbfmi, nbulk, ndiv, nRhat, nT, ntail, ntree, pairs.index,
+   ppmc01, ppmc02, ppmc03, ppmc04, ppmc05, ppmc06, ppmc07, ppmc08, ppmc09,
+   ppmc10, ppmc11, ppmc12, ppmc13, ppmc14, ppmc15, run.time, seed,
+   intext)
+```
+
+\clearpage
+
+# References
+
+
