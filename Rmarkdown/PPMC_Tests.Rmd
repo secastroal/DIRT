@@ -50,11 +50,11 @@ setmodel <- params$setmodel
 
 # seeds <- 1002:1005
 # setmodel <- "TVPCM"
-# nitems <- c(3, 6)
-# for (i in 1:length(seeds)) {
-#    for (j in 1:length(nitems)) {
-#   seed <- seeds[i]
-#   nitems <- nitems[j]
+# Nitems <- c(3, 6)
+# for (k in 1:length(seeds)) {
+#    for (j in 1:length(Nitems)) {
+#   seed <- seeds[k]
+#   nitems <- Nitems[j]
 #   rmarkdown::render("Rmarkdown/PPMC_Tests.Rmd", params = list(seed = seed, 
 #                                                               nitems = nitems), 
 #                     output_file = paste0("PPMC_Tests_", setmodel, "_", seed, "_", nitems))
@@ -167,13 +167,13 @@ delta <- rowMeans(dataTRUE$thresholds.gen)
 taus  <- dataTRUE$thresholds.gen - delta
 
 # Responses factor 1
-probs.array <- array(NA, dim = c(dim(theta)[1], I / 2, K))
+probs.array <- array(NA, dim = c(dim(theta)[1], ceiling(I / 2), K))
 
 for (y in 0:M) {
   probs.array[, , y + 1] <- P.GPCM(y     = y, 
-                                   alpha = rep(1, I / 2), 
-                                   delta = delta[1:3], 
-                                   taus  = taus[1:3, ], 
+                                   alpha = rep(1, ceiling(I / 2)), 
+                                   delta = delta[1:ceiling(I / 2)], 
+                                   taus  = taus[1:ceiling(I / 2), ], 
                                    theta = theta[, 1], 
                                    M     = M)
 }
@@ -182,13 +182,13 @@ responses1   <- responses1 + 1 # To fit the PCM in stan, items should be coded s
 rm(probs.array, y)
 
 # Responses factor 2
-probs.array <- array(NA, dim = c(dim(theta)[1], I / 2, K))
+probs.array <- array(NA, dim = c(dim(theta)[1], I - ceiling(I / 2), K))
 
 for (y in 0:M) {
   probs.array[, , y + 1] <- P.GPCM(y     = y, 
-                                   alpha = rep(1, I / 2), 
-                                   delta = delta[4:6], 
-                                   taus  = taus[4:6, ], 
+                                   alpha = rep(1, I - ceiling(I / 2)), 
+                                   delta = delta[(ceiling(I / 2) + 1):I], 
+                                   taus  = taus[(ceiling(I / 2) + 1):I, ], 
                                    theta = theta[, 2], 
                                    M     = M)
 }
@@ -204,9 +204,9 @@ data3 <- responses
 
 ```{r data3_plot}
 plot(rowSums(data3), type = "l", ylab = "sumscores", xlab = "Time",
-     las = 1, ylim = c(2.75, 30.25), lwd = 2)
-lines(rowSums(data3[, 1:3]), col = "blue", lwd = 2)
-lines(rowSums(data3[, 4:6]), col = "darkgreen", lwd = 2)
+     las = 1, ylim = c((I - ceiling(I/2)) - 0.25, (I * K)+ 0.25), lwd = 2)
+lines(rowSums(data3[, 1:(ceiling(I/2))]), col = "blue", lwd = 2)
+lines(rowSums(as.matrix(data3[, (ceiling(I/2) + 1):I])), col = "darkgreen", lwd = 2)
 legend("topright", c("Total", "Factor 1", "Factor 2"),
        col = c("black", "blue", "darkgreen"), lty = 1, lwd = 2)
 
@@ -265,7 +265,8 @@ data4 <- responses
 
 ```{r data4_plot}
 plot(rowSums(data4[1:100, ]), type = "l", ylab = "sumscores", xlab = "Time",
-     las = 1, xlim = c(1, 200), lwd = 2, col = "blue")
+     las = 1, xlim = c(1, 200), lwd = 2, col = "blue", 
+     ylim = c(I - 0.25, (I * K)+ 0.25))
 lines(100:200, rowSums(data4[100:200, ]), col = "darkgreen", lwd = 2)
 ```
 
@@ -280,7 +281,7 @@ data5 <- gen.TVDPCM(nT = nT,
                                      sigma2 = dataTRUE$sigma2.gen,
                                      thresholds = dataTRUE$thresholds.gen,
                                      theta = dataTRUE$theta.gen,
-                                     alpha = c(1, 1, 1, 1, 0.5, 1.5)), 
+                                     alpha = c(rep(1, I - 2), 0.5, 1.5)), 
                     seed = seed, 
                     FUN  = "logarithmic",
                     maxAbsValue = 0.5)
@@ -302,7 +303,7 @@ Finally, the last data set (Data6) is simulated based on a dynamic process of or
 lambda <- c(0.3, 0.2, 0.1)
 
 # Use the same time varying intercept as in Data1.
-tv_int <- sinusoidal(nT, 1)
+tv_int <- logarithmic(nT, 0.5)
 tv_int <- c(tv_int * -1, tv_int)
 
 # We generate a dynamic process twice the required length and the drop the first 
@@ -876,7 +877,7 @@ ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
 In the present document, we illustrate the ideas that we have about the PPMC methods and some modified versions of these methods that can be used to assess the fit of the TV-DPCM. In this example, we simulated 6 different data sets, 4 of which violated some of the assumptions of the model. Then, we fitted the TV-DPCM model to each data set and we computed the PPMC methods available. From these preliminary analyses, it seems that the pair-wise discrepancy measures such as Yen's $Q_3$ and the odds ratio are to some extend useful to identify violations of unidimensionality. The other PPMC methods presented did not seem to be able to identify model misfit with the given data sets.
 
 ```{r clean}
-rm(list = setdiff(ls(), c(lsf.str(), "i", "seeds", "setmodel", "params", "nitems")))
+rm(list = setdiff(ls(), c(lsf.str(), "k", "j", "seeds", "setmodel", "params", "Nitems")))
 ```
 
 # References
