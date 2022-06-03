@@ -270,7 +270,7 @@ plot(rowSums(data4[1:100, ]), type = "l", ylab = "sumscores", xlab = "Time",
 lines(100:200, rowSums(data4[100:200, ]), col = "darkgreen", lwd = 2)
 ```
 
-The fifth dataset (Data5) simulates data using the GPCM instead of the PCM for the measurement equation. This means that the discrimination parameters vary across items. The discrimination parameters are 1 for items 1 to 4, 0.5 for item 5 and 1.5 for item 6. The simulated data is presented in following Figure:
+The fifth dataset (Data5) simulates data using the GPCM instead of the PCM for the measurement equation. This means that the discrimination parameters vary across items. The discrimination parameters are 1 for items 1 to `r I - 2`, 0.5 for item `r I - 1` and 1.5 for item `r I`. The simulated data is presented in following Figure:
 
 ```{r data5}
 # Generate Data based on the TV-DPCM using the GPCM for the measurement model.
@@ -300,7 +300,7 @@ Finally, the last data set (Data6) is simulated based on a dynamic process of or
 ```{r data6}
 # Generate the dynamic process of order 3.
 # Define autoregressive effect up to lag 3.
-lambda <- c(0.3, 0.2, 0.1)
+lambda <- c(0.3, 0.25, 0.2)
 
 # Use the same time varying intercept as in Data1.
 tv_int <- logarithmic(nT, 0.5)

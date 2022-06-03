@@ -103,10 +103,11 @@ for (i in 1:length(datanames)) {
                        nrow = length(unique(tmp.data$tt_obs)), 
                        ncol = tmp.data$I)
   
-  matplot(tmp.matrix[round(seq(1, nrow(tmp.matrix), length.out = 100)),],
-          lty = 1, type = "l",
-          ylab = "Responses")
+  # matplot(tmp.matrix[round(seq(1, nrow(tmp.matrix), length.out = 100)),],
+  #         lty = 1, type = "l",
+  #         ylab = "Responses")
   
+  par(mfrow = c(2, 2), mar = c(2, 4, 1, 1) + 0.1) 
   window <- max(round(nrow(tmp.matrix)/10), 50)
   out <- c()
   
@@ -158,6 +159,7 @@ for (i in 1:length(datanames)) {
        labels= names(rpatterns), 
        cex=0.75, font=0, adj = 0.5, srt = 90)
   
+  par(mfrow = c(1, 1))
   psych::pairs.panels(tmp.matrix,
                       smooth   = FALSE,
                       density  = FALSE,
