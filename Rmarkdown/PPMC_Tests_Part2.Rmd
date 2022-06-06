@@ -46,7 +46,7 @@ knitr::opts_chunk$set(echo = FALSE, fig.height = 4, fig.width = 6, fig.pos = "!H
 ```{r pre-env}
 library(rstan)
 rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores())
+options(mc.cores = parallel::detectCores() * (1/2))
 library(bayesplot)
 color_scheme_set("darkgray")
 
@@ -219,6 +219,28 @@ kbl(t(ppmcpairs), align = "c", booktabs = TRUE, caption = "PPMC Methods at the I
 ```
 
 ```{r}
+out_table <- data.frame(seed, 
+                        model = "Meaning",
+                        diag.table, 
+                        ACF = t(ppmc01),
+                        PACF = ppmc02,
+                        LPACF = ppmc03,
+                        MSSD = ppmc04,
+                        itcor = t(ppmc05),
+                        itcor2 = t(ppmc06),
+                        itcor3 = t(ppmc07),
+                        q1 = t(ppmc08),
+                        q1alt = t(ppmc09),
+                        lpacf = t(ppmc10),
+                        t(ppmc11),
+                        t(ppmc12),
+                        t(ppmc13),
+                        t(ppmc14),
+                        t(ppmc15))
+```
+
+
+```{r}
 rm(diag.table, fit, ppmcitem, ppmcpairs, ppmctest, responses, stan.diag,
    standata, maxRhat, misfit, nbfmi, nbulk, ndiv, nRhat, ntail, ntree,
    pairs.index, ppmc01, ppmc02, ppmc03, ppmc04, ppmc05, ppmc06, ppmc07, 
@@ -368,6 +390,28 @@ pairs.index <- which(lower.tri(diag(I)), arr.ind = TRUE)
 pairs.index <- apply(pairs.index, 1, function(x) paste(rev(x), collapse = ","))
 colnames(ppmcpairs) <- c(paste0("Items(", pairs.index, ")"), "Misfit")
 kbl(t(ppmcpairs), align = "c", booktabs = TRUE, caption = "PPMC Methods at the Item-Pairs Level", escape = FALSE)
+```
+
+```{r}
+out_table <- rbind(out_table,
+                   data.frame(seed, 
+                        model = "Default",
+                        diag.table, 
+                        ACF = t(ppmc01),
+                        PACF = ppmc02,
+                        LPACF = ppmc03,
+                        MSSD = ppmc04,
+                        itcor = t(ppmc05),
+                        itcor2 = t(ppmc06),
+                        itcor3 = t(ppmc07),
+                        q1 = t(ppmc08),
+                        q1alt = t(ppmc09),
+                        lpacf = t(ppmc10),
+                        t(ppmc11),
+                        t(ppmc12),
+                        t(ppmc13),
+                        t(ppmc14),
+                        t(ppmc15)))
 ```
 
 ```{r}
@@ -521,6 +565,29 @@ pairs.index <- which(lower.tri(diag(I)), arr.ind = TRUE)
 pairs.index <- apply(pairs.index, 1, function(x) paste(rev(x), collapse = ","))
 colnames(ppmcpairs) <- c(paste0("Items(", pairs.index, ")"), "Misfit")
 kbl(t(ppmcpairs), align = "c", booktabs = TRUE, caption = "PPMC Methods at the Item-Pairs Level", escape = FALSE)
+```
+
+
+```{r}
+out_table <- rbind(out_table,
+                   data.frame(seed, 
+                        model = "Random",
+                        diag.table, 
+                        ACF = t(ppmc01),
+                        PACF = ppmc02,
+                        LPACF = ppmc03,
+                        MSSD = ppmc04,
+                        itcor = t(ppmc05),
+                        itcor2 = t(ppmc06),
+                        itcor3 = t(ppmc07),
+                        q1 = t(ppmc08),
+                        q1alt = t(ppmc09),
+                        lpacf = t(ppmc10),
+                        t(ppmc11),
+                        t(ppmc12),
+                        t(ppmc13),
+                        t(ppmc14),
+                        t(ppmc15)))
 ```
 
 ```{r}
@@ -721,6 +788,39 @@ pairs.index <- which(lower.tri(diag(I)), arr.ind = TRUE)
 pairs.index <- apply(pairs.index, 1, function(x) paste(rev(x), collapse = ","))
 colnames(ppmcpairs) <- c(paste0("Items(", pairs.index, ")"), "Misfit")
 kbl(t(ppmcpairs), align = "c", booktabs = TRUE, caption = "PPMC Methods at the Item-Pairs Level", escape = FALSE)
+```
+
+
+```{r}
+out_table <- rbind(out_table,
+                   data.frame(seed, 
+                        model = "HalfDrift",
+                        diag.table, 
+                        ACF = t(ppmc01),
+                        PACF = ppmc02,
+                        LPACF = ppmc03,
+                        MSSD = ppmc04,
+                        itcor = t(ppmc05),
+                        itcor2 = t(ppmc06),
+                        itcor3 = t(ppmc07),
+                        q1 = t(ppmc08),
+                        q1alt = t(ppmc09),
+                        lpacf = t(ppmc10),
+                        t(ppmc11),
+                        t(ppmc12),
+                        t(ppmc13),
+                        t(ppmc14),
+                        t(ppmc15)))
+```
+
+```{r export}
+out_file <- paste0("Results_part2_", I, "_items.dat")
+
+if (!file.exists(out_file)) {
+  write.table(out_table, out_file, row.names = FALSE, col.names = TRUE)
+} else {
+  write.table(out_table, out_file, row.names = FALSE, col.names = FALSE, append = TRUE)
+}
 ```
 
 ```{r}
