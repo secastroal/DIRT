@@ -41,7 +41,8 @@ source("../R/tvdpcm2stan.R")
 ```
 
 ```{r seed}
-set.seed(params$seed)
+seed <- params$seed
+set.seed(seed)
 ```
 
 ```{r setmodel}
@@ -235,7 +236,7 @@ for (y in 0:M) {
                                    alpha = rep(1, I), 
                                    delta = delta, 
                                    taus  = taus, 
-                                   theta = theta[1:100], 
+                                   theta = theta[1:(length(theta)/2)], 
                                    M     = M)
 }
 responses1   <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 1, vec) == 1) - 1 })
@@ -250,7 +251,7 @@ for (y in 0:M) {
                                    alpha = rep(1, I), 
                                    delta = delta2, 
                                    taus  = taus2, 
-                                   theta = theta[101:200], 
+                                   theta = theta[(length(theta)/2 + 1):length(theta)], 
                                    M     = M)
 }
 responses2   <- apply(probs.array, 1:2, function(vec) {which( rmultinom(1, 1, vec) == 1) - 1 })
@@ -264,10 +265,12 @@ data4 <- responses
 ```
 
 ```{r data4_plot}
-plot(rowSums(data4[1:100, ]), type = "l", ylab = "sumscores", xlab = "Time",
-     las = 1, xlim = c(1, 200), lwd = 2, col = "blue", 
+plot(rowSums(data4[1:(length(theta)/2), ]), type = "l", ylab = "sumscores", xlab = "Time",
+     las = 1, xlim = c(1, (length(theta))), lwd = 2, col = "blue", 
      ylim = c(I - 0.25, (I * K)+ 0.25))
-lines(100:200, rowSums(data4[100:200, ]), col = "darkgreen", lwd = 2)
+lines((length(theta)/2):(length(theta)), 
+      rowSums(data4[(length(theta)/2):(length(theta)), ]), 
+      col = "darkgreen", lwd = 2)
 ```
 
 The fifth dataset (Data5) simulates data using the GPCM instead of the PCM for the measurement equation. This means that the discrimination parameters vary across items. The discrimination parameters are 1 for items 1 to `r I - 2`, 0.5 for item `r I - 1` and 1.5 for item `r I`. The simulated data is presented in following Figure:
@@ -538,8 +541,9 @@ Following the same idea of the autocorrelation, we can instead compute the autoc
 
 ```{r racf, fig.height = 8}
 par(mfrow = c(2, 3), mar = c(2, 4, 5, 1))
+racf <- rep(NA, 6)
 for(i in 1:6) {
-  ppmc.racf(fit[[i]], standata[[i]])
+  racf[i] <- ppmc.racf(fit[[i]], standata[[i]])
   mtext(paste0("Data", i), side = 3, line = 3.5)
 }
 rm(i)
@@ -553,8 +557,9 @@ For this statistic, the first partial autocorrelation given the TV-DPCM is compu
 
 ```{r lpacf, fig.height = 8}
 par(mfrow = c(2, 3), mar = c(2, 4, 5, 1))
+lpacf <- rep(NA, 6)
 for(i in 1:6) {
-  ppmc.lpacf(fit[[i]], standata[[i]], sumscores = TRUE)
+  lpacf[i] <- ppmc.lpacf(fit[[i]], standata[[i]], sumscores = TRUE)
   mtext(paste0("Data", i), side = 3, line = 3.5)
 }
 rm(i)
@@ -574,8 +579,9 @@ When used as a PPMC method, we would expect that this statistic will indicate mi
 
 ```{r mssd, fig.height = 8}
 par(mfrow = c(2, 3), mar = c(2, 4, 5, 1))
+mssd <- rep(NA, 6)
 for(i in 1:6) {
-  ppmc.mssd(fit[[i]], standata[[i]])
+  mssd[i] <- ppmc.mssd(fit[[i]], standata[[i]])
   mtext(paste0("Data", i), side = 3, line = 3.5)
 }
 rm(i)
@@ -768,13 +774,14 @@ In the following plot, we present the ppp-values for each pair of items of each 
 ```{r q3_ppp, results='hide', fig.show='hide'}
 sp_plots <- list()
 for (i in 1:6) {
-  sp_plots[[i]] <- ppmc.Q3(fit[[i]], standata[[i]])$sp
+  sp_plots[[i]] <- ppmc.Q3(fit[[i]], standata[[i]])
 }
+q3table <- t(sapply(sp_plots, function(x) x$ppp))
 ```
 
 ```{r q3_plots, fig.height = 6, results='hide'}
-ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
-                  sp_plots[[4]], sp_plots[[5]], sp_plots[[6]],
+ggpubr::ggarrange(sp_plots[[1]]$sp, sp_plots[[2]]$sp, sp_plots[[3]]$sp,
+                  sp_plots[[4]]$sp, sp_plots[[5]]$sp, sp_plots[[6]]$sp,
                   labels = paste0("Data", 1:6), ncol = 3, nrow = 2,
                   label.x = 0.1)
 ```
@@ -794,13 +801,14 @@ where $n_{ij}$ is the number of participants that scored $i$ and $j$ in a pair o
 ```{r OR_ppp, results='hide', fig.show='hide'}
 sp_plots <- list()
 for (i in 1:6) {
-  sp_plots[[i]] <- ppmc.OR(fit[[i]], standata[[i]])$sp
+  sp_plots[[i]] <- ppmc.OR(fit[[i]], standata[[i]])
 }
+ortable <- t(sapply(sp_plots, function(x) x$ppp))
 ```
 
 ```{r OR_plots, fig.height = 6, results='hide'}
-ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
-                  sp_plots[[4]], sp_plots[[5]], sp_plots[[6]],
+ggpubr::ggarrange(sp_plots[[1]]$sp, sp_plots[[2]]$sp, sp_plots[[3]]$sp,
+                  sp_plots[[4]]$sp, sp_plots[[5]]$sp, sp_plots[[6]]$sp,
                   labels = paste0("Data", 1:6), ncol = 3, nrow = 2,
                   label.x = 0.1)
 ```
@@ -815,13 +823,14 @@ Here, we present a modified discrepancy measure of the odds ratio. The idea is t
 ```{r ORdiff_ppp, results='hide', fig.show='hide'}
 sp_plots <- list()
 for (i in 1:6) {
-  sp_plots[[i]] <- ppmc.ORDiff(fit[[i]], standata[[i]])$sp
+  sp_plots[[i]] <- ppmc.ORDiff(fit[[i]], standata[[i]])
 }
+ordifftable <- t(sapply(sp_plots, function(x) x$ppp))
 ```
 
 ```{r ORdiff_plots, fig.height = 6, results='hide'}
-ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
-                  sp_plots[[4]], sp_plots[[5]], sp_plots[[6]],
+ggpubr::ggarrange(sp_plots[[1]]$sp, sp_plots[[2]]$sp, sp_plots[[3]]$sp,
+                  sp_plots[[4]]$sp, sp_plots[[5]]$sp, sp_plots[[6]]$sp,
                   labels = paste0("Data", 1:6), ncol = 3, nrow = 2, 
                   label.x = 0.1)
 ```
@@ -841,13 +850,14 @@ See in the following Figure, the ppp-values for each pair fo items and each simu
 ```{r resid_ppp, results='hide', fig.show='hide'}
 sp_plots <- list()
 for (i in 1:6) {
-  sp_plots[[i]] <- ppmc.cov.resid(fit[[i]], standata[[i]])$sp
+  sp_plots[[i]] <- ppmc.cov.resid(fit[[i]], standata[[i]])
 }
+residtable <- t(sapply(sp_plots, function(x) x$ppp))
 ```
 
 ```{r resid_plots, fig.height = 6, results='hide'}
-ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
-                  sp_plots[[4]], sp_plots[[5]], sp_plots[[6]],
+ggpubr::ggarrange(sp_plots[[1]]$sp, sp_plots[[2]]$sp, sp_plots[[3]]$sp,
+                  sp_plots[[4]]$sp, sp_plots[[5]]$sp, sp_plots[[6]]$sp,
                   labels = paste0("Data", 1:6), ncol = 3, nrow = 2, 
                   label.x = 0.1)
 ```
@@ -861,13 +871,14 @@ Lastly, similarly as we suggested with the odds ratio, we also suggest to comput
 ```{r rediff_ppp, results='hide', fig.show='hide'}
 sp_plots <- list()
 for (i in 1:6) {
-  sp_plots[[i]] <- ppmc.cov.rediff(fit[[i]], standata[[i]])$sp
+  sp_plots[[i]] <- ppmc.cov.rediff(fit[[i]], standata[[i]])
 }
+redifftable <- t(sapply(sp_plots, function(x) x$ppp))
 ```
 
 ```{r rediff_plots, fig.height = 6, results='hide'}
-ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
-                  sp_plots[[4]], sp_plots[[5]], sp_plots[[6]],
+ggpubr::ggarrange(sp_plots[[1]]$sp, sp_plots[[2]]$sp, sp_plots[[3]]$sp,
+                  sp_plots[[4]]$sp, sp_plots[[5]]$sp, sp_plots[[6]]$sp,
                   labels = paste0("Data", 1:6), ncol = 3, nrow = 2, 
                   label.x = 0.1)
 ```
@@ -875,6 +886,37 @@ ggpubr::ggarrange(sp_plots[[1]], sp_plots[[2]], sp_plots[[3]],
 # Conclusion
 
 In the present document, we illustrate the ideas that we have about the PPMC methods and some modified versions of these methods that can be used to assess the fit of the TV-DPCM. In this example, we simulated 6 different data sets, 4 of which violated some of the assumptions of the model. Then, we fitted the TV-DPCM model to each data set and we computed the PPMC methods available. From these preliminary analyses, it seems that the pair-wise discrepancy measures such as Yen's $Q_3$ and the odds ratio are to some extend useful to identify violations of unidimensionality. The other PPMC methods presented did not seem to be able to identify model misfit with the given data sets.
+
+```{r export}
+out_table <- data.frame(seed,
+                        model = c("TV-DPCM", "DPCM", "BiDim", "DRIFT", "GPCM", "AR3"),
+                        diag.table,
+                        acftable,
+                        racf,
+                        lpacf,
+                        mssd,
+                        it_cortable[, 1:I],
+                        it_cor2table[, 1:I],
+                        it_cor3table[, 1:I],
+                        q1table[, 1:I],
+                        q1alttable[, 1:I],
+                        lpacftable[, 1:I],
+                        q3table,
+                        ortable,
+                        ordifftable,
+                        residtable,
+                        redifftable
+                        )
+
+out_file <- paste0("Results_", I, "_items.dat")
+
+if (!file.exists(out_file)) {
+  write.table(out_table, out_file, row.names = FALSE, col.names = TRUE)
+} else {
+  write.table(out_table, out_file, row.names = FALSE, col.names = FALSE, append = TRUE)
+}
+```
+
 
 ```{r clean}
 rm(list = setdiff(ls(), c(lsf.str(), "k", "j", "seeds", "setmodel", "params", "Nitems")))
