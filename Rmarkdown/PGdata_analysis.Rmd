@@ -1433,23 +1433,6 @@ rm(estimates, fit, responses, stan.diag, standata,
 
 # Fitting the TV-DPCM to SE items
 
-```{r addNA}
-PG_data <- PG_dataComplete[PG_dataComplete$phase >= 5 & 
-                             PG_dataComplete$phase <= 5, ]
-# Add ID dummy and time as numeric
-PG_data$id   <- 1
-# Create and ordered variable of the day number
-PG_data$dayno <- as.numeric(PG_data$date) - as.numeric(PG_data$date[1])
-# Combine the day number and the beep number
-PG_data$time  <- PG_data$beepno + 16 * PG_data$dayno
-# Include NA
-PG_data_na <- esmpack:::expand.esm(data = PG_data, 
-                                   id   = "id", 
-                                   time = "time",
-                                   tinterval = 1, 
-                                   include   = c(mu, na, pa, se))
-```
-
 ```{r data2stan-se}
 responses <- PG_data_na[, se]
 responses$se_ashamed  <- 6 - responses$se_ashamed
@@ -1533,7 +1516,7 @@ colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI",
 kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
 ```
 
-```{r rhats-na, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the TV-DPCM"}
+```{r rhats-se, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the TV-DPCM"}
 mcmc_rhat(rhat(fit, pars = c("beta", "theta", "lambda",
                              "sigma2", "pvar", "attractor")))
 ```
