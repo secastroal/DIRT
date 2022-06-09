@@ -104,7 +104,7 @@ plot.IIF <- function(object, data, range = c(-5, 5), item_labels = NULL,
   }
   
   if (type == "IIF") {
-    matplot(theta, Info, type = "l", lty = 1, 
+    matplot(theta, Info, type = "l", lty = 1, las = 1,
             ylab = "Information", 
             xlab = expression(theta[t]),
             main = "Item Information Functions", ...)
