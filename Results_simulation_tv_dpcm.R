@@ -31,7 +31,7 @@ if (bnw) {
 yaxis <- matrix(rep(c(TRUE, FALSE), times = c(2, 4)), ncol = 3)
 xaxis <- matrix(rep(c(FALSE, TRUE), each = 3), ncol = 3, byrow = TRUE)
 laxis <- matrix(FALSE, ncol = 3, nrow = 2)
-laxis[1, 3] <- TRUE
+# laxis[1, 3] <- TRUE
 
 # 1.0 Read output files ----
 
@@ -58,12 +58,12 @@ tmp <- 100 - tapply(results$corrupt, Cond_ext, mean) * 100
 
 pdf(file = "Figures/Convergent_TVDPCM.pdf", width = 15)
 # Define plotting parameters.
-par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 10), xpd = NA)
+par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 6), xpd = NA)
 
 for (i in 1:2) {
   for(l in 1:3) {
     matplot(1:4, tmp[, i, l,], type = "l", col = color_plot, 
-            ylim = c(-0.5, 100.5), xlab = "", 
+            ylim = c(79, 100.5), xlab = "", 
              ylab = "", xaxt = "n", yaxt = "n", lwd = 2, lty = 1)
     if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
     if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
@@ -118,7 +118,7 @@ for (p in 1:length(par_name)) {
                     gsub(" ", "_", sta_name[p]), ".pdf"), width = 15 )
   
   # Define plotting parameters.
-  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 7, 5, 10), xpd = NA)
+  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 8, 5, 6), xpd = NA)
   
   # Compute mean of the statistic across conditions
   tmp   <- tapply(results_conv[, col_index[p]], Cond_ext, mean, na.rm = TRUE)
@@ -160,7 +160,7 @@ for (p in 1:length(par_name)) {
   rm(i, l, tmp, tmp_l, tmp_u, lylim, uylim)
   
   mtext(paste("Average", lab_name[p], sta_name[p]), 2, outer = TRUE, 
-        line = 4, cex = 1.8)
+        line = 5, cex = 1.8)
   mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
   mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
   mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
@@ -171,3 +171,4 @@ for (p in 1:length(par_name)) {
   dev.off()
 }
 rm(p, plot_points, col_index, lab_name, par_name, sta_name)
+
