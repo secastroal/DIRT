@@ -1,0 +1,409 @@
+---
+title: "Empirical Example TV-DPCM"
+author: "Sebastian Castro-Alvarez"
+date: "`r format(Sys.Date(), '%B %d del %Y')`"
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{endfloat}
+  - \usepackage{amsmath}
+output: 
+  bookdown::pdf_document2:
+    toc: false
+    keep_tex: false
+    number_section: false
+bibliography: references.bib
+csl: apa7.csl
+link-citations: true
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(bookdown)
+library(kableExtra)
+knitr::opts_chunk$set(echo = FALSE, fig.height = 4, fig.width = 6, fig.pos = "!p",  
+                      warning=FALSE, message=FALSE)
+
+#rmarkdown::render("Rmarkdown/PGdata_analysis_SE_complete.Rmd")
+```
+
+```{r pre-env}
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores() * (1/2))
+library(bayesplot)
+color_scheme_set("darkgray")
+
+source("../R/IRT_models.R")
+source("../R/IRT_plots.R")
+source("../R/tvdpcm2stan.R")
+
+set.seed(2022)
+
+model <- stan_model(file = "../Stan/tv_dpcm_int_v5.1.stan", verbose = FALSE)
+```
+
+# Using the TV-DPCM to Analyze Self-Esteem 
+
+To exemplify how to use and interpret the TV-DPCM, in this section, we analyzed mood data from one subject. These data, collected between August 2012 and April 2013, were retrieved from \\citet{Kossakowski2017} and were previously analyzed by, among others, \\citet{Wichers2016}. The data come from a 57 years old male (at the time of the study) that had been diagnosed with major depressive disorder. The participant completed up to 10 semi-random assessments per day for 239 days. During this period, the participant also followed a blind gradual reduction of their anti-depressant medication dosage. In what follows, the items of interest and the data collection procedure are described in detail. Then, descriptive statistics concerning the distribution of the items scores are presented. Finally, the TV-DPCM is adjusted to the data in order to study the psychological dynamics of self-esteem and the performances of the items of the ESM questionnaire.
+
+```{r data}
+PG_data <- read.csv("../ESMdata/ESMdata.csv")
+PG_data <- PG_data[PG_data$resp_abort == 0, ]
+PG_data <- PG_data[!is.na(PG_data$mood_down), ]
+# PG_data <- PG_data[!is.na(PG_data$pat_restl), ]
+
+# Select variables
+PG_data <- PG_data[, c("date", "phase", "concentrat", "beepno", "resptime_s", 
+                       grep("mood_", names(PG_data), value = TRUE), 
+                       grep("pat_", names(PG_data), value = TRUE),
+                       grep("se_", names(PG_data), value = TRUE))]
+
+# Transform Dates
+PG_data$date       <- as.Date(PG_data$date, format = "%d/%m/%y")
+PG_data$resptime_s <- as.POSIXct(paste(PG_data$date, PG_data$resptime_s))
+
+# Select phases 1 through 5
+PG_dataComplete <- PG_data
+PG_data <- PG_dataComplete[PG_dataComplete$phase >= 1 & 
+                             PG_dataComplete$phase <= 5, ]
+```
+
+```{r components}
+pa <- c("mood_relaxed", "mood_satisfi", "mood_enthus", 
+        "mood_cheerf", "mood_strong")
+na <- c("mood_down", "mood_lonely", "mood_anxious", 
+        "mood_guilty")
+mu <- c("mood_irritat", "pat_restl", "pat_agitate")
+se <- c("se_selflike", "se_ashamed", "se_selfdoub", "se_handle")[-4]
+```
+
+## Data Collection and Procedure.
+
+As mentioned before, the participant filled in an ESM questionnaire up to 10 times a day for 239 days. The questionnaire was programmed at random moments within 90-minute intervals that were set between 07:30 AM and 10:30 PM. After the beep signal, the participant had a 10-minute window to complete the questionnaire, which consisted of 50 momentary assessment items that measured different emotions (e.g., feeling enthusiastic or feeling lonely), self-esteem, and descriptions of the situation such as whether the participant was alone or doing something. Furthermore, additional items were used at certain beep signals to measure, for example, sleep quality and depressive symptoms. These items were filled up on a daily or weekly basis. All the momentary assessment items were measured on a 7-point Likert scale from "not feeling the state" to "feeling the state very much". The participant completed a total of 1473 assessments (i.e., on average 6.2 assessments per day). Moreover, the study was divided in 5 phases \\citep{Kossakowski2017}: (1) A baseline period of four weeks, (2) a double-blind period without dosage reduction of two weeks, (3) a double blind period with gradual dosage reduction of eight weeks, (4) a post-assessment period of 8 weeks, and (5) a follow-up period of twelve weeks.
+
+For this empirical example, we actually fitted the TV-DPCM to different sets of items including some or all the phases. The sets of items were defined based on the results from a principal component analysis on the mood items \\citep{Wichers2016}, which extracted three components: Positive affect, negative affect, and mental unrest. Furthermore, the set of items that measured self-esteem were also analyzed with the TV-DPCM. Here, we present the results from the best fitting model to illustrate the TV-DPCM, which was when analyzing the items of self-esteem including phases 1 and 2.
+
+## Descriptives
+
+```{r addNA}
+# Add ID dummy and time as numeric
+PG_data$id   <- 1
+# Create and ordered variable of the day number
+PG_data$dayno <- as.numeric(PG_data$date) - as.numeric(PG_data$date[1])
+# Combine the day number and the beep number
+PG_data$time  <- PG_data$beepno + 16 * PG_data$dayno
+# Include NA
+PG_data_na <- esmpack:::expand.esm(data = PG_data, 
+                                   id   = "id", 
+                                   time = "time",
+                                   tinterval = 1, 
+                                   include   = c(mu, na, pa, se))
+```
+
+```{r data2stan-se}
+responses <- PG_data_na[, se]
+responses$se_ashamed  <- 6 - responses$se_ashamed
+responses$se_selfdoub <- 6 - responses$se_selfdoub
+responses[responses < 3] <- 3
+responses[responses > 5]  <- 5
+responses <- responses - 2
+
+I  <- ncol(responses)
+nT <- nrow(responses)
+K  <- max(responses, na.rm = TRUE)
+
+standata <- tvdpcm2stan_data(resp = as.matrix(responses),
+                             I    = I,
+                             K    = K,
+                             nT   = nT,
+                             n_knots  = 8,
+                             s_degree = 3)
+```
+
+The items of self-esteem were *I like myself* (Self-like), *I am ashamed of myself* (Ashamed), and *I doubt myself* (Self-Doubtful) \\footnote{A fourth item of self-esteem was *I can handle anything*. However, this item was excluded because the scale did not seem to be measuring an unidimensional construct when this item was included.}. The items Ashamed and Self-Doubtful were reversed coded to have high scores on the scale represent high states of self-esteem. Also, given that not all the response categories were selected and that some were selected too few times, several response categories were collapsed. For the item Selflike, the response categories lower than 3 and the response categories larger than 5 were collapse into response categories 1 and 3, respectively. Also, response category 4 was recoded as 2. For the items Ashamed and Self-Doubtful, response categories lower than 5 (after reversed coding) were collapsed into response category 1 and response categories 6 and 7 were recoded to 2 and 3, respectively. Therefore, the responses were changed from a 7-point Likert scale to a 3-point Likert scale. 
+
+Moreover, it is important to note that the TV-DPCM is a discrete time model. This means that the model requires that the time interval between consecutive observations is the same for the whole duration of the data collection. This was clearly not the case with the data at hand due to the random beeps, the missing data, and the overnight time between days. One way to address this issue is to include missing values in order to make the time interval between observations approximately the same \\citep{Asparouhov2018}. This approach have been shown to be useful to deal with unequal time intervals and the results from these kind of analyses are comparable with results from continuous time models \\citep{DeHaan-Rietdijk2017}. Given this, we also implemented this approach in the TV-DPCM analysis of the self-esteem items. For this, we divided the days in 90-minute time windows. As a result, there are a total of 16 time windows per day, 6 of which were always missing because they happened during the night. Observations within any of these time windows were considered as a representation of the state of self-esteem of the participant for that time point. When no observations were available, "missing values" were included in the date set. By doing this, we added `r nrow(PG_data_na) - nrow(PG_data)` rows of missing values, for a total number of `r nrow(PG_data_na)` time windows. The time series of the observed mean scores, after recoding and after including rows of missing values, is presented in Figure \@ref(fig:timeseries). The mean scores range between 1 and 3.
+
+```{r timeseries, fig.cap = "Observed Mean Scores of the Self-Esteem Items"}
+plot(rowMeans(responses), ylim = c(0.9, 3.1),
+     type = "l", ylab = "Mean Scores", xlab = "Time Window", las = 1)
+```
+
+## Fitting the TV-DPCM
+
+```{r stanfit-se}
+# rdsfile <- "../Fits/MUwithNA"
+rdsfile <- "../Fits/SelfEwithNA_3items"
+
+tvdpcm_inits <- function() {
+              list(lambda = runif(1, -1, 1),
+                   beta   = array(rnorm(I * (K - 1), 0, 3), dim = c(I, K - 1)),
+                   inno   = rnorm(nT, 0, 3),
+                   sigma  = rlnorm(1, 1))
+            }
+
+if (!file.exists(paste0(rdsfile, ".rds"))) {
+  begin.time <- proc.time()
+  fit <- sampling(model,                  # Stan model. 
+                  data = standata,        # Data.
+                  iter = 2000,            # Number of iterations.
+                  chains  = 3,            # Number of chains.
+                  warmup  = 500,          # Burn-in samples.
+                  init    = tvdpcm_inits, # Initial values
+                  seed = 1234,            # Seed
+                  pars = c("beta", "theta", "lambda",
+                           "sigma2", "pvar", "attractor", "rep_y"),
+                  control = list(adapt_delta   = 0.99,
+                                 max_treedepth = 15) # Other parameters to control sampling behavior.
+                  ) 
+  run.time <- proc.time() - begin.time
+  rm(begin.time)
+  
+  saveRDS(fit, file = paste0(rdsfile, ".rds"))
+  saveRDS(run.time, file = paste0(rdsfile, "_time.rds"))
+} else {
+  fit      <- readRDS(paste0(rdsfile, ".rds"))
+  run.time <- readRDS(paste0(rdsfile, "_time.rds"))
+}
+```
+
+```{r diag-se}
+stan.diag <- monitor(extract(fit, 
+                             pars = c("beta", "theta", "lambda",
+                                      "sigma2", "pvar", "attractor"),
+                             permuted = FALSE, inc_warmup = FALSE),
+                     warmup = 0, print = FALSE)
+            
+ndiv  <- get_num_divergent(fit)     # number of divergent transitions
+nbfmi <- get_low_bfmi_chains(fit)   # number of chains with a low bayesian fraction missing information 
+ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
+nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
+ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+          
+            #max Rhat
+maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
+                                        "sigma2", "pvar", "attractor"))), 4)
+nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
+                                  "sigma2", "pvar", "attractor")) > 1.05)
+```
+
+```{r diagtable-se}
+diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
+row.names(diag.table)  <- "Fitted Model"
+colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
+                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
+kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escape = FALSE)
+```
+
+
+To fit the TV-DPCM to the data, we used the same setup for the Hamiltonian Monte Carlo algorithm as we did in the simulation study. This means that we ran three chains in parallel, each with 2000 iterations, 500 of which were discarded as burnin, and we kept the same values for the *adapt_delta* (0.99) and *max_treedepth* (15) parameters. To check convergence of the model, we examined the diagnostics provided in Stan for the HMC algorithm. According to these diagnostics, we found no evidence of divergence. Graphical diagnostics for some selected parameters are presented in the supplementary materials.
+
+```{r rhats-se, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the TV-DPCM"}
+mcmc_rhat(rhat(fit, pars = c("beta", "theta", "lambda", 
+                             "sigma2", "pvar", "attractor")))
+```
+
+```{r trace-se, fig.cap = "Traceplots of Selected Parameters"}
+parameters <- c(paste0("beta[", sample(1:I, 1), ",", sample(1:(K - 1), 1), "]"),
+                paste0("theta[", sample(which(!is.na(responses[, 1])), 1), "]"),
+                "lambda", "sigma2")
+fit.array <- as.array(fit, pars = parameters)
+
+parameters[1] = gsub("beta", "delta", parameters[1])
+parameters[1] = gsub(",", "", parameters[1])
+parameters[2] = parameters[2]
+parameters[3] = 'varphi'
+parameters[4] = 'Psi'
+
+dimnames(fit.array) [[3]] <- parameters
+
+mcmc_trace(fit.array, facet_args = list(labeller = "label_parsed"))
+```
+
+```{r acf-plots-se, fig.cap = "Autocorrelation Plots of Selected Parameters"}
+mcmc_acf(fit.array, 
+         facet_args = list(labeller = "label_parsed"),
+         lags = 20)
+```
+
+
+```{r estimates-se}
+estimates <- as.data.frame(summary(fit, pars = c("beta", "lambda", "sigma2", "pvar"))$summary)
+
+estimates <- estimates[, c(6, 3, 4, 8, 9)]
+
+estimates[, 3] <- paste0("(", round(estimates[, 3], 2), ",", round(estimates[, 4], 2), ")")
+
+estimates        <- estimates[, -4]
+
+names(estimates) <- c("Median", "SD", "C.I.", "ESS")
+
+row.names(estimates) <- c(paste0("$\\delta_{", 
+                                 rep(1:I, each = K - 1), 
+                                 rep(1:(K - 1), times = I),
+                                 "}$"),
+                          "$\\varphi$", "$\\Psi$", "$\\sigma^2$")
+
+# Extract all estimates
+sum.fit <- list()
+
+sum.fit$beta   <- summary(fit, pars = "beta")$summary
+sum.fit$theta  <- summary(fit, pars = "theta")$summary
+sum.fit$lambda <- summary(fit, pars = "lambda")$summary
+sum.fit$sigma2 <- summary(fit, pars = "sigma2")$summary
+sum.fit$pvar  <- summary(fit, pars = "pvar")$summary
+sum.fit$attractor <- summary(fit, pars = "attractor")$summary
+```
+
+Table \@ref(tab:est-table) shows the estimated values (i.e., the median of the posterior distribution), the standard deviation, the credibility interval, and the effective sample size of the threshold parameters, the autoregressive effect, the variance of the innovations, and the total variance of the dynamic process. Note that the threshold parameters are ordered within items 1 and 3 but not for item 2. This means that there is a "reversal" for item 2. Hence, the probability to select response category 2 is always lower than the probability to select either response category 1 or 3 across the latent continuum. Next, the estimated autoregressive effect was `r round(sum.fit$lambda[, 6], 2)`, which implies that there is a medium-strong dependency between consecutive states of self-esteem. Lastly, the variance of the innovations and the variance of the dynamic process were `r round(sum.fit$sigma2[, 6], 2)` and `r round(sum.fit$pvar[, 6], 2)`, respectively. The first one indicates the variability of the state of self-esteem that cannot be explained by the previous state of self-esteem. The later represents the total variance of the states of self-esteem across the time series. 
+
+```{r est-table}
+kbl(estimates, align = "c", booktabs = TRUE, caption = "Estimated Parameters of the TV-DPCM", escape = FALSE, digits = c(2, 2, NA, 0))
+```
+
+The estimates of the latent state dispositions and the time-varying attractor are presented in Figure \@ref(fig:est-trend-se). To facilitate the interpretation, these estimates were previously divided by the standard deviation of the dynamic process (i.e., $\sigma$). By doing this, a latent state disposition of 1 means that the latent state of the individual at a certain time point is one standard deviation above the expected mean score on the test. Thus, Figure \@ref(fig:est-trend-se) shows that the latent state dispositions varied between `r round(min(sum.fit$theta[, 6]/sqrt(sum.fit$pvar[, 6])), 2)` and `r round(max(sum.fit$theta[, 6]/sqrt(sum.fit$pvar[, 6])), 2)`. The time varying mean or attractor with its credibility interval band, which is represented by the thick black line and the light gray band, shows and increasing trend over time. This implies that, on average, at the beginning of the study the mean of the latent states of self-esteem was about one standard deviation above the expected mean score given the test. Moreover, the mean of the latent states of self-esteem increased in such a way that by the end of the second phase, the mean of the latent states was close to two standard deviations above the expected mean score given the test. 
+
+```{r est-trend-se, fig.cap = "Estimated Latent State Dispositions and Trend"}
+plot(standata$time, 
+     sum.fit$theta[, 6]/sqrt(sum.fit$pvar[, 6]),
+     type = "l", ylim = c(-1.95, 3), col = gray(0.5), lwd = 1, las = 1,
+     ylab = "Latent State Disposition", xlab = "Beep Number")
+polygon(c(standata$time, rev(standata$time)),
+        c(sum.fit$attractor[, 4]/sqrt(sum.fit$pvar[, 6]), 
+          rev(sum.fit$attractor[, 8]/sqrt(sum.fit$pvar[, 6]))),
+        border = NA,
+        col = gray(0.75, 0.25))
+# polygon(c(standata$time, rev(standata$time)),
+#         c(sum.fit$theta[, 4], rev(sum.fit$theta[, 8])),
+#         border = NA,
+#         col = rgb(1, 0, 0, 0.25))
+lines(standata$time, sum.fit$attractor[, 6]/sqrt(sum.fit$pvar[, 6]),
+      col = 1, lwd = 2)
+```
+
+Furthermore, one of the key features of IRT modeling is that IRT models allow studying the properties of the items and the test. In this context, IRT provides the item characteristic functions (ICFs), the item information functions (IIFs), and the test information function (TIF). For the TV-DPCM, we can compute and plot these functions because the model assumes that the item parameters do not change over time (longitudinal measurement invariance holds). Therefore, these functions are defined given the latent state disposition ($\theta_t$) at a certain time point $t$. Figures \@ref(fig:ICC-se) to \@ref(fig:TIF-se) present the ICFs, the IIFs, and the TIF for the three items of self-esteem. Notice that to compute these functions, the estimated parameters were scaled (divided by $\sigma$) to facilitate interpretation. Regarding the ICFs, for the items *Self-like* and *Self-Doubtful*, the curves for each response category are nicely ordered and each of the response options get to have the highest response probability at some point in the latent continuum. On the other hand, for the item *Ashamed* there is a reversal. As a consequence, there is not point in the latent continuum where the response category 2 has the highest response probability. Additionally, when inspecting the IIFs, we can see at what levels of the latent continuum the items are more of less informative. Thus, the item *Ashamed* seems to be more useful at measuring lower states of self-esteem and the item *Self-Doubtful* seems to be more useful at measuring higher states of self-esteem. In contrast, the item *Self-Like* is not as informative and it seems it is useful to distinguish between very high and very low states of self-esteem but it is not informative on the middle levels of self-esteem. Lastly, the TIF shows that, overall, these three items are the most informative when measuring lower levels of self-esteem (solid line). However, during the study the participant mostly experienced medium and high level of self-esteem, which means that the measures have high levels of standard measurement error (dashed line). This indicates that more items were needed to accurately measure the participant's self-esteem.
+
+```{r ICC-se, fig.height = 6, fig.cap = "Item Characteristic Functions for the Self-Esteem Items"}
+par(mfrow = c(3, 1), mar = c(4, 4, 2, 1) + 0.1)
+
+plot.ICC(object = fit, data = standata, range = c(-3, 3), quiet = TRUE,
+         item_labels = c("Self-Like", "Ashamed", "Self-Doubtful"), 
+         col = gray((0:(K - 1))/K), scale = TRUE, las = 1, lwd = 2)
+pos <- legend(2.5, 2.4, c("1", "2", "3"), lty = 1, col = gray((0:(K - 1))/K), 
+              lwd = 2, title = "Response\nOption", xpd = NA, bty = "n")
+
+xleft <- pos$rect[["left"]]
+ytop <- pos$rect[["top"]]
+ybottom <- ytop - pos$rect[["h"]]
+xright <- xleft + pos$rect[["w"]]
+rect(xleft, ybottom, xright, ytop + 0.1, xpd = NA)
+rm(pos, xleft, ytop, ybottom, xright)
+
+```
+
+```{r IIF-se, fig.cap = "Item Information Functions of the Items of Self-Esteem"}
+plot.IIF(object = fit, data = standata, type = "IIF", 
+         item_labels = c("Self-Like", "Ashamed", "Self-Doubtful"), 
+         col = gray((0:(I-1))/I), range = c(-3, 3), scale = TRUE, 
+         lwd = 2)
+```
+
+
+```{r TIF-se, fig.cap = "Test Information Function of the Items of Self-Esteem"}
+plot.IIF(object = fit, data = standata, range = c(-3, 3), 
+         type = "TIF", scale = TRUE, lwd = 2, las = 1, ylim = c(0, 1.5))
+```
+
+Finally, we also computed the expected mean scores given the model, which can be interpreted as the *true scores* \\citep{Embretson2000}, to compare them with the observed mean scores. This is shown in Figure \@ref(fig:expected-plot). Panel A, shows the nonlinear relation between the estimated latent state dispositions and the expected mean score given by the model. Then, panel B presents the relation between the expected mean scores and the observed mean scores.    
+
+```{r Expected}
+  thresholds  <- matrix(sum.fit$beta[, 6]/sqrt(sum.fit$pvar[, 6]), 
+                        nrow = I, ncol = K - 1, byrow = TRUE)
+  delta       <- rowMeans(thresholds)
+  taus        <- thresholds - delta
+  
+  probs.array <- array(NA, dim = c(length(sum.fit$theta[, 6]), I, K))
+  # probs.array <- array(NA, dim = c(length(seq(-3, 3, by = 0.1)), I, K))
+  
+  for (yy in 0:(K - 1)) {
+    probs.array[, , yy + 1] <- P.GPCM(y     = yy, 
+                                      alpha = rep(sqrt(sum.fit$pvar[, 6]), I), 
+                                      delta = delta, 
+                                      taus  = taus, 
+                                      theta = sum.fit$theta[, 6]/sqrt(sum.fit$pvar[, 6]), 
+                                      # theta = seq(-3, 3, by = 0.1), 
+                                      M     = K - 1)
+  }
+  
+  thresholds2  <- matrix(sum.fit$beta[, 6], 
+                        nrow = I, ncol = K - 1, byrow = TRUE)
+  delta2      <- rowMeans(thresholds2)
+  taus2       <- thresholds2 - delta2
+  
+  probs.array2 <- array(NA, dim = c(length(sum.fit$theta[, 6]), I, K))
+  # probs.array <- array(NA, dim = c(length(seq(-3, 3, by = 0.1)), I, K))
+  
+  for (yy in 0:(K - 1)) {
+    probs.array2[, , yy + 1] <- P.GPCM(y     = yy, 
+                                      alpha = rep(1, I), 
+                                      delta = delta2, 
+                                      taus  = taus2, 
+                                      theta = sum.fit$theta[, 6], 
+                                      # theta = seq(-3, 3, by = 0.1), 
+                                      M     = K - 1)
+  }
+  
+  E <- apply(probs.array, c(1, 2), function(x) sum(x * 1:K))
+  
+  rm(probs.array, yy, delta, taus, thresholds)
+```
+
+```{r expected-plot, fig.cap = "Comparison Between the Estimated Latent States Dispositions, the Expected Mean Scores, and the Observed Mean Scores."}
+par(mfrow = c(1, 3), mar = c(4, 4, 2, 0) + 0.1)
+
+esttheta <- (sum.fit$theta[, 6]/sqrt(sum.fit$pvar[, 6]))[unique(standata$tt_obs)]
+expscores <- rowMeans(E)[unique(standata$tt_obs)] 
+
+plot(sort(esttheta), sort(expscores), type = "l",
+     ylim = c(0.9, 3.1), xlim = c(-2.5, 3), las = 1, lwd = 2,
+     ylab = "Expected Mean Scores", xlab = "Latent State Disposition")
+abline(h = 2, v = 0, lty = 2, col = gray(0.5))
+plot(esttheta, na.omit(rowMeans(responses)), 
+     pch = 20, las = 1, ylim = c(0.9, 3.1), xlim = c(-2.5, 3),
+     ylab = "Observed Mean Scores", xlab = "Latent State Disposition")
+plot(rowMeans(E), rowMeans(responses), 
+     pch = 20, las = 1, ylim = c(0.9, 3.1), xlim = c(0.9, 3.1),
+     ylab = "Observed Mean Scores", xlab = "Expected Mean Scores")
+abline(a = 0, b = 1, lty = 2, col = gray(0.5))
+mtext("A", side = 3, line = -1.5, at = 0.025, font = 2, cex = 1.3, outer = TRUE, xpd = NA)
+mtext("B", side = 3, line = -1.5, at = 0.355, font = 2, cex = 1.3, outer = TRUE, xpd = NA)
+mtext("C", side = 3, line = -1.5, at = 0.685, font = 2, cex = 1.3, outer = TRUE, xpd = NA)
+
+```
+
+```{r obs-exp, fig.cap = "Observed vs. Expected Mean Scores for the Last 50 Observations"}
+plot(tail(na.omit(rowMeans(responses)), 50), type = "l", las = 1, lwd = 2, 
+     lty = 1, col = gray(0.85), xlab = "Observed Beeps",
+     ylab = "Mean Scores")
+lines(tail(expscores, 50), lty = 2, lwd = 2, col = gray(0.5))
+legend("bottomright", c("Observed", "Expected"), 
+       col = c(gray(0.85), gray(0.5)), lwd = 2, lty = 1:2)
+```
+
+```{r clean1}
+rm(estimates, fit, responses, stan.diag, standata,
+   sum.fit, fit.array, I, K, maxRhat, E,
+   nbfmi, nbulk, ndiv, nRhat, nT, ntail, ntree,
+   parameters, rdsfile, run.time, diag.table)
+```
+
+\newpage
+
+# References
+
+
+
