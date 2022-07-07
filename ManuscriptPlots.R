@@ -5,6 +5,28 @@
 
 source("R/genTVDPCM.R")
 source("R/IRT_models.R")
+library(splines)
+
+# ICC of PCM ----
+
+probs <- matrix(NA, 200, 3)
+for (yy in 0:2) {
+  probs[, yy + 1] <- P.GPCM(yy, alpha =  1, delta = 0, taus = c(-1, 1), 
+                        theta = seq(-3, 3, length.out = 200), M = 2)
+}
+rm(yy)
+
+pdf(file = "Figures/ICC-example.pdf", heigh = 4)
+par(mar = c(4, 4.5, 2, 2) + 0.1)
+matplot(seq(-3, 3, length.out = 200), probs, las = 1,
+        ylim = c(0, 1), lty = 1:3, type = "l", col = gray((2:0)/3),
+        lwd = 2, xlab = expression(theta), cex.lab = 1.2, 
+        ylab = expression(paste("P(X"[i], " = x |", theta, ")")))
+legend("bottomright", legend = c("x = 0", "x = 1", "x = 2"),
+       col = gray((2:0)/3), lty = 1:3, lwd = 2, seg.len = 3.5, bg = "white")
+dev.off()
+
+rm(probs)
 
 # B-splines ----
 set.seed(1234)

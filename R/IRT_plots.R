@@ -47,7 +47,7 @@ plot.ICC <- function(object, data, range = c(-5, 5), items = NULL,
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
     matplot(theta, probs.array[, items[i], ], type = "l", 
-            ylim = c(0, 1), lty = 1, 
+            ylim = c(0, 1), 
             ylab = expression(paste("P(", X[i], "|", theta[t], ")")), 
             xlab = expression(theta[t]),
             main = paste0("Item ", items[i], ": ", item_labels[items[i]]), ...)
@@ -104,12 +104,12 @@ plot.IIF <- function(object, data, range = c(-5, 5), item_labels = NULL,
   }
   
   if (type == "IIF") {
-    matplot(theta, Info, type = "l", lty = 1, las = 1,
+    matplot(theta, Info, type = "l", las = 1,
             ylab = "Information", 
             xlab = expression(theta[t]),
             main = "Item Information Functions", ...)
     if (legend) {
-      legend("topright", item_labels, lty = 1, ...)
+      legend("topright", item_labels, ...)
       }
   }
   
