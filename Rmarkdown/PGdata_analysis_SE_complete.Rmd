@@ -12,7 +12,7 @@ header-includes:
 output: 
   bookdown::pdf_document2:
     toc: false
-    keep_tex: false
+    keep_tex: true
     number_section: false
 bibliography: references.bib
 csl: apa7.csl
@@ -126,9 +126,9 @@ standata <- tvdpcm2stan_data(resp = as.matrix(responses),
 
 The items of self-esteem were *I like myself* (Self-like), *I am ashamed of myself* (Ashamed), and *I doubt myself* (Self-Doubtful) \\footnote{A fourth item of self-esteem was *I can handle anything*. However, this item was excluded because the scale did not seem to be measuring an unidimensional construct when this item was included.}. The items Ashamed and Self-Doubtful were reversed coded to have high scores on the scale represent high states of self-esteem. Also, given that not all the response categories were selected and that some were selected too few times, several response categories were collapsed. For the item Selflike, the response categories lower than 3 and the response categories larger than 5 were collapse into response categories 1 and 3, respectively. Also, response category 4 was recoded as 2. For the items Ashamed and Self-Doubtful, response categories lower than 5 (after reversed coding) were collapsed into response category 1 and response categories 6 and 7 were recoded to 2 and 3, respectively. Therefore, the responses were changed from a 7-point Likert scale to a 3-point Likert scale. 
 
-Moreover, it is important to note that the TV-DPCM is a discrete time model. This means that the model requires that the time interval between consecutive observations is the same for the whole duration of the data collection. This was clearly not the case with the data at hand due to the random beeps, the missing data, and the overnight time between days. One way to address this issue is to include missing values in order to make the time interval between observations approximately the same \\citep{Asparouhov2018}. This approach have been shown to be useful to deal with unequal time intervals and the results from these kind of analyses are comparable with results from continuous time models \\citep{DeHaan-Rietdijk2017}. Given this, we also implemented this approach in the TV-DPCM analysis of the self-esteem items. For this, we divided the days in 90-minute time windows. As a result, there are a total of 16 time windows per day, 6 of which were always missing because they happened during the night. Observations within any of these time windows were considered as a representation of the state of self-esteem of the participant for that time point. When no observations were available, "missing values" were included in the date set. By doing this, we added `r nrow(PG_data_na) - nrow(PG_data)` rows of missing values, for a total number of `r nrow(PG_data_na)` time windows. The time series of the observed mean scores, after recoding and after including rows of missing values, is presented in Figure \@ref(fig:timeseries). The mean scores range between 1 and 3.
+Moreover, it is important to note that the TV-DPCM is a discrete time model. This means that the model requires that the time interval between consecutive observations is the same for the whole duration of the data collection. This was clearly not the case with the data at hand due to the random beeps, the missing data, and the overnight time between days. One way to address this issue is to include missing values in order to make the time interval between observations approximately the same \\citep{Asparouhov2018}. This approach have been shown to be useful to deal with unequal time intervals and the results from these kind of analyses are comparable with results from continuous time models \\citep{DeHaan-Rietdijk2017}. Given this, we also implemented this approach in the TV-DPCM analysis of the self-esteem items. For this, we divided the days in 90-minute time windows. As a result, there are a total of 16 time windows per day, 6 of which were always missing because they happened during the night. Observations within any of these time windows were considered as a representation of the state of self-esteem of the participant for that time point. When no observations were available, "missing values" were included in the date set. By doing this, we added `r nrow(PG_data_na) - nrow(PG_data)` rows of missing values, for a total number of `r nrow(PG_data_na)` time windows. The time series of the observed mean scores, after recoding and after including rows of missing values, is presented in Figure \@ref(fig:timeseries-comp). The mean scores range between 1 and 3.
 
-```{r timeseries, fig.cap = "Observed Mean Scores of the Self-Esteem Items"}
+```{r timeseries-comp, fig.cap = "Observed Mean Scores of the Self-Esteem Items"}
 plot(rowMeans(responses), ylim = c(0.9, 3.1),
      type = "l", ylab = "Mean Scores", xlab = "Time Window", las = 1)
 ```
@@ -191,7 +191,7 @@ nRhat   <- sum(rhat(fit, pars = c("beta", "theta", "lambda",
                                   "sigma2", "pvar", "attractor")) > 1.05)
 ```
 
-```{r diagtable-se}
+```{r diagtable-se-comp}
 diag.table <- matrix(c(nRhat, ndiv, length(nbfmi), ntree, nbulk, ntail), nrow = 1)
 row.names(diag.table)  <- "Fitted Model"
 colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI", 
@@ -202,12 +202,12 @@ kbl(diag.table, align = "c", booktabs = TRUE, caption = "HMC Diagnostics", escap
 
 To fit the TV-DPCM to the data, we used the same setup for the Hamiltonian Monte Carlo algorithm as we did in the simulation study. This means that we ran three chains in parallel, each with 2000 iterations, 500 of which were discarded as burnin, and we kept the same values for the *adapt_delta* (0.99) and *max_treedepth* (15) parameters. To check convergence of the model, we examined the diagnostics provided in Stan for the HMC algorithm. According to these diagnostics, we found no evidence of divergence. Graphical diagnostics for some selected parameters are presented in the supplementary materials.
 
-```{r rhats-se, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the TV-DPCM"}
+```{r rhats-se-comp, fig.cap = "Gelman-Rubin Statistics for the Estimated Parameters of the TV-DPCM"}
 mcmc_rhat(rhat(fit, pars = c("beta", "theta", "lambda", 
                              "sigma2", "pvar", "attractor")))
 ```
 
-```{r trace-se, fig.cap = "Traceplots of Selected Parameters"}
+```{r trace-se-comp, fig.cap = "Traceplots of Selected Parameters"}
 parameters <- c(paste0("beta[", sample(1:I, 1), ",", sample(1:(K - 1), 1), "]"),
                 paste0("theta[", sample(which(!is.na(responses[, 1])), 1), "]"),
                 "lambda", "sigma2")
@@ -224,7 +224,7 @@ dimnames(fit.array) [[3]] <- parameters
 mcmc_trace(fit.array, facet_args = list(labeller = "label_parsed"))
 ```
 
-```{r acf-plots-se, fig.cap = "Autocorrelation Plots of Selected Parameters"}
+```{r acf-plots-se-comp, fig.cap = "Autocorrelation Plots of Selected Parameters"}
 mcmc_acf(fit.array, 
          facet_args = list(labeller = "label_parsed"),
          lags = 20)
@@ -259,15 +259,15 @@ sum.fit$pvar  <- summary(fit, pars = "pvar")$summary
 sum.fit$attractor <- summary(fit, pars = "attractor")$summary
 ```
 
-Table \@ref(tab:est-table) shows the estimated values (i.e., the median of the posterior distribution), the standard deviation, the credibility interval, and the effective sample size of the threshold parameters, the autoregressive effect, the variance of the innovations, and the total variance of the dynamic process. Note that the threshold parameters are ordered within items 1 and 3 but not for item 2. This means that there is a "reversal" for item 2. Hence, the probability to select response category 2 is always lower than the probability to select either response category 1 or 3 across the latent continuum. Next, the estimated autoregressive effect was `r round(sum.fit$lambda[, 6], 2)`, which implies that there is a medium-strong dependency between consecutive states of self-esteem. Lastly, the variance of the innovations and the variance of the dynamic process were `r round(sum.fit$sigma2[, 6], 2)` and `r round(sum.fit$pvar[, 6], 2)`, respectively. The first one indicates the variability of the state of self-esteem that cannot be explained by the previous state of self-esteem. The later represents the total variance of the states of self-esteem across the time series. 
+Table \@ref(tab:est-table-comp) shows the estimated values (i.e., the median of the posterior distribution), the standard deviation, the credibility interval, and the effective sample size of the threshold parameters, the autoregressive effect, the variance of the innovations, and the total variance of the dynamic process. Note that the threshold parameters are ordered within items 1 and 3 but not for item 2. This means that there is a "reversal" for item 2. Hence, the probability to select response category 2 is always lower than the probability to select either response category 1 or 3 across the latent continuum. Next, the estimated autoregressive effect was `r round(sum.fit$lambda[, 6], 2)`, which implies that there is a medium-strong dependency between consecutive states of self-esteem. Lastly, the variance of the innovations and the variance of the dynamic process were `r round(sum.fit$sigma2[, 6], 2)` and `r round(sum.fit$pvar[, 6], 2)`, respectively. The first one indicates the variability of the state of self-esteem that cannot be explained by the previous state of self-esteem. The later represents the total variance of the states of self-esteem across the time series. 
 
-```{r est-table}
+```{r est-table-comp}
 kbl(estimates, align = "c", booktabs = TRUE, caption = "Estimated Parameters of the TV-DPCM", escape = FALSE, digits = c(2, 2, NA, 0))
 ```
 
-The estimates of the latent state dispositions and the time-varying attractor are presented in Figure \@ref(fig:est-trend-se). To facilitate the interpretation, these estimates were previously divided by the standard deviation of the dynamic process (i.e., $\sigma$). By doing this, a latent state disposition of 1 means that the latent state of the individual at a certain time point is one standard deviation above the expected mean score on the test. Thus, Figure \@ref(fig:est-trend-se) shows that the latent state dispositions varied between `r round(min(sum.fit$theta[, 6]/sqrt(sum.fit$pvar[, 6])), 2)` and `r round(max(sum.fit$theta[, 6]/sqrt(sum.fit$pvar[, 6])), 2)`. The time varying mean or attractor with its credibility interval band, which is represented by the thick black line and the light gray band, shows and increasing trend over time. This implies that, on average, at the beginning of the study the mean of the latent states of self-esteem was about one standard deviation above the expected mean score given the test. Moreover, the mean of the latent states of self-esteem increased in such a way that by the end of the second phase, the mean of the latent states was close to two standard deviations above the expected mean score given the test. 
+The estimates of the latent state dispositions and the time-varying attractor are presented in Figure \@ref(fig:est-trend-se-comp). To facilitate the interpretation, these estimates were previously divided by the standard deviation of the dynamic process (i.e., $\sigma$). By doing this, a latent state disposition of 1 means that the latent state of the individual at a certain time point is one standard deviation above the expected mean score on the test. Thus, Figure \@ref(fig:est-trend-se-comp) shows that the latent state dispositions varied between `r round(min(sum.fit$theta[, 6]/sqrt(sum.fit$pvar[, 6])), 2)` and `r round(max(sum.fit$theta[, 6]/sqrt(sum.fit$pvar[, 6])), 2)`. The time varying mean or attractor with its credibility interval band, which is represented by the thick black line and the light gray band, shows and increasing trend over time. This implies that, on average, at the beginning of the study the mean of the latent states of self-esteem was about one standard deviation above the expected mean score given the test. Moreover, the mean of the latent states of self-esteem increased in such a way that by the end of the second phase, the mean of the latent states was close to two standard deviations above the expected mean score given the test. 
 
-```{r est-trend-se, fig.cap = "Estimated Latent State Dispositions and Trend"}
+```{r est-trend-se-comp, fig.cap = "Estimated Latent State Dispositions and Trend"}
 plot(standata$time, 
      sum.fit$theta[, 6]/sqrt(sum.fit$pvar[, 6]),
      type = "l", ylim = c(-1.95, 3), col = gray(0.5), lwd = 1, las = 1,
@@ -285,15 +285,15 @@ lines(standata$time, sum.fit$attractor[, 6]/sqrt(sum.fit$pvar[, 6]),
       col = 1, lwd = 2)
 ```
 
-Furthermore, one of the key features of IRT modeling is that IRT models allow studying the properties of the items and the test. In this context, IRT provides the item characteristic functions (ICFs), the item information functions (IIFs), and the test information function (TIF). For the TV-DPCM, we can compute and plot these functions because the model assumes that the item parameters do not change over time (longitudinal measurement invariance holds). Therefore, these functions are defined given the latent state disposition ($\theta_t$) at a certain time point $t$. Figures \@ref(fig:ICC-se) to \@ref(fig:TIF-se) present the ICFs, the IIFs, and the TIF for the three items of self-esteem. Notice that to compute these functions, the estimated parameters were scaled (divided by $\sigma$) to facilitate interpretation. Regarding the ICFs, for the items *Self-like* and *Self-Doubtful*, the curves for each response category are nicely ordered and each of the response options get to have the highest response probability at some point in the latent continuum. On the other hand, for the item *Ashamed* there is a reversal. As a consequence, there is not point in the latent continuum where the response category 2 has the highest response probability. Additionally, when inspecting the IIFs, we can see at what levels of the latent continuum the items are more of less informative. Thus, the item *Ashamed* seems to be more useful at measuring lower states of self-esteem and the item *Self-Doubtful* seems to be more useful at measuring higher states of self-esteem. In contrast, the item *Self-Like* is not as informative and it seems it is useful to distinguish between very high and very low states of self-esteem but it is not informative on the middle levels of self-esteem. Lastly, the TIF shows that, overall, these three items are the most informative when measuring lower levels of self-esteem (solid line). However, during the study the participant mostly experienced medium and high level of self-esteem, which means that the measures have high levels of standard measurement error (dashed line). This indicates that more items were needed to accurately measure the participant's self-esteem.
+Furthermore, one of the key features of IRT modeling is that IRT models allow studying the properties of the items and the test. In this context, IRT provides the item characteristic functions (ICFs), the item information functions (IIFs), and the test information function (TIF). For the TV-DPCM, we can compute and plot these functions because the model assumes that the item parameters do not change over time (longitudinal measurement invariance holds). Therefore, these functions are defined given the latent state disposition ($\theta_t$) at a certain time point $t$. Figures \@ref(fig:ICC-se-comp) to \@ref(fig:TIF-se-comp) present the ICFs, the IIFs, and the TIF for the three items of self-esteem. Notice that to compute these functions, the estimated parameters were scaled (divided by $\sigma$) to facilitate interpretation. Regarding the ICFs, for the items *Self-like* and *Self-Doubtful*, the curves for each response category are nicely ordered and each of the response options get to have the highest response probability at some point in the latent continuum. On the other hand, for the item *Ashamed* there is a reversal. As a consequence, there is not point in the latent continuum where the response category 2 has the highest response probability. Additionally, when inspecting the IIFs, we can see at what levels of the latent continuum the items are more of less informative. Thus, the item *Ashamed* seems to be more useful at measuring lower states of self-esteem and the item *Self-Doubtful* seems to be more useful at measuring higher states of self-esteem. In contrast, the item *Self-Like* is not as informative and it seems it is useful to distinguish between very high and very low states of self-esteem but it is not informative on the middle levels of self-esteem. Lastly, the TIF shows that, overall, these three items are the most informative when measuring lower levels of self-esteem (solid line). However, during the study the participant mostly experienced medium and high level of self-esteem, which means that the measures have high levels of standard measurement error (dashed line). This indicates that more items were needed to accurately measure the participant's self-esteem.
 
-```{r ICC-se, fig.height = 6, fig.cap = "Item Characteristic Functions for the Self-Esteem Items"}
+```{r ICC-se-comp, fig.height = 6, fig.cap = "Item Characteristic Functions for the Self-Esteem Items"}
 par(mfrow = c(3, 1), mar = c(4, 4, 2, 1) + 0.1)
 
 plot.ICC(object = fit, data = standata, range = c(-3, 3), quiet = TRUE,
          item_labels = c("Self-Like", "Ashamed", "Self-Doubtful"), 
-         col = gray((0:(K - 1))/K), scale = TRUE, las = 1, lwd = 2)
-pos <- legend(2.5, 2.4, c("1", "2", "3"), lty = 1, col = gray((0:(K - 1))/K), 
+         col = gray((0:(K - 1))/K), scale = TRUE, las = 1, lwd = 2, lty = 3:1)
+pos <- legend(2.5, 2.61, c("1", "2", "3"), lty = 3:1, col = gray((0:(K - 1))/K), 
               lwd = 2, title = "Response\nOption", xpd = NA, bty = "n")
 
 xleft <- pos$rect[["left"]]
@@ -305,20 +305,20 @@ rm(pos, xleft, ytop, ybottom, xright)
 
 ```
 
-```{r IIF-se, fig.cap = "Item Information Functions of the Items of Self-Esteem"}
+```{r IIF-se-comp, fig.cap = "Item Information Functions of the Items of Self-Esteem"}
 plot.IIF(object = fit, data = standata, type = "IIF", 
          item_labels = c("Self-Like", "Ashamed", "Self-Doubtful"), 
          col = gray((0:(I-1))/I), range = c(-3, 3), scale = TRUE, 
-         lwd = 2)
+         lwd = 2, lty = 3:1)
 ```
 
 
-```{r TIF-se, fig.cap = "Test Information Function of the Items of Self-Esteem"}
+```{r TIF-se-comp, fig.cap = "Test Information Function of the Items of Self-Esteem"}
 plot.IIF(object = fit, data = standata, range = c(-3, 3), 
          type = "TIF", scale = TRUE, lwd = 2, las = 1, ylim = c(0, 1.5))
 ```
 
-Finally, we also computed the expected mean scores given the model, which can be interpreted as the *true scores* \\citep{Embretson2000}, to compare them with the observed mean scores. This is shown in Figure \@ref(fig:expected-plot). Panel A, shows the nonlinear relation between the estimated latent state dispositions and the expected mean score given by the model. Then, panel B presents the relation between the expected mean scores and the observed mean scores.    
+Finally, we also computed the expected mean scores given the model, which can be interpreted as the *true scores* \\citep{Embretson2000}, to compare them with the observed mean scores. This is shown in Figure \@ref(fig:expected-plot-comp). Panel A, shows the nonlinear relation between the estimated latent state dispositions and the expected mean score given by the model. Then, panel B presents the relation between the expected mean scores and the observed mean scores.    
 
 ```{r Expected}
   thresholds  <- matrix(sum.fit$beta[, 6]/sqrt(sum.fit$pvar[, 6]), 
@@ -362,36 +362,23 @@ Finally, we also computed the expected mean scores given the model, which can be
   rm(probs.array, yy, delta, taus, thresholds)
 ```
 
-```{r expected-plot, fig.cap = "Comparison Between the Estimated Latent States Dispositions, the Expected Mean Scores, and the Observed Mean Scores."}
-par(mfrow = c(1, 3), mar = c(4, 4, 2, 0) + 0.1)
-
+```{r expected-plot-comp, fig.cap = "Comparison Between the Estimated Latent States Dispositions, the Expected Mean Scores, and the Observed Mean Scores."}
 esttheta <- (sum.fit$theta[, 6]/sqrt(sum.fit$pvar[, 6]))[unique(standata$tt_obs)]
 expscores <- rowMeans(E)[unique(standata$tt_obs)] 
 
-plot(sort(esttheta), sort(expscores), type = "l",
-     ylim = c(0.9, 3.1), xlim = c(-2.5, 3), las = 1, lwd = 2,
-     ylab = "Expected Mean Scores", xlab = "Latent State Disposition")
-abline(h = 2, v = 0, lty = 2, col = gray(0.5))
-plot(esttheta, na.omit(rowMeans(responses)), 
-     pch = 20, las = 1, ylim = c(0.9, 3.1), xlim = c(-2.5, 3),
+plot(esttheta, na.omit(rowMeans(responses)), col = gray(1/2),
+     pch = 20, las = 1, ylim = c(0.9, 3.1), xlim = c(-1.5, 3),
      ylab = "Observed Mean Scores", xlab = "Latent State Disposition")
-plot(rowMeans(E), rowMeans(responses), 
-     pch = 20, las = 1, ylim = c(0.9, 3.1), xlim = c(0.9, 3.1),
-     ylab = "Observed Mean Scores", xlab = "Expected Mean Scores")
-abline(a = 0, b = 1, lty = 2, col = gray(0.5))
-mtext("A", side = 3, line = -1.5, at = 0.025, font = 2, cex = 1.3, outer = TRUE, xpd = NA)
-mtext("B", side = 3, line = -1.5, at = 0.355, font = 2, cex = 1.3, outer = TRUE, xpd = NA)
-mtext("C", side = 3, line = -1.5, at = 0.685, font = 2, cex = 1.3, outer = TRUE, xpd = NA)
-
+lines(sort(esttheta), sort(expscores), lwd = 2)
+abline(h = 2, v = 0, lty = 2, col = gray(4/5))
 ```
 
-```{r obs-exp, fig.cap = "Observed vs. Expected Mean Scores for the Last 50 Observations"}
+```{r obs-exp-comp, fig.cap = "Observed vs. Expected Mean Scores for the Last 50 Observations"}
 plot(tail(na.omit(rowMeans(responses)), 50), type = "l", las = 1, lwd = 2, 
-     lty = 1, col = gray(0.85), xlab = "Observed Beeps",
-     ylab = "Mean Scores")
+     lty = 1, col = gray(0.85), ylim = c(0.9, 3.1), xlab = "",
+     ylab = "Mean Scores", xaxt = 'n')
 lines(tail(expscores, 50), lty = 2, lwd = 2, col = gray(0.5))
-legend("bottomright", c("Observed", "Expected"), 
-       col = c(gray(0.85), gray(0.5)), lwd = 2, lty = 1:2)
+mtext("Observed Beeps", side = 1, line = 1)
 ```
 
 ```{r clean1}
