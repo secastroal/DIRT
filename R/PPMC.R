@@ -74,8 +74,10 @@ ppmc.sumscore.ts <- function(object, data, mc.cores = getOption("mc.cores", 2L))
   return(prop_out)
 }
 
-# Autocorrelation of the residuals ----
-ppmc.racf <- function(object, data, mc.cores = getOption("mc.cores", 2L)) {
+# Partial Autocorrelation of the residuals ----
+ppmc.racf <- function(object, data, col.ppp = "black", 
+                      col.y = "black", col.yrep = "lightgray", 
+                      mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -113,19 +115,22 @@ ppmc.racf <- function(object, data, mc.cores = getOption("mc.cores", 2L)) {
   # Compute posterior predictive p-values
   out <- sum(acorrep <= acor) / length(acorrep)
   
-  hist(acorrep, main = "Histogram Residuals Autocorrelation",
-       xlab = "Autocorrelation",
-       xlim = c(min(acorrep, acor),
-                max(acorrep, acor)))
-  abline(v = acor, lwd = 3)
-  mtext(paste0("PPP = ", round(out, 3)), line = -1.5, col = "red", 
+  hist(acorrep, main = "",
+       xlab = "Partial Autocorrelation",
+       xlim = c(min(acorrep, acor) - IQR(acorrep)/3,
+                max(acorrep, acor) + IQR(acorrep)/3),
+       las = 1, freq = FALSE, col = col.yrep, ...)
+  abline(v = acor, lwd = 3, col = col.y)
+  mtext(paste0("  PPP = ", round(out, 3)), line = -1.5, col = col.ppp, 
         cex = 0.8, adj = 0)
   
   return(round(out, 3))
 }
 
 # Autocorrelation of the sumscores ----
-ppmc.acf <- function(object, data, lag.max = 5, mc.cores = getOption("mc.cores", 2L)) {
+ppmc.acf <- function(object, data, lag.max = 5, col.ppp = "black", 
+                     col.y = "black", col.yrep = "lightgray",  
+                     mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -160,12 +165,13 @@ ppmc.acf <- function(object, data, lag.max = 5, mc.cores = getOption("mc.cores",
   out <- apply(acorrep <= acor, 1, function(x) sum(x)/dim(acorrep)[2])
   
   for (i in 1:lag.max) {
-    hist(acorrep[i, ], main = paste0("Histogram Autocorrelation Lag ", i),
-         xlab = "Autocorrelation",
-         xlim = c(min(acorrep, acor),
-                  max(acorrep, acor)))
-    abline(v = acor[i], lwd = 3)
-    mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
+    hist(acorrep[i, ], main = "",
+         xlab = paste0("Autocorrelation Lag ", i),
+         xlim = c(min(acorrep[i, ], acor) - IQR(acorrep[i, ])/3,
+                  max(acorrep[i, ], acor) + IQR(acorrep[i, ])/3),
+         las = 1, freq = FALSE, col = col.yrep, ...)
+    abline(v = acor[i], lwd = 3, col = col.y)
+    mtext(paste0("  PPP = ", round(out[i], 3)), line = -1.5, col = col.ppp, 
           cex = 0.8, adj = 0)
   }
   
