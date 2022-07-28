@@ -113,10 +113,10 @@ ppmc.racf <- function(object, data, col.ppp = "black",
   acorrep <- unlist(acorrep)
   
   # Compute posterior predictive p-values
-  out <- sum(acorrep <= acor) / length(acorrep)
+  out <- sum(acorrep >= acor) / length(acorrep)
   
   hist(acorrep, main = "",
-       xlab = "Partial Autocorrelation",
+       xlab = expression(PACF(y^rep)),
        xlim = c(min(acorrep, acor) - IQR(acorrep)/3,
                 max(acorrep, acor) + IQR(acorrep)/3),
        las = 1, freq = FALSE, col = col.yrep, ...)
@@ -162,11 +162,11 @@ ppmc.acf <- function(object, data, lag.max = 5, col.ppp = "black",
   acorrep <- as.matrix(as.data.frame(acorrep))
   
   # Compute posterior predictive p-values
-  out <- apply(acorrep <= acor, 1, function(x) sum(x)/dim(acorrep)[2])
+  out <- apply(acorrep >= acor, 1, function(x) sum(x)/dim(acorrep)[2])
   
   for (i in 1:lag.max) {
     hist(acorrep[i, ], main = "",
-         xlab = paste0("Autocorrelation Lag ", i),
+         xlab = bquote(ACF[.(i)](y^rep)),
          xlim = c(min(acorrep[i, ], acor) - IQR(acorrep[i, ])/3,
                   max(acorrep[i, ], acor) + IQR(acorrep[i, ])/3),
          las = 1, freq = FALSE, col = col.yrep, ...)
@@ -180,7 +180,9 @@ ppmc.acf <- function(object, data, lag.max = 5, col.ppp = "black",
 
 # Mean Square Successive Difference ----
 
-ppmc.mssd <- function(object, data, mc.cores = getOption("mc.cores", 2L)) {
+ppmc.mssd <- function(object, data, col.ppp = "black", 
+                      col.y = "black", col.yrep = "lightgray", 
+                      mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -215,14 +217,15 @@ ppmc.mssd <- function(object, data, mc.cores = getOption("mc.cores", 2L)) {
   mssdrep <- unlist(mssdrep)
   
   # Compute posterior predictive p-values
-  out <- sum(mssdrep <= mssd) / length(mssdrep)
+  out <- sum(mssdrep >= mssd) / length(mssdrep)
   
-  hist(mssdrep, main = "Histogram MSSD",
-       xlab = "MSSD",
-       xlim = c(min(mssdrep, mssd),
-                max(mssdrep, mssd)))
-  abline(v = mssd, lwd = 3)
-  mtext(paste0("PPP = ", round(out, 3)), line = -1.5, col = "red", 
+  hist(mssdrep, main = "",
+       xlab = expression(paste("MSSD(", y^rep, ")")),
+       xlim = c(min(mssdrep, mssd) - IQR(mssdrep)/3,
+                max(mssdrep, mssd) + IQR(mssdrep)/3),
+       las = 1, freq = FALSE, col = col.yrep, ...)
+  abline(v = mssd, lwd = 3, col = col.y)
+  mtext(paste0("  PPP = ", round(out, 3)), line = -1.5, col = col.ppp, 
         cex = 0.8, adj = 0)
   
   return(round(out, 3))
@@ -284,8 +287,10 @@ ppmc.item.ts <- function(object, data, quiet = FALSE, items = NULL) {
 # There might be warning messages with the polyserial correlation because the 
 # estimated correlation is larger than 1. For example, "initial correlation 
 # inadmissible, 1.01866242085942, set to 0.9999"
-ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items = NULL, 
-                       quiet = FALSE, mc.cores = getOption("mc.cores", 2L)) {
+ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), 
+                       items = NULL, col.ppp = "black", col.y = "black", 
+                       col.yrep = "lightgray", quiet = FALSE, 
+                       mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -352,18 +357,22 @@ ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items 
   repdat <- as.matrix(as.data.frame(repdat))
   
   # Compute posterior predictive p-values
-  out <- apply(repdat <= polcor, 1, function(x) sum(x, na.rm = TRUE)/dim(repdat)[2])
+  out <- apply(repdat >= polcor, 1, function(x) sum(x, na.rm = TRUE)/dim(repdat)[2])
   names(out) <- paste0("Item_", items)
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
     hist(repdat[items[i], ], 
-         main = paste0("Histogram Item-Total Correlation Item ", items[i]),
-         xlab = "Item-Total Correlation",
-         xlim = c(min(repdat[items[i], ], polcor[items[i]], na.rm = TRUE),
-                  max(repdat[items[i], ], polcor[items[i]], na.rm = TRUE)))
-    abline(v = polcor[items[i]], lwd = 3)
-    mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
+         main = "",
+         xlab = substitute(paste("Item-Total Correlation Item ", ii, 
+                                 " (", y^rep, ")"), list(ii = items[i])),
+         xlim = c(min(repdat[items[i], ], polcor[items[i]], na.rm = TRUE)
+                  - IQR(repdat[items[i], ]/3),
+                  max(repdat[items[i], ], polcor[items[i]], na.rm = TRUE)
+                  + IQR(repdat[items[i], ]/3)),
+         las = 1, freq = FALSE, col = col.yrep, ...)
+    abline(v = polcor[items[i]], lwd = 3, col = col.y)
+    mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
           cex = 0.8, adj = 0)
   }
   
@@ -379,8 +388,10 @@ ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), items 
 # Again, one can use either polyserial or pearson correlation.
 # Apparently with this methods, we do not get the warnings about correlations 
 # larger than 1, when using polyserial correlation.
-ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items = NULL, 
-                        quiet = FALSE, mc.cores = getOption("mc.cores", 2L)) {
+ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), 
+                        items = NULL, quiet = FALSE, col.ppp = "black", 
+                        col.y = "black", col.yrep = "lightgray",
+                        mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -455,18 +466,22 @@ ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items
   repdat <- as.matrix(as.data.frame(repdat))
   
   # Compute posterior predictive p-values
-  out <- apply(repdat <= polcor, 1, function(x) sum(x, na.rm = TRUE)/dim(repdat)[2])
+  out <- apply(repdat >= polcor, 1, function(x) sum(x, na.rm = TRUE)/dim(repdat)[2])
   names(out) <- paste0("Item_", items)
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
     hist(repdat[items[i], ], 
-         main = paste0("Histogram Item-Total Correlation Item ", items[i]),
-         xlim = c(min(repdat[items[i], ], polcor[items[i]], na.rm = TRUE),
-                  max(repdat[items[i], ], polcor[items[i]], na.rm = TRUE)),
-         xlab = "Item-Total Correlation")
-    abline(v = polcor[items[i]], lwd = 3)
-    mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
+         main = "",
+         xlim = c(min(repdat[items[i], ], polcor[items[i]], na.rm = TRUE) -
+                    IQR(repdat[items[i], ])/3,
+                  max(repdat[items[i], ], polcor[items[i]], na.rm = TRUE) +
+                    IQR(repdat[items[i], ])/3),
+         xlab = substitute(paste("Item-Total Correlation (v2) Item ", ii, 
+                                 " (", y^rep, ")"), list(ii = items[i])),
+         las = 1, freq = FALSE, col = col.yrep, ...)
+    abline(v = polcor[items[i]], lwd = 3, col = col.y)
+    mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
           cex = 0.8, adj = 0)
   }
   
@@ -478,8 +493,10 @@ ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), items
 # Item-total Correlation Version 3 ----
 # In this version, we fit a autoregressive model to both the item scores and 
 # the rescores. Then, the residuals from these model are correlated.
-ppmc.itcor3 <- function(object, data, method = "pearson", items = NULL, 
-                        quiet = FALSE, mc.cores = getOption("mc.cores", 2L)) {
+ppmc.itcor3 <- function(object, data, method = "pearson", 
+                        items = NULL, quiet = FALSE, col.ppp = "black", 
+                        col.y = "black", col.yrep = "lightgray", 
+                        mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -531,18 +548,22 @@ ppmc.itcor3 <- function(object, data, method = "pearson", items = NULL,
   repdat <- as.matrix(as.data.frame(repdat))
   
   # Compute posterior predictive p-values
-  out <- apply(repdat <= polcor, 1, function(x) sum(x, na.rm = TRUE)/dim(repdat)[2])
+  out <- apply(repdat >= polcor, 1, function(x) sum(x, na.rm = TRUE)/dim(repdat)[2])
   names(out) <- paste0("Item_", items)
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
     hist(repdat[items[i], ], 
-         main = paste0("Histogram Item-Total Correlation Item ", items[i]),
-         xlim = c(min(repdat[items[i], ], polcor[items[i]], na.rm = TRUE),
-                  max(repdat[items[i], ], polcor[items[i]], na.rm = TRUE)),
-         xlab = "Item-Total Correlation")
-    abline(v = polcor[items[i]], lwd = 3)
-    mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
+         main = "",
+         xlim = c(min(repdat[items[i], ], polcor[items[i]], na.rm = TRUE) -
+                    IQR(repdat[items[i], ])/3,
+                  max(repdat[items[i], ], polcor[items[i]], na.rm = TRUE) +
+                    IQR(repdat[items[i], ])/3),
+         xlab = substitute(paste("Item-Total Correlation (v3) Item ", ii, 
+                                 " (", y^rep, ")"), list(ii = items[i])),
+         las = 1, freq = FALSE, col = col.yrep, ...)
+    abline(v = polcor[items[i]], lwd = 3, col = col.y)
+    mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
           cex = 0.8, adj = 0)
   }
   
