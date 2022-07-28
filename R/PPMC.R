@@ -619,7 +619,8 @@ gpcm.Q1 <- function(y, theta, thresholds, alpha, I, K, group, group_index, i_ind
 }
 
 ppmc.Q1 <- function(object, data, items = NULL, quiet = FALSE, 
-                    mc.cores = getOption("mc.cores", 2L)) {
+                    col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                    mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -689,18 +690,20 @@ ppmc.Q1 <- function(object, data, items = NULL, quiet = FALSE,
   discrepancy <- aperm(discrepancy, c(3, 1, 2))
   
   # Compute posterior predictive p-values
-  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+  out  <- apply(discrepancy[, , 2] >= discrepancy[, , 1], 2, mean)
   names(out) <- paste0("Item_", 1:I)
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
-    plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], las = 1,
-         main = paste0("Scatterplot Yen's Q1 of item ", items[i]),
-         ylab = expression(paste("Yen's ", Q[1], "(", y^rep, ";", Theta, ")")),
-         xlab = expression(paste("Yen's ", Q[1], "(y;", Theta, ")")))
-    abline(a= 0, b = 1, col = "red")
-    mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
+    plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], 
+         las = 1, main = "",
+         ylab = expression(paste("Yen's ", Q[1], "(", y^rep, ";", omega, ")")),
+         xlab = expression(paste("Yen's ", Q[1], "(y;", omega, ")")),
+         ...)
+    abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
+    mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
           cex = 0.8, adj = 0)
+    mtext(paste("Item", items[i]), line = 0.5, cex = 1.2, font = 2, adj = 1)
   }
   
   return(round(out, 3))
@@ -713,7 +716,8 @@ ppmc.Q1 <- function(object, data, items = NULL, quiet = FALSE,
 # the time into account.
 
 ppmc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE,
-                        mc.cores = getOption("mc.cores", 2L)) {
+                        col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                        mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -777,18 +781,19 @@ ppmc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE,
   discrepancy <- aperm(discrepancy, c(3, 1, 2))
   
   # Compute posterior predictive p-values
-  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+  out  <- apply(discrepancy[, , 2] >= discrepancy[, , 1], 2, mean)
   names(out) <- paste0("Item_", 1:I)
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
-    plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], las = 1,
-         main = paste0("Scatterplot Alt. Yen's Q1 of item ", items[i]),
-         ylab = expression(paste("Alt. Yen's ", Q[1], "(", y^rep, ";", Theta, ")")),
-         xlab = expression(paste("Alt. Yen's ", Q[1], "(y;", Theta, ")")))
-    abline(a= 0, b = 1, col = "red")
-    mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
+    plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], 
+         las = 1, main = "",
+         ylab = expression(paste("Alt. Yen's ", Q[1], "(", y^rep, ";", omega, ")")),
+         xlab = expression(paste("Alt. Yen's ", Q[1], "(y;", omega, ")")), ...)
+    abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
+    mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
           cex = 0.8, adj = 0)
+    mtext(paste("Item", items[i]), line = 0.5, cex = 1.2, font = 2, adj = 1)
   }
   
   return(round(out, 3))
@@ -838,7 +843,8 @@ gpcm.Q3 <- function(y, theta, thresholds, alpha, I, K, t_index) {
 }
 
 ppmc.Q3 <- function(object, data, scatterplots = FALSE,
-                    mc.cores = getOption("mc.cores", 2L)) {
+                    col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                    mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -888,19 +894,21 @@ ppmc.Q3 <- function(object, data, scatterplots = FALSE,
   discrepancy <- aperm(discrepancy, c(3, 1, 2))
   
   # Compute posterior predictive p-values
-  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+  out  <- apply(discrepancy[, , 2] >= discrepancy[, , 1], 2, mean)
   names(out) <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
     paste0("ppp-q3(", paste(x, collapse = ","), ")"))
   
   if (scatterplots) {
-    for (i in 1:15) {
-      plot(discrepancy[, i, 1], discrepancy[, i, 2], las = 1,
-           main = paste0("Scatterplot Yen's Q3 of items ", substring(names(out)[i], 7)),
-           ylab = expression(paste("Yen's ", Q[3], "(", y^rep, ";", Theta, ")")),
-           xlab = expression(paste("Yen's ", Q[3], "(y;", Theta, ")")))
-      abline(a= 0, b = 1, col = "red")
-      mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
+    for (i in 1:length(out)) {
+      plot(discrepancy[, i, 1], discrepancy[, i, 2], 
+           las = 1, main = "",
+           ylab = expression(paste("Yen's ", Q[3], "(", y^rep, ";", omega, ")")),
+           xlab = expression(paste("Yen's ", Q[3], "(y;", omega, ")")), ...)
+      abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
+      mtext(paste0("  PPP = ", round(out[i], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)
+      mtext(paste("Items", substring(names(out)[i], 7)), line = 0.5, cex = 1.2, 
+            font = 2, adj = 1)
     }
   }
   
@@ -912,6 +920,8 @@ ppmc.Q3 <- function(object, data, scatterplots = FALSE,
                              cols=c("out","out2"), color = NA,
                              show.legend = FALSE) + coord_equal()  +
     scale_fill_manual(values = c("black", gray(0.9))) +
+    scale_x_continuous(breaks = 2:I) +
+    scale_y_continuous(breaks = 1:(I - 1)) +
     labs(y = "Item", x = "Item") + theme_bw() + 
     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), 
@@ -1203,7 +1213,8 @@ cov.resid <- function(y, theta, thresholds, alpha, I, K, t_index) {
 }
 
 ppmc.cov.resid <- function(object, data, scatterplots = FALSE, 
-                           mc.cores = getOption("mc.cores", 2L)) {
+                           col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                           mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -1253,19 +1264,21 @@ ppmc.cov.resid <- function(object, data, scatterplots = FALSE,
   discrepancy <- aperm(discrepancy, c(3, 1, 2))
   
   # Compute posterior predictive p-values
-  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+  out  <- apply(discrepancy[, , 2] >= discrepancy[, , 1], 2, mean)
   names(out) <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
     paste0("ppp-resid(", paste(x, collapse = ","), ")"))
   
   if (scatterplots) {
-    for (i in 1:15) {
-      plot(discrepancy[, i, 1], discrepancy[, i, 2], las = 1,
-           main = paste0("Scatterplot cov RESID of items ", substring(names(out)[i], 10)),
-           ylab = expression(paste("Cov RESID (", y^rep, ";", Theta, ")")),
-           xlab = expression(paste("Cov RESID (y;", Theta, ")")))
-      abline(a= 0, b = 1, col = "red")
-      mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
+    for (i in 1:length(out)) {
+      plot(discrepancy[, i, 1], discrepancy[, i, 2], 
+           las = 1, main = "",
+           ylab = expression(paste("Cov RESID (", y^rep, ";", omega, ")")),
+           xlab = expression(paste("Cov RESID (y;", omega, ")")), ...)
+      abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
+      mtext(paste0("  PPP = ", round(out[i], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)
+      mtext(paste("Items", substring(names(out)[i], 10)), line = 0.5, cex = 1.2, 
+            font = 2, adj = 1)
     }
   }
   
@@ -1277,6 +1290,8 @@ ppmc.cov.resid <- function(object, data, scatterplots = FALSE,
                                    cols=c("out","out2"), color = NA,
                                    show.legend = FALSE) + coord_equal()  +
     scale_fill_manual(values = c("black", gray(0.9))) +
+    scale_x_continuous(breaks = 2:I) +
+    scale_y_continuous(breaks = 1:(I - 1)) +
     labs(y = "Item", x = "Item") + theme_bw() + 
     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), 
@@ -1289,7 +1304,8 @@ ppmc.cov.resid <- function(object, data, scatterplots = FALSE,
 # Absolute Item Covariance Residual Difference ----
 
 ppmc.cov.rediff <- function(object, data, scatterplots = FALSE,
-                            mc.cores = getOption("mc.cores", 2L)) {
+                            col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                            mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -1355,19 +1371,21 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE,
   discrepancy <- aperm(discrepancy, c(3, 1, 2))
   
   # Compute posterior predictive p-values
-  out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+  out  <- apply(discrepancy[, , 2] >= discrepancy[, , 1], 2, mean)
   names(out) <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
     paste0("ppp-rediff(", paste(x, collapse = ","), ")"))
   
   if (scatterplots) {
-    for (i in 1:15) {
-      plot(discrepancy[, i, 1], discrepancy[, i, 2], las = 1,
-           main = paste0("Scatterplot cov REDIFF of items ", substring(names(out)[i], 11)),
-           ylab = expression(paste("Cov REDIFF (", y^rep, ";", Theta, ")")),
-           xlab = expression(paste("Cov REDIFF (y;", Theta, ")")))
-      abline(a= 0, b = 1, col = "red")
-      mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
+    for (i in 1:length(out)) {
+      plot(discrepancy[, i, 1], discrepancy[, i, 2], 
+           las = 1, main = "",
+           ylab = expression(paste("Cov REDIFF (", y^rep, ";", omega, ")")),
+           xlab = expression(paste("Cov REDIFF (y;", omega, ")")), ...)
+      abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
+      mtext(paste0("  PPP = ", round(out[i], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)
+      mtext(paste("Items", substring(names(out)[i], 11)), line = 0.5, cex = 1.2, 
+            font = 2, adj = 1)
     }
   }
   
@@ -1379,6 +1397,8 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE,
                                    cols=c("out","out2"), color = NA,
                                    show.legend = FALSE) + coord_equal()  +
     scale_fill_manual(values = c("black", gray(0.9))) +
+    scale_x_continuous(breaks = 2:I) +
+    scale_y_continuous(breaks = 1:(I - 1)) +
     labs(y = "Item", x = "Item") + theme_bw() + 
     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), 
@@ -1429,8 +1449,9 @@ gpcm.lpacf <- function(y, theta, thresholds, alpha, I, K,
   return(out)
 }
 
-ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, 
-                       sumscores = FALSE, mc.cores = getOption("mc.cores", 2L)) {
+ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, sumscores = FALSE, 
+                       col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                       mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -1494,29 +1515,33 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE,
   
   # Compute posterior predictive p-values
   if (sumscores) {
-    out  <- mean(discrepancy[, 1, 2] > discrepancy[, 1, 1])
+    out  <- mean(discrepancy[, 1, 2] >= discrepancy[, 1, 1])
     names(out) <- "ppp"
     
-    plot(discrepancy[, 1, 1], discrepancy[, 1, 2], las = 1,
-         main = paste0("Scatterplot PACF of Sumscores"),
-         ylab = expression(paste("PACF", "(", y^rep, ";", Theta, ")")),
-         xlab = expression(paste("PACF", "(y;", Theta, ")")))
-    abline(a= 0, b = 1, col = "red")
-    mtext(paste0("PPP = ", round(out, 3)), line = -1.5, col = "red", 
+    plot(discrepancy[, 1, 1], discrepancy[, 1, 2], 
+         las = 1, main = "",
+         ylab = expression(paste("LPACF", "(", y^rep, ";", omega, ")")),
+         xlab = expression(paste("LPACF", "(y;", omega, ")")), ...)
+    abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
+    mtext(paste0("  PPP = ", round(out, 3)), line = -1.5, col = col.ppp, 
           cex = 0.8, adj = 0)
+    mtext("Sumscores", line = 0.5, cex = 1.2, 
+          font = 2, adj = 1)
   } else {
-    out  <- apply(discrepancy[, , 2] > discrepancy[, , 1], 2, mean)
+    out  <- apply(discrepancy[, , 2] >= discrepancy[, , 1], 2, mean)
     names(out) <- paste0("Item_", 1:I)
     
     for (i in 1:length(items)) {
       if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
-      plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], las = 1,
-           main = paste0("Scatterplot PACF of item ", items[i]),
-           ylab = expression(paste("PACF", "(", y^rep, ";", Theta, ")")),
-           xlab = expression(paste("PACF", "(y;", Theta, ")")))
-      abline(a= 0, b = 1, col = "red")
-      mtext(paste0("PPP = ", round(out[items[i]], 3)), line = -1.5, col = "red", 
+      plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], 
+           las = 1, main = "",
+           ylab = expression(paste("LPACF", "(", y^rep, ";", omega, ")")),
+           xlab = expression(paste("LPACF", "(y;", omega, ")")), ...)
+      abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
+      mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)
+      mtext(paste("Item ", items[i]), line = 0.5, cex = 1.2, 
+            font = 2, adj = 1)
     }
   }
   

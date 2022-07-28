@@ -221,7 +221,7 @@ ppmc.item.ts(object = fit, data = standata, quiet = TRUE)
 ### Item-Total Correlation: Version 1
 
 ```{r itcor, results = 'hide', fig.height = 6, fig.cap = "Item-Total Correlation"}
-par(mfrow = c(I, 1), mar = c(2, 3, 2, 2) + 0.1)
+par(mfrow = c(I, 1), mar = c(4, 4, 0, 2) + 0.1)
 ppmc.itcor(object = fit, data = standata, quiet = TRUE, method = "pearson")
 ```
 
