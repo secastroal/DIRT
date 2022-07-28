@@ -971,7 +971,8 @@ odds.ratio <- function(y, I, K, t_index) {
 }
 
 ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE,
-                    mc.cores = getOption("mc.cores", 2L)) {
+                    col.ppp = "black", col.y = "black", col.yrep = "lightgray",
+                    mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -1019,15 +1020,17 @@ ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE,
   orrep <- as.matrix(as.data.frame(orrep))
   
   # Compute posterior predictive p-values
-  out <- apply(orrep <= or, 1, function(x) sum(x)/dim(orrep)[2])
+  out <- apply(orrep >= or, 1, function(x) sum(x)/dim(orrep)[2])
   
   if (histograms) {
     for (i in 1:length(or)) {
-      hist(orrep[i, ], main = paste0("Histogram Odd Ratio of Items ", 
-                                     substring(names(out)[i], 3)),
-           xlab = "Odd Ratio")
-      abline(v = or[i], lwd = 3)
-      mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
+      hist(orrep[i, ], main = "",
+           xlab = substitute(paste("OR", ii,"(", y^rep, ")"), 
+                             list(ii = substring(names(out)[i], 3))),
+           xlim = c(0, max(orrep[i, ], or[i]) + IQR(orrep[i, ])/3),
+           las = 1, freq = FALSE, col = col.yrep, ...)
+      abline(v = or[i], lwd = 3, col = col.y)
+      mtext(paste0("  PPP = ", round(out[i], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)
     }
   }
@@ -1040,6 +1043,8 @@ ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE,
                                    cols=c("out","out2"), color = NA,
                                    show.legend = FALSE) + coord_equal()  +
     scale_fill_manual(values = c("black", gray(0.9))) +
+    scale_x_continuous(breaks = 2:I) +
+    scale_y_continuous(breaks = 1:(I - 1)) +
     labs(y = "Item", x = "Item") + theme_bw() + 
     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), 
@@ -1052,7 +1057,8 @@ ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE,
 # Odds Ratio Difference ----
 
 ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE,
-                        mc.cores = getOption("mc.cores", 2L)) {
+                        col.ppp = "black", col.y = "black", col.yrep = "lightgray",
+                        mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
   
@@ -1121,18 +1127,20 @@ ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE,
   ordiffrep <- as.matrix(as.data.frame(ordiffrep))
   
   # Compute posterior predictive p-values
-  out <- apply(ordiffrep <= ordiff, 1, function(x) sum(x)/dim(ordiffrep)[2])
+  out <- apply(ordiffrep >= ordiff, 1, function(x) sum(x)/dim(ordiffrep)[2])
   names(out) <- apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, function(x)
     paste0("ppp-ordiff(", paste(x, collapse = ","), ")"))
   
   if (histograms) {
     for (i in 1:length(ordiff)) {
-      hist(ordiffrep[i, ], 
-           main = paste0("Histogram Odd Ratio Difference of Items ",
-                         substring(names(out)[i], 11)),
-           xlab = "Odd Ratio Difference")
-      abline(v = ordiff[i], lwd = 3)
-      mtext(paste0("PPP = ", round(out[i], 3)), line = -1.5, col = "red", 
+      hist(ordiffrep[i, ], main = "",
+           xlab = substitute(paste("ORDiff", ii,"(", y^rep, ")"), 
+                             list(ii = substring(names(out)[i], 11))),
+           xlim = c(min(ordiffrep[i, ], ordiff[i]) - IQR(ordiffrep[i, ])/3, 
+                    max(ordiffrep[i, ], ordiff[i]) + IQR(ordiffrep[i, ])/3),
+           las = 1, freq = FALSE, col = col.yrep, ...)
+      abline(v = ordiff[i], lwd = 3, col = col.y)
+      mtext(paste0("  PPP = ", round(out[i], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)
     }
   }
@@ -1145,6 +1153,8 @@ ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE,
                                    cols=c("out","out2"), color = NA,
                                    show.legend = FALSE) + coord_equal()  +
     scale_fill_manual(values = c("black", gray(0.9))) +
+    scale_x_continuous(breaks = 2:I) +
+    scale_y_continuous(breaks = 1:(I - 1)) +
     labs(y = "Item", x = "Item") + theme_bw() + 
     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), 
