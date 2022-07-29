@@ -75,7 +75,7 @@ ppmc.sumscore.ts <- function(object, data, mc.cores = getOption("mc.cores", 2L))
 }
 
 # Partial Autocorrelation of the residuals ----
-ppmc.racf <- function(object, data, col.ppp = "black", 
+ppmc.racf <- function(object, data, col.ppp = "black", xlab = NULL,
                       col.y = "black", col.yrep = "lightgray", 
                       mc.cores = getOption("mc.cores", 2L), ...) {
   
@@ -115,8 +115,10 @@ ppmc.racf <- function(object, data, col.ppp = "black",
   # Compute posterior predictive p-values
   out <- sum(acorrep >= acor) / length(acorrep)
   
+  if (is.null(xlab)) {xlab = expression(PACF(y^rep))}
+  
   hist(acorrep, main = "",
-       xlab = expression(PACF(y^rep)),
+       xlab = xlab,
        xlim = c(min(acorrep, acor) - IQR(acorrep)/3,
                 max(acorrep, acor) + IQR(acorrep)/3),
        las = 1, freq = FALSE, col = col.yrep, ...)
@@ -129,7 +131,8 @@ ppmc.racf <- function(object, data, col.ppp = "black",
 
 # Autocorrelation of the sumscores ----
 ppmc.acf <- function(object, data, lag.max = 5, col.ppp = "black", 
-                     col.y = "black", col.yrep = "lightgray",  
+                     col.y = "black", col.yrep = "lightgray", 
+                     xlab = NULL, default.xlab = is.null(xlab),  
                      mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -165,8 +168,10 @@ ppmc.acf <- function(object, data, lag.max = 5, col.ppp = "black",
   out <- apply(acorrep >= acor, 1, function(x) sum(x)/dim(acorrep)[2])
   
   for (i in 1:lag.max) {
+    if (default.xlab) {xlab = bquote(ACF[.(i)](y^rep))}
+    
     hist(acorrep[i, ], main = "",
-         xlab = bquote(ACF[.(i)](y^rep)),
+         xlab = xlab,
          xlim = c(min(acorrep[i, ], acor) - IQR(acorrep[i, ])/3,
                   max(acorrep[i, ], acor) + IQR(acorrep[i, ])/3),
          las = 1, freq = FALSE, col = col.yrep, ...)
@@ -180,7 +185,7 @@ ppmc.acf <- function(object, data, lag.max = 5, col.ppp = "black",
 
 # Mean Square Successive Difference ----
 
-ppmc.mssd <- function(object, data, col.ppp = "black", 
+ppmc.mssd <- function(object, data, col.ppp = "black", xlab = NULL, 
                       col.y = "black", col.yrep = "lightgray", 
                       mc.cores = getOption("mc.cores", 2L), ...) {
   
@@ -219,8 +224,10 @@ ppmc.mssd <- function(object, data, col.ppp = "black",
   # Compute posterior predictive p-values
   out <- sum(mssdrep >= mssd) / length(mssdrep)
   
+  if (is.null(xlab)) {xlab = expression(paste("MSSD(", y^rep, ")"))}
+  
   hist(mssdrep, main = "",
-       xlab = expression(paste("MSSD(", y^rep, ")")),
+       xlab = xlab,
        xlim = c(min(mssdrep, mssd) - IQR(mssdrep)/3,
                 max(mssdrep, mssd) + IQR(mssdrep)/3),
        las = 1, freq = FALSE, col = col.yrep, ...)
@@ -290,6 +297,7 @@ ppmc.item.ts <- function(object, data, quiet = FALSE, items = NULL) {
 ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"), 
                        items = NULL, col.ppp = "black", col.y = "black", 
                        col.yrep = "lightgray", quiet = FALSE, 
+                       xlab = NULL, default.xlab = is.null(xlab),  
                        mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -362,10 +370,13 @@ ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"),
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
+    if (default.xlab) {xlab = substitute(paste("Item-Total Correlation Item ", 
+                                               ii, " (", y^rep, ")"), 
+                                         list(ii = items[i]))}
+    
     hist(repdat[items[i], ], 
          main = "",
-         xlab = substitute(paste("Item-Total Correlation Item ", ii, 
-                                 " (", y^rep, ")"), list(ii = items[i])),
+         xlab = xlab,
          xlim = c(min(repdat[items[i], ], polcor[items[i]], na.rm = TRUE)
                   - IQR(repdat[items[i], ]/3),
                   max(repdat[items[i], ], polcor[items[i]], na.rm = TRUE)
@@ -391,6 +402,7 @@ ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"),
 ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"), 
                         items = NULL, quiet = FALSE, col.ppp = "black", 
                         col.y = "black", col.yrep = "lightgray",
+                        xlab = NULL, default.xlab = is.null(xlab),  
                         mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -471,14 +483,17 @@ ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"),
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
+    if (default.xlab) {xlab = substitute(paste("Item-Total Correlation (v2) Item ", 
+                                               ii, " (", y^rep, ")"), 
+                                         list(ii = items[i]))}
+    
     hist(repdat[items[i], ], 
          main = "",
          xlim = c(min(repdat[items[i], ], polcor[items[i]], na.rm = TRUE) -
                     IQR(repdat[items[i], ])/3,
                   max(repdat[items[i], ], polcor[items[i]], na.rm = TRUE) +
                     IQR(repdat[items[i], ])/3),
-         xlab = substitute(paste("Item-Total Correlation (v2) Item ", ii, 
-                                 " (", y^rep, ")"), list(ii = items[i])),
+         xlab = xlab,
          las = 1, freq = FALSE, col = col.yrep, ...)
     abline(v = polcor[items[i]], lwd = 3, col = col.y)
     mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
@@ -496,6 +511,7 @@ ppmc.itcor2 <- function(object, data, method = c("polyserial", "pearson"),
 ppmc.itcor3 <- function(object, data, method = "pearson", 
                         items = NULL, quiet = FALSE, col.ppp = "black", 
                         col.y = "black", col.yrep = "lightgray", 
+                        xlab = NULL, default.xlab = is.null(xlab),  
                         mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -553,14 +569,17 @@ ppmc.itcor3 <- function(object, data, method = "pearson",
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
+    if (default.xlab) {xlab = substitute(paste("Item-Total Correlation (v3) Item ", 
+                                               ii, " (", y^rep, ")"), 
+                                         list(ii = items[i]))}
+    
     hist(repdat[items[i], ], 
          main = "",
          xlim = c(min(repdat[items[i], ], polcor[items[i]], na.rm = TRUE) -
                     IQR(repdat[items[i], ])/3,
                   max(repdat[items[i], ], polcor[items[i]], na.rm = TRUE) +
                     IQR(repdat[items[i], ])/3),
-         xlab = substitute(paste("Item-Total Correlation (v3) Item ", ii, 
-                                 " (", y^rep, ")"), list(ii = items[i])),
+         xlab = xlab,
          las = 1, freq = FALSE, col = col.yrep, ...)
     abline(v = polcor[items[i]], lwd = 3, col = col.y)
     mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
@@ -620,6 +639,8 @@ gpcm.Q1 <- function(y, theta, thresholds, alpha, I, K, group, group_index, i_ind
 
 ppmc.Q1 <- function(object, data, items = NULL, quiet = FALSE, 
                     col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                    xlab = NULL, default.xlab = is.null(xlab),  
+                    ylab = NULL, default.ylab = is.null(ylab),  
                     mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -695,10 +716,13 @@ ppmc.Q1 <- function(object, data, items = NULL, quiet = FALSE,
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
+    if (default.ylab) {ylab = expression(paste("Yen's ", Q[1], "(", y^rep, ";", omega, ")"))}
+    if (default.xlab) {xlab = expression(paste("Yen's ", Q[1], "(y;", omega, ")"))}
+    
     plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], 
          las = 1, main = "",
-         ylab = expression(paste("Yen's ", Q[1], "(", y^rep, ";", omega, ")")),
-         xlab = expression(paste("Yen's ", Q[1], "(y;", omega, ")")),
+         ylab = ylab,
+         xlab = xlab,
          ...)
     abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
     mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
@@ -717,6 +741,8 @@ ppmc.Q1 <- function(object, data, items = NULL, quiet = FALSE,
 
 ppmc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE,
                         col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                        xlab = NULL, default.xlab = is.null(xlab),  
+                        ylab = NULL, default.ylab = is.null(ylab),  
                         mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -786,10 +812,13 @@ ppmc.Q1.alt <- function(object, data, items = NULL, quiet = FALSE,
   
   for (i in 1:length(items)) {
     if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
+    if (default.ylab) {ylab = expression(paste("Alt. Yen's ", Q[1], "(", y^rep, ";", omega, ")"))}
+    if (default.xlab) {xlab = expression(paste("Alt. Yen's ", Q[1], "(y;", omega, ")"))}
+    
     plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], 
          las = 1, main = "",
-         ylab = expression(paste("Alt. Yen's ", Q[1], "(", y^rep, ";", omega, ")")),
-         xlab = expression(paste("Alt. Yen's ", Q[1], "(y;", omega, ")")), ...)
+         ylab = ylab,
+         xlab = xlab, ...)
     abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
     mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
           cex = 0.8, adj = 0)
@@ -844,6 +873,8 @@ gpcm.Q3 <- function(y, theta, thresholds, alpha, I, K, t_index) {
 
 ppmc.Q3 <- function(object, data, scatterplots = FALSE,
                     col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                    xlab = NULL, default.xlab = is.null(xlab),  
+                    ylab = NULL, default.ylab = is.null(ylab),  
                     mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -900,10 +931,13 @@ ppmc.Q3 <- function(object, data, scatterplots = FALSE,
   
   if (scatterplots) {
     for (i in 1:length(out)) {
+      if (default.ylab) {ylab = expression(paste("Yen's ", Q[3], "(", y^rep, ";", omega, ")"))}
+      if (default.xlab) {xlab = expression(paste("Yen's ", Q[3], "(y;", omega, ")"))}
+      
       plot(discrepancy[, i, 1], discrepancy[, i, 2], 
            las = 1, main = "",
-           ylab = expression(paste("Yen's ", Q[3], "(", y^rep, ";", omega, ")")),
-           xlab = expression(paste("Yen's ", Q[3], "(y;", omega, ")")), ...)
+           ylab = ylab,
+           xlab = xlab, ...)
       abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
       mtext(paste0("  PPP = ", round(out[i], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)
@@ -982,6 +1016,7 @@ odds.ratio <- function(y, I, K, t_index) {
 
 ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE,
                     col.ppp = "black", col.y = "black", col.yrep = "lightgray",
+                    xlab = NULL, default.xlab = is.null(xlab),  
                     mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -1034,9 +1069,11 @@ ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE,
   
   if (histograms) {
     for (i in 1:length(or)) {
+      if (default.xlab) {xlab = substitute(paste("OR", ii,"(", y^rep, ")"),
+                                           list(ii = substring(names(out)[i], 3)))}
+      
       hist(orrep[i, ], main = "",
-           xlab = substitute(paste("OR", ii,"(", y^rep, ")"), 
-                             list(ii = substring(names(out)[i], 3))),
+           xlab = xlab,
            xlim = c(0, max(orrep[i, ], or[i]) + IQR(orrep[i, ])/3),
            las = 1, freq = FALSE, col = col.yrep, ...)
       abline(v = or[i], lwd = 3, col = col.y)
@@ -1068,6 +1105,7 @@ ppmc.OR <- function(object, data, cutoff = NULL, histograms = FALSE,
 
 ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE,
                         col.ppp = "black", col.y = "black", col.yrep = "lightgray",
+                        xlab = NULL, default.xlab = is.null(xlab),  
                         mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -1143,9 +1181,11 @@ ppmc.ORDiff <- function(object, data, cutoff = NULL, histograms = FALSE,
   
   if (histograms) {
     for (i in 1:length(ordiff)) {
+      if (default.xlab) {xlab = substitute(paste("ORDiff", ii,"(", y^rep, ")"), 
+                                           list(ii = substring(names(out)[i], 11)))}
+      
       hist(ordiffrep[i, ], main = "",
-           xlab = substitute(paste("ORDiff", ii,"(", y^rep, ")"), 
-                             list(ii = substring(names(out)[i], 11))),
+           xlab = xlab,
            xlim = c(min(ordiffrep[i, ], ordiff[i]) - IQR(ordiffrep[i, ])/3, 
                     max(ordiffrep[i, ], ordiff[i]) + IQR(ordiffrep[i, ])/3),
            las = 1, freq = FALSE, col = col.yrep, ...)
@@ -1214,6 +1254,8 @@ cov.resid <- function(y, theta, thresholds, alpha, I, K, t_index) {
 
 ppmc.cov.resid <- function(object, data, scatterplots = FALSE, 
                            col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                           xlab = NULL, default.xlab = is.null(xlab),  
+                           ylab = NULL, default.ylab = is.null(ylab),  
                            mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -1270,10 +1312,13 @@ ppmc.cov.resid <- function(object, data, scatterplots = FALSE,
   
   if (scatterplots) {
     for (i in 1:length(out)) {
+      if (default.ylab) {ylab = expression(paste("Cov RESID (", y^rep, ";", omega, ")"))}
+      if (default.xlab) {xlab = expression(paste("Cov RESID (y;", omega, ")"))}
+      
       plot(discrepancy[, i, 1], discrepancy[, i, 2], 
            las = 1, main = "",
-           ylab = expression(paste("Cov RESID (", y^rep, ";", omega, ")")),
-           xlab = expression(paste("Cov RESID (y;", omega, ")")), ...)
+           ylab = ylab,
+           xlab = xlab, ...)
       abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
       mtext(paste0("  PPP = ", round(out[i], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)
@@ -1305,6 +1350,8 @@ ppmc.cov.resid <- function(object, data, scatterplots = FALSE,
 
 ppmc.cov.rediff <- function(object, data, scatterplots = FALSE,
                             col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                            xlab = NULL, default.xlab = is.null(xlab),  
+                            ylab = NULL, default.ylab = is.null(ylab),  
                             mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -1377,10 +1424,13 @@ ppmc.cov.rediff <- function(object, data, scatterplots = FALSE,
   
   if (scatterplots) {
     for (i in 1:length(out)) {
+      if (default.ylab) {ylab = expression(paste("Cov REDIFF (", y^rep, ";", omega, ")"))}
+      if (default.xlab) {xlab = expression(paste("Cov REDIFF (y;", omega, ")"))}
+      
       plot(discrepancy[, i, 1], discrepancy[, i, 2], 
            las = 1, main = "",
-           ylab = expression(paste("Cov REDIFF (", y^rep, ";", omega, ")")),
-           xlab = expression(paste("Cov REDIFF (y;", omega, ")")), ...)
+           ylab = ylab,
+           xlab = xlab, ...)
       abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
       mtext(paste0("  PPP = ", round(out[i], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)
@@ -1451,6 +1501,8 @@ gpcm.lpacf <- function(y, theta, thresholds, alpha, I, K,
 
 ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, sumscores = FALSE, 
                        col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
+                       xlab = NULL, default.xlab = is.null(xlab),  
+                       ylab = NULL, default.ylab = is.null(ylab),  
                        mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -1518,10 +1570,13 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, sumscores = FA
     out  <- mean(discrepancy[, 1, 2] >= discrepancy[, 1, 1])
     names(out) <- "ppp"
     
+    if (default.ylab) {ylab = expression(paste("LPACF", "(", y^rep, ";", omega, ")"))}
+    if (default.xlab) {xlab = expression(paste("LPACF", "(y;", omega, ")"))}
+    
     plot(discrepancy[, 1, 1], discrepancy[, 1, 2], 
          las = 1, main = "",
-         ylab = expression(paste("LPACF", "(", y^rep, ";", omega, ")")),
-         xlab = expression(paste("LPACF", "(y;", omega, ")")), ...)
+         ylab = ylab,
+         xlab = xlab, ...)
     abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
     mtext(paste0("  PPP = ", round(out, 3)), line = -1.5, col = col.ppp, 
           cex = 0.8, adj = 0)
@@ -1531,12 +1586,15 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, sumscores = FA
     out  <- apply(discrepancy[, , 2] >= discrepancy[, , 1], 2, mean)
     names(out) <- paste0("Item_", 1:I)
     
+    if (default.ylab) {ylab = expression(paste("LPACF", "(", y^rep, ";", omega, ")"))}
+    if (default.xlab) {xlab = expression(paste("LPACF", "(y;", omega, ")"))}
+    
     for (i in 1:length(items)) {
       if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
       plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], 
            las = 1, main = "",
-           ylab = expression(paste("LPACF", "(", y^rep, ";", omega, ")")),
-           xlab = expression(paste("LPACF", "(y;", omega, ")")), ...)
+           ylab = ylab,
+           xlab = xlab, ...)
       abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
       mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)
