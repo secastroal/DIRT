@@ -1502,7 +1502,8 @@ gpcm.lpacf <- function(y, theta, thresholds, alpha, I, K,
 ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, sumscores = FALSE, 
                        col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
                        xlab = NULL, default.xlab = is.null(xlab),  
-                       ylab = NULL, default.ylab = is.null(ylab),  
+                       ylab = NULL, default.ylab = is.null(ylab), 
+                       subtitle = TRUE,
                        mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -1580,8 +1581,10 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, sumscores = FA
     abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
     mtext(paste0("  PPP = ", round(out, 3)), line = -1.5, col = col.ppp, 
           cex = 0.8, adj = 0)
-    mtext("Sumscores", line = 0.5, cex = 1.2, 
-          font = 2, adj = 1)
+    if (subtitle) {
+      mtext("Sumscores", line = 0.5, cex = 1.2, 
+            font = 2, adj = 1)
+    }
   } else {
     out  <- apply(discrepancy[, , 2] >= discrepancy[, , 1], 2, mean)
     names(out) <- paste0("Item_", 1:I)
@@ -1598,8 +1601,10 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, sumscores = FA
       abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
       mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)
-      mtext(paste("Item ", items[i]), line = 0.5, cex = 1.2, 
-            font = 2, adj = 1)
+      if (subtitle) {
+        mtext(paste("Item ", items[i]), line = 0.5, cex = 1.2, 
+              font = 2, adj = 1)
+      }
     }
   }
   

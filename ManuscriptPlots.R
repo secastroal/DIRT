@@ -118,7 +118,8 @@ dev.off()
 # PPMC example ----
 
 # Load Stan, the stan model, and PPMC functions.
-library(rstan)rstan_options(auto_write = TRUE)
+library(rstan)
+rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores() - 1)
 library(bayesplot)
 color_scheme_set("darkgray")
@@ -152,7 +153,7 @@ fit <- sampling(model,                  # Stan model.
                 init    = tvdpcm_inits, # Initial values
                 seed = 2022,            # Seed
                 pars = c("beta", "theta", "lambda",
-                         "sigma2", "pvar", "attractor"),
+                         "sigma2", "pvar", "attractor", "rep_y"),
                 control = list(adapt_delta   = 0.99,
                                max_treedepth = 15) # Other parameters to control sampling behavior.
                 ) 
@@ -184,8 +185,12 @@ colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI",
                           "Excedeed Treedepth", "Low Bulk ESS", "Low Tail ESS")
 
 # Plot PPMC method by test statistic and by discrepancy measure.
-
+pdf("Figures/PPMC_example.pdf", height = 4)
+par(mfrow = c(1, 2), mar = c(4, 5, 0, 1) + 0.1, oma = c(0, 0, 2, 0) + 0.1)
 ppmc.racf(object = fit, data = standata, xlab = expression(T(y^rep)))
 ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE,
-           xlab = expression(D(y,omega)), ylab = expression(D(y^rep,omega)))
-
+           xlab = expression(D(y,omega)), ylab = expression(D(y^rep,omega)), 
+           subtitle = FALSE)
+mtext("A", side = 3, line = 0.2, outer = TRUE, at = 0.025, font = 2, cex = 1.3)
+mtext("B", side = 3, line = 0.2, outer = TRUE, at = 0.505, font = 2, cex = 1.3)
+dev.off()
