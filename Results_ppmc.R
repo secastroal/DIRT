@@ -214,6 +214,32 @@ print(xtable(outDefault, type = "latex", caption = "Proportion of Extreme PPP-Va
       include.rownames = TRUE, NA.string = "-", caption.placement = "top", sanitize.text.function = function(x){x},
       file = "Tables/outDefault.tex")
 
+# Random Responses
+
+outRandom <- matrix(NA, length(discmeasures), 3)
+
+for(i in 1:3) {
+  for (j in 1:length(discmeasures)) {
+    tmp.data <- Results[[i]][Results[[i]]$model == "Random", ]
+    tmp <- unlist(tmp.data[, grep(discmeasures[j], names(tmp.data))])
+    outRandom[j, i] <- round(sum(tmp <= 0.05 | tmp >= 0.95)/length(tmp), 2)
+  }
+}
+
+outRandom <- data.frame(outRandom)
+names(outRandom) <- paste0("I=", c(3, 6, 12))
+row.names(outRandom) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF", "MSSD",
+                           "Item-total correlation", "Item-total correlation (v2)", 
+                           "Item-total correlation (v3)", "Yen's $Q_1$", "Yen's $Q_1$ alt.",
+                           "Item LPACF", "Yen's $Q_3$", "OR", "OR difference", 
+                           "RESID", "RESID  difference")
+
+print(xtable(outRandom, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-DPCM as the Generating Model when Default Responses were given to the Last Third of the Measurements",
+             label = "tab:random", align = c("l", "c", "c", "c")),
+      include.colnames=T, sanitize.rownames.function = identity,
+      include.rownames = TRUE, NA.string = "-", caption.placement = "top", sanitize.text.function = function(x){x},
+      file = "Tables/outRandom.tex")
+
 # GPCM different discrimination
 
 pairsindex <- list(c(2, 2, 3),
