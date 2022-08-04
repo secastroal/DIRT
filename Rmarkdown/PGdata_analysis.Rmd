@@ -52,9 +52,9 @@ To exemplify how to use an interpret the TV-DPCM, in this section, we analyzed m
 
 ```{r data}
 PG_data <- read.csv("../ESMdata/ESMdata.csv")
-PG_data <- PG_data[PG_data$resp_abort == 0, ]
-PG_data <- PG_data[!is.na(PG_data$mood_down), ]
-# PG_data <- PG_data[!is.na(PG_data$pat_restl), ]
+# PG_data <- PG_data[PG_data$resp_abort == 0, ]
+# PG_data <- PG_data[!is.na(PG_data$mood_down), ]
+PG_data <- PG_data[!is.na(PG_data$pat_restl), ]
 
 # Select variables
 PG_data <- PG_data[, c("date", "phase", "concentrat", "beepno", "resptime_s", 
