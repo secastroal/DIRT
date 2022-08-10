@@ -120,18 +120,33 @@ for(i in 1:3) {
   }
 }
 
+outTVDPCM <- ifelse(outTVDPCM >= 0.7,
+                    paste0("\\textbf{", round(outTVDPCM, 2), "}"),
+                    round(outTVDPCM, 2))
+
 outTVDPCM <- data.frame(outTVDPCM)
-names(outTVDPCM) <- paste0("I=", c(3, 6, 12))
-row.names(outTVDPCM) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF", "MSSD",
-                          "Item-total correlation", "Item-total correlation (v2)", 
-                          "Item-total correlation (v3)", "Yen's $Q_1$", "Yen's $Q_1$ alt.",
-                          "Item LPACF", "Yen's $Q_3$", "OR", "OR difference", 
-                          "RESID", "RESID  difference")
+names(outTVDPCM) <- paste0("$I=", c(3, 6, 12), "$")
+row.names(outTVDPCM) <- paste0("\\hspace{0.25in}",
+                               c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", 
+                                 "LPACF", "MSSD", "Item-total correlation", 
+                                 "Item-total correlation (v2)", "Item-total correlation (v3)", 
+                                 "Yen's $Q_1$", "Yen's $Q_1$ alt.", "Item LPACF", 
+                                 "Yen's $Q_3$", "OR", "OR difference",
+                                 "RESID", "RESID  difference"))
+
+addtorow <- list()
+addtorow$pos <- list(0, 0, nrow(outTVDPCM))
+addtorow$command <- c("& \\multicolumn{3}{c}{Number of Items} \\\\\n",
+                      " & $I = 3$ & $I = 6$ & $I = 12$\\\\\n",
+                      "\\begin{tablenotes}[para,flushleft]\n{\\small 
+                      \\textit{Note.} Test one.}\n\\end{tablenotes}\n")
 
 print(xtable(outTVDPCM, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-DPCM as the Generating Model",
-             label = "tab:tvdpcm", align = c("l", "c", "c", "c")),
-      include.colnames=T, sanitize.rownames.function = identity,
-      include.rownames = TRUE, NA.string = "-", caption.placement = "top", sanitize.text.function = function(x){x},
+             label = "tab:tvdpcm", align = c("l", "r", "r", "r")),
+      include.colnames = FALSE, sanitize.rownames.function = identity,
+      include.rownames = TRUE, NA.string = "-", caption.placement = "top", 
+      sanitize.text.function = function(x){x}, booktabs = TRUE,
+      add.to.row = addtorow,
       file = "Tables/outTVDPCM.tex")
 
 # Bidimensional
@@ -167,6 +182,10 @@ for(i in 1:3) {
   rm(tmp1, tmp2, tmp3)
 }
 
+outBiDim <- ifelse(outBiDim >= 0.7,
+                    paste0("\\textbf{", round(outBiDim, 2), "}"),
+                    round(outBiDim, 2))
+
 outBiDim <- data.frame(outBiDim)
 names(outBiDim) <- paste0("I=", c(3, 6, 12))
 row.names(outBiDim) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF", "MSSD",
@@ -181,11 +200,24 @@ row.names(outBiDim) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF",
                         paste("OR difference", c("(dim1, dim1)", "(dim1, dim2)", "(dim2, dim2)")),
                         paste("RESID", c("(dim1, dim1)", "(dim1, dim2)", "(dim2, dim2)")),
                         paste("RESID  difference",c("(dim1, dim1)", "(dim1, dim2)", "(dim2, dim2)")))
+row.names(outBiDim) <- paste0("\\hspace{0.25in}", row.names(outBiDim))
+
+outBiDim <- outBiDim[-(1:6), ]
+
+addtorow <- list()
+addtorow$pos <- list(0, 0, nrow(outBiDim))
+addtorow$command <- c("& \\multicolumn{3}{c}{Number of Items} \\\\\n",
+                      " & $I = 3$ & $I = 6$ & $I = 12$\\\\\n",
+                      "\\begin{tablenotes}[para,flushleft]\n{\\small 
+                      \\textit{Note.} \\textit{dim1} denotes the items of dimension 1.
+                      \\textit{dim2} denotes the items of dimension 2.}\n\\end{tablenotes}\n")
 
 print(xtable(outBiDim, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-MDPCM as the Generating Model",
-             label = "tab:tvmdpcm", align = c("l", "c", "c", "c")),
-      include.colnames=T, sanitize.rownames.function = identity,
-      include.rownames = TRUE, NA.string = "-", caption.placement = "top", sanitize.text.function = function(x){x},
+             label = "tab:tvmdpcm", align = c("l", "r", "r", "r")),
+      include.colnames = FALSE, sanitize.rownames.function = identity,
+      include.rownames = TRUE, NA.string = "-", caption.placement = "top", 
+      sanitize.text.function = function(x){x}, booktabs = TRUE,
+      add.to.row = addtorow,
       file = "Tables/outTVMDPCM.tex")
 
 # Default Responses
@@ -200,6 +232,10 @@ for(i in 1:3) {
   }
 }
 
+outDefault <- ifelse(outDefault >= 0.7,
+                   paste0("\\textbf{", round(outDefault, 2), "}"),
+                   round(outDefault, 2))
+
 outDefault <- data.frame(outDefault)
 names(outDefault) <- paste0("I=", c(3, 6, 12))
 row.names(outDefault) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF", "MSSD",
@@ -207,11 +243,21 @@ row.names(outDefault) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF
                          "Item-total correlation (v3)", "Yen's $Q_1$", "Yen's $Q_1$ alt.",
                          "Item LPACF", "Yen's $Q_3$", "OR", "OR difference", 
                          "RESID", "RESID  difference")
+row.names(outDefault) <- paste0("\\hspace{0.25in}", row.names(outDefault))
 
-print(xtable(outDefault, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-DPCM as the Generating Model when Default Responses were given to the Last Third of the Measurements",
-             label = "tab:default", align = c("l", "c", "c", "c")),
-      include.colnames=T, sanitize.rownames.function = identity,
-      include.rownames = TRUE, NA.string = "-", caption.placement = "top", sanitize.text.function = function(x){x},
+outDefault <- outDefault[-(1:6), ]
+
+addtorow <- list()
+addtorow$pos <- list(0, 0)
+addtorow$command <- c("& \\multicolumn{3}{c}{Number of Items} \\\\\n",
+                      " & $I = 3$ & $I = 6$ & $I = 12$\\\\\n")
+
+print(xtable(outDefault, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-DPCM-Meaning as the Generating Model",
+             label = "tab:default", align = c("l", "r", "r", "r")),
+      include.colnames = FALSE, sanitize.rownames.function = identity,
+      include.rownames = TRUE, NA.string = "-", caption.placement = "top", 
+      sanitize.text.function = function(x){x}, booktabs = TRUE,
+      add.to.row = addtorow,
       file = "Tables/outDefault.tex")
 
 # Random Responses
@@ -234,7 +280,7 @@ row.names(outRandom) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF"
                            "Item LPACF", "Yen's $Q_3$", "OR", "OR difference", 
                            "RESID", "RESID  difference")
 
-print(xtable(outRandom, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-DPCM as the Generating Model when Default Responses were given to the Last Third of the Measurements",
+print(xtable(outRandom, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-DPCM-Random",
              label = "tab:random", align = c("l", "c", "c", "c")),
       include.colnames=T, sanitize.rownames.function = identity,
       include.rownames = TRUE, NA.string = "-", caption.placement = "top", sanitize.text.function = function(x){x},
@@ -274,6 +320,10 @@ for(i in 1:3) {
   rm(tmp1, tmp2, tmp3)
 }
 
+outGPCM <- ifelse(outGPCM >= 0.7,
+                   paste0("\\textbf{", round(outGPCM, 2), "}"),
+                   round(outGPCM, 2))
+
 outGPCM <- data.frame(outGPCM)
 names(outGPCM) <- paste0("I=", c(3, 6, 12))
 row.names(outGPCM) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF", "MSSD",
@@ -289,10 +339,24 @@ row.names(outGPCM) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF", 
                         paste("RESID", c("(disc1, disc1)", "(disc1, disc2)", "(disc2, disc2)")),
                         paste("RESID  difference",c("(disc1, disc1)", "(disc1, disc2)", "(disc2, disc2)")))
 
+row.names(outGPCM) <- paste0("\\hspace{0.25in}", row.names(outGPCM))
+
+outGPCM <- outGPCM[-(1:6), ]
+
+addtorow <- list()
+addtorow$pos <- list(0, 0, nrow(outGPCM))
+addtorow$command <- c("& \\multicolumn{3}{c}{Number of Items} \\\\\n",
+                      " & $I = 3$ & $I = 6$ & $I = 12$\\\\\n",
+                      "\\begin{tablenotes}[para,flushleft]\n{\\small 
+                      \\textit{Note.} \\textit{disc} denotes the items with discrimination parameter equal to 1.
+                      \\textit{disc2} denotes the items with discrimination parameters different from 1.}\\end{tablenotes}\n")
+
 print(xtable(outGPCM, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-DGPCM as the Generating Model",
-             label = "tab:gpcm", align = c("l", "c", "c", "c")),
-      include.colnames=T, sanitize.rownames.function = identity,
-      include.rownames = TRUE, NA.string = "-", caption.placement = "top", sanitize.text.function = function(x){x},
+             label = "tab:gpcm", align = c("l", "r", "r", "r")),
+      include.colnames = FALSE, sanitize.rownames.function = identity,
+      include.rownames = TRUE, NA.string = "-", caption.placement = "top", 
+      sanitize.text.function = function(x){x}, booktabs = TRUE,
+      add.to.row = addtorow,
       file = "Tables/outGPCM.tex")
 
 # Half Drift
@@ -329,6 +393,10 @@ for(i in 1:3) {
   rm(tmp1, tmp2, tmp3)
 }
 
+outHDrift <- ifelse(outHDrift >= 0.7,
+                   paste0("\\textbf{", round(outHDrift, 2), "}"),
+                   round(outHDrift, 2))
+
 outHDrift <- data.frame(outHDrift)
 names(outHDrift) <- paste0("I=", c(3, 6, 12))
 row.names(outHDrift) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF", "MSSD",
@@ -343,11 +411,24 @@ row.names(outHDrift) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF"
                         paste("OR difference", c("(drift1, drift1)", "(drift1, drift2)", "(drift2, drift2)")),
                         paste("RESID", c("(drift1, drift1)", "(drift1, drift2)", "(drift2, drift2)")),
                         paste("RESID  difference",c("(drift1, drift1)", "(drift1, drift2)", "(drift2, drift2)")))
+row.names(outHDrift) <- paste0("\\hspace{0.25in}", row.names(outHDrift))
 
-print(xtable(outHDrift, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-DPCM as the Generating Model when Some Items showed Item Parameter Drift",
-             label = "tab:halfdrift", align = c("l", "c", "c", "c")),
-      include.colnames=T, sanitize.rownames.function = identity,
-      include.rownames = TRUE, NA.string = "-", caption.placement = "top", sanitize.text.function = function(x){x},
+outHDrift <- outHDrift[-(1:6), ]
+
+addtorow <- list()
+addtorow$pos <- list(0, 0, nrow(outHDrift))
+addtorow$command <- c("& \\multicolumn{3}{c}{Number of Items} \\\\\n",
+                      " & $I = 3$ & $I = 6$ & $I = 12$\\\\\n",
+                      "\\begin{tablenotes}[para,flushleft]\n{\\small 
+                      \\textit{Note.} \\textit{drift1} denotes the items without parameter drift.
+                      \\textit{drift2} denotes the items with parameter drift.}\n\\end{tablenotes}\n")
+
+print(xtable(outHDrift, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-DPCM-HIPD as the Generating Model",
+             label = "tab:halfdrift", align = c("l", "r", "r", "r")),
+      include.colnames = FALSE, sanitize.rownames.function = identity,
+      include.rownames = TRUE, NA.string = "-", caption.placement = "top", 
+      sanitize.text.function = function(x){x}, booktabs = TRUE,
+      add.to.row = addtorow,
       file = "Tables/outHalfDrift.tex")
 
 # Change of Meaning
@@ -382,6 +463,10 @@ for(i in 1:3) {
   rm(tmp1, tmp2)
 }
 
+outMeaning <- ifelse(outMeaning >= 0.7,
+                   paste0("\\textbf{", round(outMeaning, 2), "}"),
+                   round(outMeaning, 2))
+
 outMeaning <- data.frame(outMeaning)
 names(outMeaning) <- paste0("I=", c(3, 6, 12))
 row.names(outMeaning) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF", "MSSD",
@@ -396,11 +481,24 @@ row.names(outMeaning) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF
                           paste("OR difference", c("(meaning1, meaning1)", "(meaning1, meaning2)")),
                           paste("RESID", c("(meaning1, meaning1)", "(meaning1, meaning2)")),
                           paste("RESID  difference",c("(meaning1, meaning1)", "(meaning1, meaning2)")))
+row.names(outMeaning) <- paste0("\\hspace{0.25in}", row.names(outMeaning))
 
-print(xtable(outMeaning, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-DPCM as the Generating Model when the Meaning of one Item Changes",
-             label = "tab:Meaning", align = c("l", "c", "c", "c")),
-      include.colnames=T, sanitize.rownames.function = identity,
-      include.rownames = TRUE, NA.string = "-", caption.placement = "top", sanitize.text.function = function(x){x},
+outMeaning <- outMeaning[-(1:6), ]
+
+addtorow <- list()
+addtorow$pos <- list(0, 0, nrow(outMeaning))
+addtorow$command <- c("& \\multicolumn{3}{c}{Number of Items} \\\\\n",
+                      " & $I = 3$ & $I = 6$ & $I = 12$\\\\\n",
+                      "\\begin{tablenotes}[para,flushleft]\n{\\small 
+                      \\textit{Note.} \\textit{meaning1} denotes the items for which its meaning did not changed.
+                      \\textit{meaning2} denotes the item for which its meaning changed.}\n\\end{tablenotes}\n")
+
+print(xtable(outMeaning, type = "latex", caption = "Proportion of Extreme PPP-Values with the TV-DPCM-Meaning as the Generating Model",
+             label = "tab:Meaning", align = c("l", "r", "r", "r")),
+      include.colnames = FALSE, sanitize.rownames.function = identity,
+      include.rownames = TRUE, NA.string = "-", caption.placement = "top", 
+      sanitize.text.function = function(x){x}, booktabs = TRUE,
+      add.to.row = addtorow,
       file = "Tables/outMeaning.tex")
 
 # Plot the distribution of the PPP-values
