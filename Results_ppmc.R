@@ -503,11 +503,11 @@ print(xtable(outMeaning, type = "latex", caption = "Proportion of Extreme PPP-Va
 
 # Plot the distribution of the PPP-values
 
-discme_labels <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "PACF", "LPACF", "MSSD",
+discme_labels <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "RACF", "LRACF", "MSSD",
                    "Item-total Correlation", "Item-total Correlation (v2)", 
                    "Item-total Correlation (v3)", expression(paste("Yen's ", Q[1])), 
                    expression(paste("Yen's ", Q[1], " alt.")),
-                   "Item LPACF", expression(paste("Yen's ", Q[3])), 
+                   "Item LRACF", expression(paste("Yen's ", Q[3])), 
                    "OR", "OR difference", 
                    "RESID", "RESID  difference") 
 
@@ -516,7 +516,9 @@ par(mfrow = c(2, 3), mar = c(2, 4, 4, 1) + 0.1, oma = c(0, 1, 0, 1) + 0.1)
 for (i in 7:12) {
   hist(unlist(results12[results12$model == "TV-DPCM", grep(discmeasures[i], names(results12))]),
        las = 1, xlim = c(0, 1), main = discme_labels[i], xlab = "", 
-       freq = FALSE, breaks = 19)
+       freq = FALSE, breaks = seq(0, 1, by = 0.05), 
+       col = c("black", rep("lightgray", 18), "black"), 
+       border = c("black", rep("lightgray", 18), "black"))
 }
 rm(i)
 dev.off()
@@ -526,7 +528,9 @@ par(mfrow = c(2, 3), mar = c(2, 4, 4, 1) + 0.1, oma = c(0, 1, 0, 1) + 0.1)
 for (i in 13:17) {
   hist(unlist(results12[results12$model == "TV-DPCM", grep(discmeasures[i], names(results12))]),
        las = 1, xlim = c(0, 1), main = discme_labels[i], xlab = "", 
-       freq = FALSE, breaks = 19)
+       freq = FALSE, breaks = seq(0, 1, by = 0.05), 
+       col = c("black", rep("lightgray", 18), "black"), 
+       border = c("black", rep("lightgray", 18), "black"))
 }
 rm(i)
 dev.off()
