@@ -48,11 +48,11 @@ comb <- function(x, ...) {
 # 1.0 Set up Conditions ----
 
 # Number of parallel analyses.
-ncores <- 24
+ncores <- 2
 
 # Fix conditions
 
-nT     <- 300   # Number of time points
+nT     <- 20   # Number of time points
 I      <- 6     # Number of items
 K      <- 5     # Number of categories per item
 M      <- K - 1 # Number of thresholds per item
@@ -94,8 +94,9 @@ args <- commandArgs(trailingOnly = TRUE)
 
 outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multicombine = TRUE) %:%
   foreach(r = args[3]:args[4], .combine = 'comb', .multicombine = TRUE, 
-          .packages = c("rstan", "bayesplot", "scatterpie", "abind"), 
-          .export = c("logarithmic")) %dopar% {
+          .packages = c("rstan", "bayesplot", "scatterpie", "abind", "parallel")#, 
+          #.export = c("logarithmic")
+          ) %dopar% {
             
             # Define manipulated factors and seed
             gen.model <- Cond[cond, 1]
@@ -132,7 +133,7 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                 thetabi[i, ] <- lambda * thetabi[i - 1, ] +
                   MASS::mvrnorm(1, mu = mubi[i, ], Sigma = Sigma)
               }
-              rm(i, mubi, Sigma)
+              rm(i, Sigma)
               
               
               gen.factor1 <- gen.TVDPCM(nT = nT,
@@ -160,6 +161,7 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                                         maxAbsValue = 0.5)
               
               responses <- cbind(gen.factor1$data, gen.factor2$data)
+              rm(mubi)
             }
             
             if (gen.model == "GPCM") {
@@ -204,7 +206,6 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                             show_messages = FALSE,
                             refresh = 0) 
             run.time <- proc.time() - begin.time
-            rm(begin.time)
             
             # Stan diagnostic checks ----
             
@@ -269,12 +270,16 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
             ppmc12 <- ppmc.cov.resid(object = fit, data = standata)$ppp
             ppmc13 <- ppmc.cov.rediff(object = fit, data = standata)$ppp
             
+            tot.time <- proc.time() - begin.time
+            rm(begin.time)
+            
             # Export output to outer foreach ----
             result <- list(c(cond,
                              r,
                              gen.model,
                              par.model,
                              round(run.time[3]),
+                             round(tot.time[3]),
                              ndiv,
                              nbfmi,
                              ntree,
@@ -297,8 +302,8 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                              ppmc11,
                              ppmc12,
                              ppmc13))
-            rm(standata, fit, sum.fit, gen.Data, responses,
-               run.time, nT, lambda, I, cond, r, seed, gen.model, par.model,
+            rm(standata, fit, gen.Data, responses, tot.time,
+               run.time, cond, r, seed, gen.model, par.model,
                ndiv, nbfmi, ntree, nbulk, ntail, stan.diag, maxRhat, nRhat, 
                corrupt, efficiency, ppmc01, ppmc02, ppmc03, ppmc04, ppmc05,
                ppmc06, ppmc07, ppmc08, ppmc09, ppmc10, ppmc11, ppmc12,
@@ -315,6 +320,7 @@ for (i in args[1]:args[2]) {
                      "genModel",
                      "parModel",
                      "run.time",
+                     "tot.time",
                      "ndiv",
                      "nbfmi",
                      "ntree",
@@ -324,111 +330,24 @@ for (i in args[1]:args[2]) {
                      "nRhat",
                      "corrupt",
                      "efficiency",
-                     "ACF1",
-                     "ACF2",
-                     "ACF3",
+                     paste0("acf", 1:3),
                      "racf",
                      "lpacf",
                      "mssd",
-                     "Item1",
-                     "Item2",
-                     "Item3",
-                     "Item4",
-                     "Item5",
-                     "Item6",
-                     "Item1.3", 
-                     "Item2.3", 
-                     "Item3.3",
-                     "Item4.3",
-                     "Item5.3",
-                     "Item6.3",
-                     "Item1.4",
-                     "Item2.4",
-                     "Item3.4",
-                     "Item4.4",
-                     "Item5.4",
-                     "Item6.4",
-                     "Item1.5",
-                     "Item2.5",
-                     "Item3.5",
-                     "Item4.5",
-                     "Item5.5",
-                     "Item6.5",
-                     "ppp.q3.2.1.",
-                     "ppp.q3.3.1.",
-                     "ppp.q3.4.1.",
-                     "ppp.q3.5.1.",
-                     "ppp.q3.6.1.",
-                     "ppp.q3.3.2.",
-                     "ppp.q3.4.2.",
-                     "ppp.q3.5.2.",
-                     "ppp.q3.6.2.",
-                     "ppp.q3.4.3.",
-                     "ppp.q3.5.3.",
-                     "ppp.q3.6.3.",
-                     "ppp.q3.5.4.",
-                     "ppp.q3.6.4.",
-                     "ppp.q3.6.5.",
-                     "OR.2.1.",
-                     "OR.3.1.",
-                     "OR.4.1.",
-                     "OR.5.1.",
-                     "OR.6.1.",
-                     "OR.3.2.",
-                     "OR.4.2.",
-                     "OR.5.2.",
-                     "OR.6.2.",
-                     "OR.4.3.",
-                     "OR.5.3.",
-                     "OR.6.3.",
-                     "OR.5.4.",
-                     "OR.6.4.",
-                     "OR.6.5.",
-                     "ppp.ordiff.2.1.",
-                     "ppp.ordiff.3.1.",
-                     "ppp.ordiff.4.1.",
-                     "ppp.ordiff.5.1.",
-                     "ppp.ordiff.6.1.",
-                     "ppp.ordiff.3.2.",
-                     "ppp.ordiff.4.2.",
-                     "ppp.ordiff.5.2.",
-                     "ppp.ordiff.6.2.",
-                     "ppp.ordiff.4.3.",
-                     "ppp.ordiff.5.3.",
-                     "ppp.ordiff.6.3.",
-                     "ppp.ordiff.5.4.",
-                     "ppp.ordiff.6.4.",
-                     "ppp.ordiff.6.5.",
-                     "ppp.resid.2.1.",
-                     "ppp.resid.3.1.",
-                     "ppp.resid.4.1.",
-                     "ppp.resid.5.1.",
-                     "ppp.resid.6.1.",
-                     "ppp.resid.3.2.",
-                     "ppp.resid.4.2.",
-                     "ppp.resid.5.2.",
-                     "ppp.resid.6.2.",
-                     "ppp.resid.4.3.",
-                     "ppp.resid.5.3.",
-                     "ppp.resid.6.3.",
-                     "ppp.resid.5.4.",
-                     "ppp.resid.6.4.",
-                     "ppp.resid.6.5.",
-                     "ppp.rediff.2.1.",
-                     "ppp.rediff.3.1.",
-                     "ppp.rediff.4.1.",
-                     "ppp.rediff.5.1.",
-                     "ppp.rediff.6.1.",
-                     "ppp.rediff.3.2.",
-                     "ppp.rediff.4.2.",
-                     "ppp.rediff.5.2.",
-                     "ppp.rediff.6.2.",
-                     "ppp.rediff.4.3.",
-                     "ppp.rediff.5.3.",
-                     "ppp.rediff.6.3.",
-                     "ppp.rediff.5.4.",
-                     "ppp.rediff.6.4.",
-                     "ppp.rediff.6.5."
+                     paste0("itcor", 1:I),
+                     paste0("q1_", 1:I),
+                     paste0("q1alt_", 1:I),
+                     paste0("ilpacf_", 1:I),
+                     apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, 
+                           function(x) paste0("q3_", paste(x, collapse = "_"))),
+                     apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, 
+                           function(x) paste0("or_", paste(x, collapse = "_"))),
+                     apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, 
+                           function(x) paste0("ordiff_", paste(x, collapse = "_"))),
+                     apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, 
+                           function(x) paste0("resid_", paste(x, collapse = "_"))),
+                     apply(which(lower.tri(diag(I)), arr.ind = TRUE), 1, 
+                           function(x) paste0("rediff_", paste(x, collapse = "_")))
                      )
   write.table(tmp, file = paste0(getwd(), "/Simulation/Sim_PPMC_cond_", i, ".txt"),
               col.names = TRUE, row.names = FALSE, quote = FALSE)
