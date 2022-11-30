@@ -357,6 +357,7 @@ ppmc.itcor <- function(object, data, method = c("polyserial", "pearson"),
                                     data$tt_obs[data$ii_obs != items[i]], 
                                     sum),
                              x[data$ii_obs == items[i]])
+        if (is.na(out[items[i]])) {out[items[i]] <- polcor[items[i]]}
       }
       return(out)
     }, mc.cores = cores)
