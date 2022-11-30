@@ -123,7 +123,45 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
             }
             
             if (gen.model == "BiDim") {
+              # Generate two correlated factors
+              thetabi <- matrix(NA, nrow = nT, ncol = 2)
+              mubi    <- replicate(2, logarithmic(nT, maxAbsValue = 0.5))
+              Sigma   <- matrix(c(1, par.model, par.model, 1), 2) 
               
+              thetabi[1, ] <- MASS::mvrnorm(1, mu = mubi[1, ], Sigma = Sigma)
+              
+              for (i in 2:nT) {
+                thetabi[i, ] <- lambda * thetabi[i - 1, ] +
+                  MASS::mvrnorm(1, mu = mubi[i, ], Sigma = Sigma)
+              }
+              rm(i, mubi, Sigma)
+              
+              
+              gen.factor1 <- gen.TVDPCM(nT = nT,
+                                        I  = ceiling(I / 2),
+                                        K  = K,
+                                        pop.param = list(
+                                          lambda     = lambda,
+                                          thresholds = gen.Data$thresholds.gen[1:ceiling(I / 2), ],
+                                          attractor  = mubi[, 1],
+                                          theta      = thetabi[, 1]),
+                                        seed = seed,
+                                        FUN  = "logarithmic",
+                                        maxAbsValue = 0.5)
+              
+              gen.factor2 <- gen.TVDPCM(nT = nT,
+                                        I  = I - ceiling(I / 2),
+                                        K  = K,
+                                        pop.param = list(
+                                          lambda     = lambda,
+                                          thresholds = gen.Data$thresholds.gen[(ceiling(I / 2) + 1):I, ],
+                                          attractor  = mubi[, 2],
+                                          theta      = thetabi[, 2]),
+                                        seed = seed,
+                                        FUN  = "logarithmic",
+                                        maxAbsValue = 0.5)
+              
+              responses <- cbind(gen.factor1$data, gen.factor2$data)
             }
             
             if (gen.model == "GPCM") {
