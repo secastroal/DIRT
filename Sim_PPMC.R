@@ -86,16 +86,17 @@ model <- stan_model(file = "Stan/tv_dpcm_int_v5.1.stan", verbose = FALSE)
 # 2.0 Run Simulation ----
 
 # Setup parallel backend to use parallel tasks
-cl <- makeCluster(ncores, outfile = "")
-registerDoParallel(cl, cores = ncores)
+clus <- makeCluster(ncores, outfile = "")
+registerDoParallel(clus, cores = ncores)
 
 # Get conditions and replications from the batch file
 args <- commandArgs(trailingOnly = TRUE)
 
 outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multicombine = TRUE) %:%
   foreach(r = args[3]:args[4], .combine = 'comb', .multicombine = TRUE, 
-          .packages = c("rstan", "bayesplot", "scatterpie", "abind", "parallel")#, 
-          #.export = c("logarithmic")
+          .packages = c("rstan", "bayesplot", "scatterpie", "abind", 
+                        "parallel", "doParallel"), 
+          .export = c("acomb")
           ) %dopar% {
             
             # Define manipulated factors and seed
@@ -355,7 +356,7 @@ for (i in args[1]:args[2]) {
 }
 
 # Stop parallel cluster
-stopCluster(cl)
-rm(cl)
+stopCluster(clus)
+rm(clus)
 
 # END ----
