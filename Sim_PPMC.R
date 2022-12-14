@@ -143,7 +143,7 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                                         pop.param = list(
                                           lambda     = lambda,
                                           thresholds = gen.Data$thresholds.gen[1:ceiling(I / 2), ],
-                                          attractor  = mubi[, 1],
+                                          tv_int     = mubi[, 1],
                                           theta      = thetabi[, 1]),
                                         seed = seed,
                                         FUN  = "logarithmic",
@@ -155,7 +155,7 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                                         pop.param = list(
                                           lambda     = lambda,
                                           thresholds = gen.Data$thresholds.gen[(ceiling(I / 2) + 1):I, ],
-                                          attractor  = mubi[, 2],
+                                          tv_int     = mubi[, 2],
                                           theta      = thetabi[, 2]),
                                         seed = seed,
                                         FUN  = "logarithmic",
@@ -166,7 +166,22 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
             }
             
             if (gen.model == "GPCM") {
+              # Discrimination parameters different from 1
+              alpha.gpcm <- c(rep(1, I - I * par.model),
+                              rep(c(.5, 1.5), each = I * par.model / 2))
               
+              gen.tvgpcm <- gen.TVDPCM(nT = nT,
+                                       I  = I,
+                                       K  = K,
+                                       pop.param = list(
+                                         lambda     = lambda,
+                                         thresholds = gen.Data$thresholds.gen,
+                                         alpha      = alpha.gpcm,
+                                         theta      = gen.Data$theta.gen),
+                                       seed = seed,
+                                       FUN  = "logarithmic",
+                                       maxAbsValue = 0.5)
+              responses <- gen.tvgpcm$data
             }
             
             if (gen.model == "DRIFT") {
