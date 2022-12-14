@@ -88,10 +88,10 @@ gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
   # Generate the latent dynamic process if theta is missing ----
   
   # Create time varying intercept
-  if (is.null(pop.param$attractor)) {
+  if (is.null(pop.param$tv_int)) {
     tv_int <- select_trend(nT, FUN, ...)
   } else {
-    tv_int <- pop.param$attractor/(1 - pop.param$lambda)
+    tv_int <- pop.param$tv_int
   }
   
   if (is.null(pop.param$theta)) {
@@ -120,7 +120,7 @@ gen.TVDPCM <-  function (nT, I, K, pop.param = NULL, seed, FUN, ...) {
   }
   
   if (is.null(pop.param$pvar)) {
-    pvar      <- pop.param$sigma2 / (1 - pop.param$lambda ^ 2)
+    pvar <- pop.param$sigma2 / (1 - pop.param$lambda ^ 2)
   }else{
     pvar <- pop.param$pvar
   }
