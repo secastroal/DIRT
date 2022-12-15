@@ -128,11 +128,13 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
               mubi    <- replicate(2, logarithmic(nT, maxAbsValue = 0.5))
               Sigma   <- matrix(c(1, par.model, par.model, 1), 2) 
               
-              thetabi[1, ] <- MASS::mvrnorm(1, mu = mubi[1, ], Sigma = Sigma)
+              thetabi[1, ] <- MASS::mvrnorm(1, 
+                                            mu = mubi[1, ]/(1 - gen.Data$lambda.gen), 
+                                            Sigma = Sigma)
               
               for (i in 2:nT) {
-                thetabi[i, ] <- lambda * thetabi[i - 1, ] +
-                  MASS::mvrnorm(1, mu = mubi[i, ], Sigma = Sigma)
+                thetabi[i, ] <- mubi[i, ] + lambda * thetabi[i - 1, ] +
+                  MASS::mvrnorm(1, mu = rep(0, 2), Sigma = Sigma)
               }
               rm(i, Sigma)
               
@@ -162,7 +164,7 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                                         maxAbsValue = 0.5)
               
               responses <- cbind(gen.factor1$data, gen.factor2$data)
-              rm(mubi)
+              rm(mubi, gen.factor1, gen.factor2, thetabi)
             }
             
             if (gen.model == "GPCM") {
@@ -182,14 +184,51 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                                        FUN  = "logarithmic",
                                        maxAbsValue = 0.5)
               responses <- gen.tvgpcm$data
+              rm(alpha.gpcm, gen.tvgpcm)
             }
             
             if (gen.model == "DRIFT") {
+              # Item Parameter Drift
+              drift <- c(rep(0, I - I * par.model),
+                         rep(c(-2, 2), each = I * par.model / 2))
               
+              gen.drift1 <- gen.TVDPCM(
+                nT = ceiling(2 * nT/3),
+                I  = I,
+                K  = K,
+                pop.param = list(
+                  lambda     = lambda,
+                  thresholds = gen.Data$thresholds.gen,
+                  theta      = gen.Data$theta.gen[1:ceiling(2 * nT/3)],
+                  tv_int     = logarithmic(
+                    nT, 
+                    maxAbsValue = 0.5)[1:ceiling(2 * nT/3)]),
+                seed = seed,
+                FUN  = "logarithmic",
+                maxAbsValue = 0.5)
+              
+              gen.drift2 <- gen.TVDPCM(
+                nT = nT - ceiling(2 * nT/3),
+                I  = I,
+                K  = K,
+                pop.param = list(
+                  lambda     = lambda,
+                  thresholds = gen.Data$thresholds.gen + drift,
+                  theta      = gen.Data$theta.gen[(ceiling(2 * nT/3) + 1):nT],
+                  tv_int     = logarithmic(
+                    nT, 
+                    maxAbsValue = 0.5)[(ceiling(2 * nT/3) + 1):nT]),
+                seed = seed,
+                FUN  = "logarithmic",
+                maxAbsValue = 0.5)
+              
+              responses <- rbind(gen.drift1$data, gen.drift2$data)
+              rm(drift, gen.drift1, gen.drift2)
             }
             
             if (gen.model == "Meaning") {
-              
+              responses <- gen.Data$data
+              responses[ceiling(2*nT/3):nT, I] <- 6 - responses[ceiling(2*nT/3):nT, I]
             }
             
             # Fit the TV-DPCM model with stan ----
