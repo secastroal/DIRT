@@ -48,11 +48,11 @@ comb <- function(x, ...) {
 # 1.0 Set up Conditions ----
 
 # Number of parallel analyses.
-ncores <- 2
+ncores <- 24
 
 # Fix conditions
 
-nT     <- 20   # Number of time points
+nT     <- 300   # Number of time points
 I      <- 6     # Number of items
 K      <- 5     # Number of categories per item
 M      <- K - 1 # Number of thresholds per item
