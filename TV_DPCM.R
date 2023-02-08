@@ -105,7 +105,7 @@ rm(probs.array, y)
 # model <- stan_model(file = "Stan/ar_irt_pcm_na.stan", verbose = FALSE)
 # model <- stan_model(file = "Stan/ar_irt_pcm_na_free.stan", verbose = FALSE)
 # model <- stan_model(file = "Stan/splines_irt_pcm_long.stan", verbose = FALSE)
-model <- stan_model(file = "Stan/tv_dpcm_int_v7.stan", verbose = FALSE)
+model <- stan_model(file = "Stan/tv_dpcm_int_v5.1.stan", verbose = FALSE)
 # model <- stan_model(file = "Stan/tv_dpcm_slo.stan", verbose = FALSE)
 
 # standata <- list(num_data      = nT, 
@@ -168,7 +168,7 @@ sum.fit$beta   <- summary(fit, pars = "beta")$summary
 sum.fit$theta  <- summary(fit, pars = "theta")$summary
 sum.fit$lambda <- summary(fit, pars = "lambda")$summary
 sum.fit$sigma2 <- summary(fit, pars = "sigma2")$summary
-sum.fit$p_var  <- summary(fit, pars = "p_var")$summary
+sum.fit$pvar   <- summary(fit, pars = "pvar")$summary
 sum.fit$attractor <- summary(fit, pars = "attractor")$summary
 
 # 3. Checking convergence and parameter recovery ----
@@ -193,7 +193,7 @@ mcmc_rhat(rhat(fit))
 traceplot(fit, pars = betapars, inc_warmup = FALSE)
 traceplot(fit, pars = thetapars, inc_warmup = FALSE)
 traceplot(fit, pars = attrapars, inc_warmup = FALSE)
-traceplot(fit, pars = c("lambda", "sigma2", "p_var"), inc_warmup = FALSE)
+traceplot(fit, pars = c("lambda", "sigma2", "pvar"), inc_warmup = FALSE)
 
 # Autocorrelation plots selected parameters
 fit.array <- as.array(fit)
@@ -211,7 +211,7 @@ mcmc_acf(fit.array,
          lags = 20)
 
 mcmc_acf(fit.array, 
-         pars = c("lambda", "sigma2", "p_var"), 
+         pars = c("lambda", "sigma2", "pvar"), 
          lags = 20)
 
 # Recovery of parameters: True vs. estimated.
@@ -247,10 +247,10 @@ abline(v = in_var, lwd = 5, col = 2)
 abline(v = sum.fit$sigma2[, 1], lwd = 5, col = 1)
 lines(sum.fit$sigma2[, c(4, 8)], c(0, 0), lwd = 5, col = 3)
 
-hist(fit.array[, , "p_var"], freq = FALSE)
+hist(fit.array[, , "pvar"], freq = FALSE)
 abline(v = p_var[1], lwd = 5, col = 2)
-abline(v = sum.fit$p_var[, 1], lwd = 5, col = 1)
-lines(sum.fit$p_var[, c(4, 8)], c(0, 0), lwd = 5, col = 3)
+abline(v = sum.fit$pvar[, 1], lwd = 5, col = 1)
+lines(sum.fit$pvar[, c(4, 8)], c(0, 0), lwd = 5, col = 3)
 
 # Scatter plot of time and theta. 
 # Including the estimated theta in red (With 95% credibility interval) and the 
