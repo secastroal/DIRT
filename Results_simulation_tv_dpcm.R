@@ -172,3 +172,94 @@ for (p in 1:length(par_name)) {
 }
 rm(p, plot_points, col_index, lab_name, par_name, sta_name)
 
+# Additional plots of the median BULK and TAIL ESS.
+# We run a very small version of the simulation including the conditions without 
+# missing values and doing five replications per conditions as a suggestion of
+# one anonymous reviewer. The purpose of this was to get information about the 
+# typical BULK and TAIL ESS of the parameters of the TV-DPCM.
+
+# Select the conditions without missing values.
+Cond <- Cond[1:24, ]
+
+# Read output files from small simulation into R
+files <- paste0(getwd(), "/Simulation/Sim_TV_DPCM_testcond_", 1:nrow(Cond), ".txt")
+
+data <- lapply(files, function(x) read.table(file = x, header = TRUE))
+
+# Merge output into one data.frame
+resultsESS <- ldply(data, data.frame)
+
+rm(data, files)
+
+# Extend condition matrix to match the total number of analyses performed.
+Cond_ext <- Cond[resultsESS$cond, ]
+
+# Get ESS column index
+col_index <- grep("mbulk|mtail|neff", names(resultsESS))
+
+# Character vectors to define file name and y axis label.
+par_name <- c("BULKESS", "TAILESS", "neff")
+lab_name <- c("Bulk ESS", "Tail ESS", "n_eff")
+sta_name <- rep("Median", 3)
+
+plot_points <- cbind(1:4, 1:4 + 0.1)
+
+for (p in 1:length(par_name)) {
+  pdf(file = paste0("Figures/", par_name[p], "_",
+                    gsub(" ", "_", sta_name[p]), ".pdf"), width = 15 )
+  
+  # Define plotting parameters.
+  par(mfrow = c(2, 3), mar = c(0.2, 0.2, 0.2, 1.2), oma = c(6, 8, 5, 6), xpd = NA)
+  
+  # Compute mean of the statistic across conditions
+  tmp   <- tapply(resultsESS[, col_index[p]], Cond_ext, mean, na.rm = TRUE)
+  tmp_l <- tapply(resultsESS[, col_index[p]], Cond_ext, quantile, 
+                  probs = 0.25, na.rm = TRUE)
+  tmp_u <- tapply(resultsESS[, col_index[p]], Cond_ext, quantile, 
+                  probs = 0.75, na.rm = TRUE)
+  
+  # Define lower and upper limits for the plots.
+  lylim <- round(min(tmp_l, na.rm = TRUE) - 0.01, 2)
+  uylim <- round(max(tmp_u, na.rm = TRUE) + 0.01, 2)
+  if (sta_name[p] == "C.I. Coverage") {lylim <- 0}
+  if (sta_name[p] == "Correlation" | sta_name[p] == "C.I. Coverage") {uylim <- 1}
+  
+  for (i in 1:2) {
+    for (l in 1:3) {
+      matplot(plot_points, tmp[, i, l,], type = "b", 
+              col = color_plot, ylim = c(lylim, uylim), xlab = "", 
+              ylab = "", xaxt = "n", yaxt = "n", lwd = 2, pch = 19, lty = 1)
+      if (sta_name[p] == "Relative Bias 2.0") {
+        abline(h = 1, lty = 2, col = gray(0.9), xpd = FALSE)
+      } else {
+        abline(h = 0, lty = 2, col = gray(0.9), xpd = FALSE)  
+      }
+      if (!(sta_name[p] == "C.I. Coverage" & 
+            (par_name[p] %in% c("Autoregression", "ProcessVar", "InnoVar")))) {
+        segments(x0 = c(plot_points),
+                 y0 = c(tmp_l[, i, l, ]),
+                 y1 = c(tmp_u[, i, l, ]),
+                 lwd = 1, lty = 3, col = rep(color_plot, each = 4))
+      }
+      if (yaxis[i, l]) {axis(2, labels = TRUE, cex.axis = 2, las = 1)}
+      if (xaxis[i, l]) {axis(1, at = 1:4, labels = N_timepoints, cex.axis = 2)}
+      if (laxis[i, l]) {legend("topright", legend = c("0%", "30%"),
+                               col = color_plot, lty = 1, lwd = 2, cex = 1.5,
+                               seg.len = 3, title = "% of NA", inset = c(-1/3, 0))}
+    }
+  }
+  rm(i, l, tmp, tmp_l, tmp_u, lylim, uylim)
+  
+  mtext(paste("Average", lab_name[p], sta_name[p]), 2, outer = TRUE, 
+        line = 5, cex = 1.8)
+  mtext("Number of Time Points", 1, outer = TRUE, line = 4, cex = 1.8)
+  mtext("I = 3", 4, outer = TRUE, line = 1, cex = 1.5, at = 3 / 4, las = 1)
+  mtext("I = 6", 4, outer = TRUE, line = 1, cex = 1.5, at = 1 / 4, las = 1)
+  mtext("AR = 0",    3, outer = TRUE, line = 1, cex = 1.5, at = 1 / 6)
+  mtext("AR = 0.25", 3, outer = TRUE, line = 1, cex = 1.5, at = 3 / 6)
+  mtext("AR = 0.5",  3, outer = TRUE, line = 1, cex = 1.5, at = 5 / 6)
+  
+  dev.off()
+}
+rm(p, plot_points, col_index, lab_name, par_name, sta_name)
+
