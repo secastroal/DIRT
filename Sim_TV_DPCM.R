@@ -62,8 +62,8 @@ model <- stan_model(file = "Stan/tv_dpcm_int_v5.1.stan", verbose = FALSE)
 # 2.0 Run simulation ----
 
 # Setup parallel backend to use parallel tasks
-cl <- makeCluster(24, outfile = "")
-registerDoParallel(cl, cores = 24)
+cl <- makeCluster(12, outfile = "")
+registerDoParallel(cl, cores = 12)
 
 # Get conditions and replications from the batch file
 args <- commandArgs(trailingOnly = TRUE)
@@ -156,6 +156,9 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
             ntree <- get_num_max_treedepth(fit) # number of transitions that exceeded the maximum treedepth
             nbulk <- sum(stan.diag$Bulk_ESS < 100 * dim(fit)[2]) # number of parameters with low bulk ESS
             ntail <- sum(stan.diag$Tail_ESS < 100 * dim(fit)[2]) # number of parameters with low tail ESS
+            mbulk <- median(stan.diag$Bulk_ESS) # median bulk effective sample size
+            mtail <- median(stan.diag$Tail_ESS) # median tail effective sample size
+            mneff <- median(stan.diag$n_eff)    # median effective sample size
           
             #max Rhat
             maxRhat <- round(max(rhat(fit, pars = c("beta", "theta", "lambda", 
@@ -252,6 +255,9 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                              ntree,
                              nbulk,
                              ntail,
+                             mbulk,
+                             mtail,
+                             mneff,
                              maxRhat,
                              nRhat,
                              beta.cor,
@@ -292,9 +298,9 @@ outcome.simulation <- foreach(cond = args[1]:args[2], .combine = 'list', .multic
                              sigma2.CI,
                              corrupt,
                              efficiency))
-            rm(standata, fit, sum.fit, gen.Data, trend,
-               run.time, nT, naprop, lambda, I, cond, r, seed,
-               ndiv, nbfmi, ntree, nbulk, ntail, stan.diag, maxRhat, nRhat, 
+            rm(standata, fit, sum.fit, gen.Data, trend, run.time, nT, naprop, 
+               lambda, I, cond, r, seed, ndiv, nbfmi, ntree, nbulk, ntail, 
+               mbulk, mtail, mneff, stan.diag, maxRhat, nRhat,
                beta.cor, beta.bias, beta.abbias, beta.rmse, beta.cover,
                beta.CI, theta.cor, theta.bias, theta.abbias, theta.rmse,
                theta.cover, theta.CI, attra.cor, attra.bias, attra.abbias,
@@ -318,6 +324,9 @@ for (i in args[1]:args[2]) {
                      "ntree",
                      "nbulk",
                      "ntail",
+                     "mbulk",
+                     "mtail",
+                     "mneff",
                      "maxRhat",
                      "nRhat",
                      "beta.cor",
@@ -358,7 +367,7 @@ for (i in args[1]:args[2]) {
                      "sigma2.CI",
                      "corrupt",
                      "efficiency")
-  write.table(tmp, file = paste0(getwd(), "/Simulation/Sim_TV_DPCM_cond_", i, ".txt"),
+  write.table(tmp, file = paste0(getwd(), "/Simulation/Sim_TV_DPCM_testcond_", i, ".txt"),
               col.names = TRUE, row.names = FALSE, quote = FALSE)
   rm(tmp)
 }
