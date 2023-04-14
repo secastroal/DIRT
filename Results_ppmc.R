@@ -1,3 +1,62 @@
+# Summary PPMC Simulations
+
+# This file plots the results from the simulation study of the PPMC methods
+# for the TV-DPCM model.
+
+# 0.0 Prepare environment
+# 1.0 Read output files
+# 2.0 Check convergence per condition
+# 3.0 Plot PPPs distributions
+# 4.0 Tables of measures' power 
+
+# 0.0 Prepare environment ----
+library(plyr)
+library(xtable)
+
+## 0.1 Recreate simulation conditions ----
+
+# Fix conditions
+
+nT     <- 300   # Number of time points
+I      <- 6     # Number of items
+K      <- 5     # Number of categories per item
+M      <- K - 1 # Number of thresholds per item
+lambda <- 0.5   # Size of the autoregressive effect
+in_var <- 1     # Variance of the innovations
+
+# Manipulated conditions
+# Generating model.
+#   'TV-DPCM': No violation to assumptions of TV-DPCM
+#   'BiDim': Unidimensionality is violated.
+#   'GPCM': Discrimination is not equal for all items.
+#   'Drift': Longitudinal measurement invariance does not hold. Parameter Drift.
+#   'Meaning': The meaning of the items changes. 
+#              This is also measurement non-invariance
+gen.model <- c("TV-DPCM", "BiDim", "BiDim", "GPCM", "GPCM", 
+               "DRIFT", "DRIFT", "Meaning")
+# Parameters of the generating model. Correlation between latent variables for 
+# 'BiDim' and proportion of items with discrimination different from 1 or with
+# item parameter drift for 'GPCM' and 'DRIFT' respectively.
+par.model <- c(NA, 0.3, 0.6, 1/3, 2/3, 1/3, 2/3, NA)
+
+# Matrix of conditions to loop through
+Cond <- data.frame(gen.model, par.model)
+names(Cond) <- c("genModel", "parModel")
+rm(gen.model, par.model)
+
+# 1.0 Read output files ----
+
+# Read output files into R
+files <- paste0(getwd(), "/Simulation/Sim_PPMC_cond_", 1:nrow(Cond), ".txt")
+
+data <- lapply(files, function(x) read.table(file = x, header = TRUE))
+
+# Merge output into one data.frame
+results <- ldply(data, data.frame)
+
+rm(data, files)
+
+
 results3_1 <- read.table("Simulation/Results_3_items.dat", header = TRUE)
 results3_2 <- read.table("Simulation/Results_part2_3_items.dat", header = TRUE)
 results6_1 <- read.table("Simulation/Results_6_items.dat", header = TRUE)
@@ -22,8 +81,8 @@ rm(results3_1, results3_2,
 sumresults3 <- apply(results3[, -(1:8)], 2, function(x) {
   tapply(x, results3$model, function(y) {
     sum(y <= 0.05 | y >= 0.95)
-    })
   })
+})
 
 sumresults3 <- t(sumresults3)
 
@@ -105,9 +164,48 @@ rm(tmp, tmp.data, i, j)
 
 # Create tables for manuscript
 
-library(xtable)
+
 
 Results <- list(results3, results6, results12)
+
+# 2.0 Check convergence per condition ----
+# 3.0 Plot PPPs distributions ----
+
+# Plot the distribution of the PPP-values
+
+discme_labels <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "RACF", "LRACF", "MSSD",
+                   "Item-total Correlation", "Item-total Correlation (v2)", 
+                   "Item-total Correlation (v3)", expression(paste("Yen's ", Q[1])), 
+                   expression(paste("Yen's ", Q[1], " alt.")),
+                   "Item LRACF", expression(paste("Yen's ", Q[3])), 
+                   "OR", "OR difference", 
+                   "RESID", "RESID  difference") 
+
+pdf("Figures/ppp_dist_item_measures.pdf", height = 5)
+par(mfrow = c(2, 3), mar = c(2, 4, 4, 1) + 0.1, oma = c(0, 1, 0, 1) + 0.1)
+for (i in 7:12) {
+  hist(unlist(results12[results12$model == "TV-DPCM", grep(discmeasures[i], names(results12))]),
+       las = 1, xlim = c(0, 1), main = discme_labels[i], xlab = "", 
+       freq = FALSE, breaks = seq(0, 1, by = 0.05), 
+       col = c("black", rep("lightgray", 18), "black"), 
+       border = c("black", rep("lightgray", 18), "black"))
+}
+rm(i)
+dev.off()
+
+pdf("Figures/ppp_dist_pair_measures.pdf", height = 5)
+par(mfrow = c(2, 3), mar = c(2, 4, 4, 1) + 0.1, oma = c(0, 1, 0, 1) + 0.1)
+for (i in 13:17) {
+  hist(unlist(results12[results12$model == "TV-DPCM", grep(discmeasures[i], names(results12))]),
+       las = 1, xlim = c(0, 1), main = discme_labels[i], xlab = "", 
+       freq = FALSE, breaks = seq(0, 1, by = 0.05), 
+       col = c("black", rep("lightgray", 18), "black"), 
+       border = c("black", rep("lightgray", 18), "black"))
+}
+rm(i)
+dev.off()
+
+# 4.0 Tables of measures' power  ----
 
 # TV-DPCM
 outTVDPCM <- matrix(NA, length(discmeasures), 3)
@@ -501,36 +599,6 @@ print(xtable(outMeaning, type = "latex", caption = "Proportion of Extreme PPP-Va
       add.to.row = addtorow,
       file = "Tables/outMeaning.tex")
 
-# Plot the distribution of the PPP-values
 
-discme_labels <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "RACF", "LRACF", "MSSD",
-                   "Item-total Correlation", "Item-total Correlation (v2)", 
-                   "Item-total Correlation (v3)", expression(paste("Yen's ", Q[1])), 
-                   expression(paste("Yen's ", Q[1], " alt.")),
-                   "Item LRACF", expression(paste("Yen's ", Q[3])), 
-                   "OR", "OR difference", 
-                   "RESID", "RESID  difference") 
 
-pdf("Figures/ppp_dist_item_measures.pdf", height = 5)
-par(mfrow = c(2, 3), mar = c(2, 4, 4, 1) + 0.1, oma = c(0, 1, 0, 1) + 0.1)
-for (i in 7:12) {
-  hist(unlist(results12[results12$model == "TV-DPCM", grep(discmeasures[i], names(results12))]),
-       las = 1, xlim = c(0, 1), main = discme_labels[i], xlab = "", 
-       freq = FALSE, breaks = seq(0, 1, by = 0.05), 
-       col = c("black", rep("lightgray", 18), "black"), 
-       border = c("black", rep("lightgray", 18), "black"))
-}
-rm(i)
-dev.off()
-
-pdf("Figures/ppp_dist_pair_measures.pdf", height = 5)
-par(mfrow = c(2, 3), mar = c(2, 4, 4, 1) + 0.1, oma = c(0, 1, 0, 1) + 0.1)
-for (i in 13:17) {
-  hist(unlist(results12[results12$model == "TV-DPCM", grep(discmeasures[i], names(results12))]),
-       las = 1, xlim = c(0, 1), main = discme_labels[i], xlab = "", 
-       freq = FALSE, breaks = seq(0, 1, by = 0.05), 
-       col = c("black", rep("lightgray", 18), "black"), 
-       border = c("black", rep("lightgray", 18), "black"))
-}
-rm(i)
-dev.off()
+# END

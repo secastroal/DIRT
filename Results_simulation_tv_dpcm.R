@@ -1,6 +1,6 @@
 # Summary Simulations
 
-# This file plots the results form the simulation study of the TV-DPCM model.
+# This file plots the results from the simulation study of the TV-DPCM model.
 
 # 0.0 Prepare environment ----
 library(plyr)
