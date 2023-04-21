@@ -56,6 +56,32 @@ results <- ldply(data, data.frame)
 
 rm(data, files)
 
+# 2.0 Check convergence per condition ----
+
+# Number of replications that did not converged
+conv <- tapply(results$corrupt, results$cond, sum)
+
+# In almost all of the cases it was due to divergent transitions.
+# There is only one of these replications in which the Rhats were larger than 
+# 1.05.
+
+results[results$maxRhat > 1.05, c(1:13)]
+
+par(mar = c(5, 6, 1, 1) + 0.1)
+bp <- barplot(100 - conv, xlim = c(0, 100), las = 1, horiz = TRUE,
+              names.arg = paste(Cond[, 1], c("", rep(c("1/3", "2/3"), 3), "")),
+              xlab = "Convergence Rate (%)")
+mtext(paste0(100 - conv, "%"), side = 2, line = -2, las = 1,
+      at = as.vector(bp))
+dev.off()
+
+# Create and optional matrix to exclude replications that did not converged.
+
+results_conv <- results
+results_conv <- results[results$corrupt == 0, ]
+
+
+# Old code ----
 
 results3_1 <- read.table("Simulation/Results_3_items.dat", header = TRUE)
 results3_2 <- read.table("Simulation/Results_part2_3_items.dat", header = TRUE)
@@ -168,7 +194,7 @@ rm(tmp, tmp.data, i, j)
 
 Results <- list(results3, results6, results12)
 
-# 2.0 Check convergence per condition ----
+
 # 3.0 Plot PPPs distributions ----
 
 # Plot the distribution of the PPP-values
