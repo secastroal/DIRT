@@ -152,14 +152,28 @@ outresults <- matrix(NA, nrow = 6 + 4 * 2 + 5 * 3, ncol = nrow(Cond))
 # last items violate the assumptions of the TV-DPCM.
 # In Meaning, one item changes it meaning.
 
-pairindex <- list(rep(c(1, 2, 1, 2, 3), times = c(2, 3, 1, 6, 3)),
-                  rep(c(rep(1:2, 3), 3), times = c(3, 2, 2, 2, 1, 4, 1)),
-                  rep(1:3, times = c(1, 8, 6)),
-                  rep(c(rep(1:2, 3), 3), times = c(3, 2, 2, 2, 1, 4, 1)))
+pairsindex <- list(rep(1, 15),
+                   rep(c(1, 2, 1, 2, 3), times = c(2, 3, 1, 6, 3)),
+                   rep(c(rep(1:2, 3), 3), times = c(3, 2, 2, 2, 1, 4, 1)),
+                   rep(1:3, times = c(1, 8, 6)),
+                   rep(rep(1:2, 4), times = c(4, 1, 3, 1, 2, 1, 1, 2)))
 
-pairsindex <- rep(c(rep(1:2, 3), 3), times = c(3, 2, 2, 2, 1, 4, 1))
+pairsindex <- pairsindex[c(1, 2, 2, 3, 4, 3, 4, 5)]
 
-outBiDim <- matrix(NA, 6 + 6 * 2 + 5 * 3, 3)
+# It goes similar for the items.
+
+itemsindex <- list(rep(1, 6),
+                   rep(1:2, each = 3),
+                   rep(1:2, times = c(4, 2)),
+                   rep(1:2, times = c(2, 4)),
+                   rep(1:2, times = c(5, 1)))
+
+itemsindex <- itemsindex[c(1, 2, 2, 3, 4, 3, 4, 5)]
+
+# For loop to compute measures' power and fill in the matrix outresults.
+
+for (i in 1:8)
+
 
 # TV-DPCM
 outTVDPCM <- matrix(NA, length(discmeasures), 3)
