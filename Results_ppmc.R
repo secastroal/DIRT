@@ -137,6 +137,30 @@ dev.off()
 
 # 4.0 Tables of measures' power  ----
 
+# Create empty table to store results from all conditions
+
+outresults <- matrix(NA, nrow = 6 + 4 * 2 + 5 * 3, ncol = nrow(Cond))
+
+# Create indexes to compute power pair pairs of interest in the
+# pairwise measures. For example, in the bidimiensional conditions,
+# we would like to the the proportion of misfit when using items
+# from the same dimension versus items from different dimensions.
+
+# Pairs are built different depending on the condition. 
+# In BiDim, there are two factors with three items each.
+# In GPCM and Drift, either the two or the four
+# last items violate the assumptions of the TV-DPCM.
+# In Meaning, one item changes it meaning.
+
+pairindex <- list(rep(c(1, 2, 1, 2, 3), times = c(2, 3, 1, 6, 3)),
+                  rep(c(rep(1:2, 3), 3), times = c(3, 2, 2, 2, 1, 4, 1)),
+                  rep(1:3, times = c(1, 8, 6)),
+                  rep(c(rep(1:2, 3), 3), times = c(3, 2, 2, 2, 1, 4, 1)))
+
+pairsindex <- rep(c(rep(1:2, 3), 3), times = c(3, 2, 2, 2, 1, 4, 1))
+
+outBiDim <- matrix(NA, 6 + 6 * 2 + 5 * 3, 3)
+
 # TV-DPCM
 outTVDPCM <- matrix(NA, length(discmeasures), 3)
 
