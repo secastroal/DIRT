@@ -172,7 +172,62 @@ itemsindex <- itemsindex[c(1, 2, 2, 3, 4, 3, 4, 5)]
 
 # For loop to compute measures' power and fill in the matrix outresults.
 
-for (i in 1:8)
+for (i in 1:nrow(Cond)) {
+  # Select replications for condition i
+  tmp.data <- results_conv[results_conv$cond == i, ]
+  
+  # Compute power of test-level discrepancy measures
+  for (j in 1:6) {
+    tmp <- unlist(tmp.data[, grep(discmeasures[j], names(tmp.data))])
+    outresults[j, i] <- round(sum(tmp <= 0.05 | tmp >= 0.95)/length(tmp), 2)
+  }
+  rm(j, tmp)
+  
+  # Compute power of item-level discrepancy measures
+  for (j in 7:10) {
+    if (i == 1) {
+      tmp <- unlist(tmp.data[, grep(discmeasures[j], names(tmp.data))])
+      outresults[2 * j - 7, i] <- round(sum(tmp <= 0.05 | tmp >= 0.95)/length(tmp), 2)
+      rm(tmp)
+    } else {
+      tmp1 <- unlist(tmp.data[, grep(discmeasures[j], names(tmp.data))[itemsindex[[i]] == 1]])
+      tmp2 <- unlist(tmp.data[, grep(discmeasures[j], names(tmp.data))[itemsindex[[i]] == 2]])
+      outresults[2 * j - 7, i] <- round(sum(tmp1 <= 0.05 | tmp1 >= 0.95)/length(tmp1), 2)
+      outresults[2 * j - 6, i] <- round(sum(tmp2 <= 0.05 | tmp2 >= 0.95)/length(tmp2), 2)
+      rm(tmp1, tmp2)
+    }
+  }
+  rm(j)
+  
+  # Compute power of pair-wise discrepancy measures
+  for (j in 11:15) {
+    if (i == 1) {
+      tmp <- unlist(tmp.data[, grep(discmeasures[j], names(tmp.data))])
+      outresults[3 * j - 18, i] <- round(sum(tmp <= 0.05 | tmp >= 0.95)/length(tmp), 2)
+      rm(tmp)
+    }
+    
+    if (i %in% 2:7) {
+      tmp1 <- unlist(tmp.data[, grep(discmeasures[j], names(tmp.data))[pairsindex[[i]] == 1]])
+      tmp2 <- unlist(tmp.data[, grep(discmeasures[j], names(tmp.data))[pairsindex[[i]] == 2]])
+      tmp3 <- unlist(tmp.data[, grep(discmeasures[j], names(tmp.data))[pairsindex[[i]] == 3]])
+      outresults[3 * j - 18, i] <- round(sum(tmp1 <= 0.05 | tmp1 >= 0.95)/length(tmp1), 2)
+      outresults[3 * j - 17, i] <- round(sum(tmp2 <= 0.05 | tmp2 >= 0.95)/length(tmp2), 2)
+      outresults[3 * j - 16, i] <- round(sum(tmp3 <= 0.05 | tmp3 >= 0.95)/length(tmp3), 2)
+      rm(tmp1, tmp2, tmp3)
+    }
+    
+    if (i == 8) {
+      tmp1 <- unlist(tmp.data[, grep(discmeasures[j], names(tmp.data))[pairsindex[[i]] == 1]])
+      tmp2 <- unlist(tmp.data[, grep(discmeasures[j], names(tmp.data))[pairsindex[[i]] == 2]])
+      outresults[3 * j - 18, i] <- round(sum(tmp1 <= 0.05 | tmp1 >= 0.95)/length(tmp1), 2)
+      outresults[3 * j - 17, i] <- round(sum(tmp2 <= 0.05 | tmp2 >= 0.95)/length(tmp2), 2)
+      rm(tmp1, tmp2)
+    }
+  }
+  rm(j)
+}
+
 
 
 # TV-DPCM
