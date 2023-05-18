@@ -72,18 +72,23 @@ conv <- tapply(results$corrupt, results$cond, sum)
 
 results[results$maxRhat > 1.05, c(1:13)]
 
-par(mar = c(5, 6, 1, 1) + 0.1)
-bp <- barplot(100 - conv, xlim = c(0, 100), las = 1, horiz = TRUE,
-              names.arg = paste(Cond[, 1], c("", rep(c("1/3", "2/3"), 3), "")),
+pdf("Figures/ppmc_conv.pdf", height = 4)
+par(mar = c(5, 9, 0.25, 1) + 0.1)
+bp <- barplot(rev(100 - conv), xlim = c(0, 100), las = 1, horiz = TRUE,
+              names.arg = paste(rev(c("TV-DPCM", "TV-MDPCM", "TV-MDPCM", 
+                                  "TV-DGPCM", "TV-DGPCM", "TV-DPCM-IPD",
+                                  "TV-DPCM-IPD", "TV-DPCM-Meaning")), 
+                                rev(c("", c("r = 0.3", "r = 0.6"), 
+                                  rep(c("1/3", "2/3"), 2), ""))),
               xlab = "Convergence Rate (%)")
-mtext(paste0(100 - conv, "%"), side = 2, line = -2, las = 1,
+mtext(rev(paste0(100 - conv, "%")), side = 2, line = -2, las = 1,
       at = as.vector(bp))
 rm(bp)
 dev.off()
 
 # Create and optional matrix to exclude replications that did not converged.
 
-results_conv <- results
+# results_conv <- results
 results_conv <- results[results$corrupt == 0, ]
 
 # 3.0 Plot PPPs distributions ----
@@ -258,8 +263,8 @@ outresults <- outresults[-(1:6), ]
 addtorow <- list()
 addtorow$pos <- list(0, 0, nrow(outresults))
 addtorow$command <- c("& TV-DPCM & \\multicolumn{2}{c}{TV-MDPCM} & \\multicolumn{2}{c}{TV-DGPCM} 
-                      & \\multicolumn{2}{c}{TV-DPCM-IPD} & TV-DPCM-Meaning \\\\\n",
-                      " & & $r = 0.3$ & $r = 0.6$ & $1/3$ & $1/6$ & $1/3$ & $1/6$ & \\\\\n",
+                      & \\multicolumn{2}{c}{TV-DPCM-IPD} & TV-DPCM \\\\\n",
+                      " & & $r = 0.3$ & $r = 0.6$ & $1/3$ & $2/3$ & $1/3$ & $2/3$ & Meaning \\\\\n",
                       "\\begin{tablenotes}[para,flushleft]\n{\\small 
                       \\textit{Note.} In conditions where the generating model was the TV-MDPCM, 
                       \\textit{set1} denotes the items of dimension 1 and \\textit{dim2} denotes 
