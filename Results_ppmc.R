@@ -276,7 +276,7 @@ addtorow$command <- c("& TV-DPCM & \\multicolumn{2}{c}{TV-MDPCM} & \\multicolumn
                       item parameter drift and \\textit{dim2} denotes the items that have item
                       parameter drift. In conditions where the generating model was the 
                       TV-DPCM-Meaning, \\textit{set1} denotes the items for which its meaning 
-                      did not change and \\textit{dim2} denotes the item for which its meaning 
+                      did not change and \\textit{set2} denotes the item for which its meaning 
                       changed. Proportions larger than 0.7 are highlighted in boldface.}\n
                       \\end{tablenotes}\n")
 
