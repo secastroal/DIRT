@@ -71,6 +71,9 @@ conv <- tapply(results$corrupt, results$cond, sum)
 # 1.05.
 
 results[results$maxRhat > 1.05, c(1:13)]
+results[results$ndiv != 0, c(1:13)]
+table(results[results$ndiv != 0, c(1:13)]$ndiv)
+results[results$nbfmi != 0, c(1:13)]
 
 pdf("Figures/ppmc_conv.pdf", height = 4)
 par(mar = c(5, 9, 0.25, 1) + 0.1)
@@ -267,13 +270,13 @@ addtorow$command <- c("& TV-DPCM & \\multicolumn{2}{c}{TV-MDPCM} & \\multicolumn
                       " & & $r = 0.3$ & $r = 0.6$ & $1/3$ & $2/3$ & $1/3$ & $2/3$ & Meaning \\\\\n",
                       "\\begin{tablenotes}[para,flushleft]\n{\\small 
                       \\textit{Note.} In conditions where the generating model was the TV-MDPCM, 
-                      \\textit{set1} denotes the items of dimension 1 and \\textit{dim2} denotes 
+                      \\textit{set1} denotes the items of dimension 1 and \\textit{set2} denotes 
                       the items of dimension 2. In conditions where the generating model was the 
                       TV-DGPCM, \\textit{set1} denotes the items with discrimination parameters 
-                      equal to 1 and \\textit{dim2} denotes the items with discrimination
+                      equal to 1 and \\textit{set2} denotes the items with discrimination
                       parameters different from 1. In conditions where the generating model was 
                       the TV-DPCM-IPD, \\textit{set1} denotes the items that do not present
-                      item parameter drift and \\textit{dim2} denotes the items that have item
+                      item parameter drift and \\textit{set2} denotes the items that have item
                       parameter drift. In conditions where the generating model was the 
                       TV-DPCM-Meaning, \\textit{set1} denotes the items for which its meaning 
                       did not change and \\textit{set2} denotes the item for which its meaning 
