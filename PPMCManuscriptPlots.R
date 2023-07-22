@@ -82,7 +82,8 @@ pdf("Figures/PPMC_example.pdf", height = 4)
 par(mfrow = c(1, 2), mar = c(4, 5, 0, 1) + 0.1, oma = c(0, 0, 2, 0) + 0.1)
 ppmc.racf(object = fit, data = standata, 
           xlab = expression(T(y^rep)), ylim = c(0, 12), 
-          col.yrep = rep(c("gray80", "gray30"), times = c(11, 3)))
+          col.yrep = rep(c("gray80", "gray30"), times = c(11, 3)),
+          border = rep(c("gray80", "gray30"), times = c(11, 3)))
 ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE,
            xlab = expression(D(y,omega)), ylab = expression(D(y^rep,omega)), 
            subtitle = FALSE, pch = 4, cex = 0.5, bty = "n",
