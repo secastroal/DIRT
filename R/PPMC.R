@@ -1504,7 +1504,7 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, sumscores = FA
                        col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
                        xlab = NULL, default.xlab = is.null(xlab),  
                        ylab = NULL, default.ylab = is.null(ylab), 
-                       subtitle = TRUE,
+                       subtitle = TRUE, col, split = FALSE, 
                        mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)
@@ -1575,10 +1575,14 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, sumscores = FA
     if (default.ylab) {ylab = expression(paste("LPACF", "(", y^rep, ";", omega, ")"))}
     if (default.xlab) {xlab = expression(paste("LPACF", "(y;", omega, ")"))}
     
+    if (split) {
+      col <- ifelse(discrepancy[, 1, 1] < discrepancy[, 1, 2], col[1], col[2])
+    }
+    
     plot(discrepancy[, 1, 1], discrepancy[, 1, 2], 
          las = 1, main = "",
          ylab = ylab,
-         xlab = xlab, ...)
+         xlab = xlab, col = col,  ...)
     abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
     mtext(paste0("  PPP = ", round(out, 3)), line = -1.5, col = col.ppp, 
           cex = 0.8, adj = 0)
@@ -1595,10 +1599,13 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, sumscores = FA
     
     for (i in 1:length(items)) {
       if (!quiet) {invisible(readline(prompt="Press [enter] to continue"))}
+      if (split) {
+        col <- ifelse(discrepancy[, items[i], 1] < discrepancy[, items[i], 2], col[1], col[2])
+      }
       plot(discrepancy[, items[i], 1], discrepancy[, items[i], 2], 
            las = 1, main = "",
            ylab = ylab,
-           xlab = xlab, ...)
+           xlab = xlab, col = col, ...)
       abline(a= 0, b = 1, lwd = 3, col = col.abline, lty = lty.abline)
       mtext(paste0("  PPP = ", round(out[items[i]], 3)), line = -1.5, col = col.ppp, 
             cex = 0.8, adj = 0)

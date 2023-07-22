@@ -80,12 +80,14 @@ colnames(diag.table) <- c("Rhat>1.05", "N. Divergent", "N. Low BFMI",
 # Plot PPMC method by test statistic and by discrepancy measure.
 pdf("Figures/PPMC_example.pdf", height = 4)
 par(mfrow = c(1, 2), mar = c(4, 5, 0, 1) + 0.1, oma = c(0, 0, 2, 0) + 0.1)
-ppmc.racf(object = fit, data = standata, xlab = expression(T(y^rep)),
-          ylim = c(0, 12))
+ppmc.racf(object = fit, data = standata, 
+          xlab = expression(T(y^rep)), ylim = c(0, 12), 
+          col.yrep = rep(c("gray80", "gray30"), times = c(11, 3)))
 ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE,
            xlab = expression(D(y,omega)), ylab = expression(D(y^rep,omega)), 
            subtitle = FALSE, pch = 4, cex = 0.5, bty = "n",
-           ylim = c(-0.3, 0.3), xlim = c(-0.3, 0.3))
+           ylim = c(-0.3, 0.3), xlim = c(-0.3, 0.3), 
+           col.abline = "black", col = c("gray30", "gray80"), split = TRUE)
 dev.off()
 
 # Example when the TV-DPCM does not fit the data ----
