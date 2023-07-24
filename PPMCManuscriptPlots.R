@@ -86,7 +86,7 @@ ppmc.racf(object = fit, data = standata,
           border = rep(c("gray80", "gray30"), times = c(11, 3)))
 ppmc.lpacf(object = fit, data = standata, quiet = TRUE, sumscores = TRUE,
            xlab = expression(D(y,omega)), ylab = expression(D(y^rep,omega)), 
-           subtitle = FALSE, pch = 4, cex = 0.5, bty = "n",
+           subtitle = FALSE, pch = 4, cex = 0.5, bty = "n", lty.abline = 1,
            ylim = c(-0.3, 0.3), xlim = c(-0.3, 0.3), 
            col.abline = "black", col = c("gray30", "gray80"), split = TRUE)
 dev.off()
