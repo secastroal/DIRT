@@ -1504,7 +1504,7 @@ ppmc.lpacf <- function(object, data, items = NULL, quiet = FALSE, sumscores = FA
                        col.ppp = "black", col.abline = "lightgray", lty.abline = 2,
                        xlab = NULL, default.xlab = is.null(xlab),  
                        ylab = NULL, default.ylab = is.null(ylab), 
-                       subtitle = TRUE, col, split = FALSE, 
+                       subtitle = TRUE, col = "darkgray", split = FALSE, 
                        mc.cores = getOption("mc.cores", 2L), ...) {
   
   cores <- as.integer(mc.cores)

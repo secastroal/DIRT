@@ -151,11 +151,11 @@ print(xtable(NAMUitemPPPs, type = "latex", caption = "PPPs Item-Level Measures I
       sanitize.text.function = function(x){x}, booktabs = TRUE,
       file = "Tables/NAMUitemPPPs.tex")
 
-pdf("Figures/PairsNAMU.pdf", heigh = 5)
-ggpubr::ggarrange(ppmc11, ppmc12, ppmc13, ppmc14, ppmc15,
-                  labels = c("Yen's Q3", "Odds Ratio", "OR Diff",
-                             "RESID", "RESID Diff"), 
-                  ncol = 3, nrow = 2, label.x = c(0.1, 0.05, 0.1, 0.125, 0.05))
+pdf("Figures/PairsNAMU.pdf", heigh = 4)
+ggpubr::ggarrange(ppmc11, ppmc12, ppmc14,
+                  labels = c("Yen's Q3", "OR", "RESID"), 
+                  ncol = 3, nrow = 1, label.x = c(0.05, 0.15, 0.09),
+                  vjust = 8)
 dev.off()
 
 # Example when the TV-DPCM fits the data ----
