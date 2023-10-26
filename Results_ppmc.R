@@ -259,8 +259,11 @@ row.names(outresults) <- c("ACF lag 1", "ACF lag 2", "ACF lag 3", "RACF", "LRACF
                            paste("RESID  difference",c("(set1, set1)", "(set1, set2)", "(set2, set2)")))
 row.names(outresults) <- paste0("\\hspace{0.25in}", row.names(outresults))
 
-# Remove row with test-level discrepancy measures.
-outresults <- outresults[-(1:6), ]
+outresultsfull <- outresults
+
+# Export table for manuscript.
+# Remove row with test-level discrepancy measures and alternative OR and RESID.
+outresults <- outresults[-c(1:6, 21:23, 27:29), ]
 
 # Adjust heading and table note.
 addtorow <- list()
@@ -290,5 +293,38 @@ print(xtable(outresults, type = "latex", caption = "Proportion of Extreme PPP-Va
       sanitize.text.function = function(x){x}, booktabs = TRUE,
       add.to.row = addtorow,
       file = "Tables/outResults.tex")
+
+# Export table for appendix.
+# Select rows with ineffective measures.
+outineffective <- outresultsfull[c(1:6, 21:23, 27:29), ]
+
+# Adjust heading and table note.
+addtorow <- list()
+addtorow$pos <- list(0, 0, nrow(outineffective))
+addtorow$command <- c("& TV-DPCM & \\multicolumn{2}{c}{TV-MDPCM} & \\multicolumn{2}{c}{TV-DGPCM} 
+                      & \\multicolumn{2}{c}{TV-DPCM-IPD} & TV-DPCM \\\\\n",
+                      " & & $r = 0.3$ & $r = 0.6$ & $1/3$ & $2/3$ & $1/3$ & $2/3$ & Meaning \\\\\n",
+                      "\\begin{tablenotes}[para,flushleft]\n{\\small 
+                      \\textit{Note.} In conditions where the generating model was the TV-MDPCM, 
+                      \\textit{set1} denotes the items of dimension 1 and \\textit{set2} denotes 
+                      the items of dimension 2. In conditions where the generating model was the 
+                      TV-DGPCM, \\textit{set1} denotes the items with discrimination parameters 
+                      equal to 1 and \\textit{set2} denotes the items with discrimination
+                      parameters different from 1. In conditions where the generating model was 
+                      the TV-DPCM-IPD, \\textit{set1} denotes the items that do not present
+                      item parameter drift and \\textit{set2} denotes the items that have item
+                      parameter drift. In conditions where the generating model was the 
+                      TV-DPCM-Meaning, \\textit{set1} denotes the items for which its meaning 
+                      did not change and \\textit{set2} denotes the item for which its meaning 
+                      changed.}\n
+                      \\end{tablenotes}\n")
+
+print(xtable(outineffective, type = "latex", caption = "Proportion of Extreme PPP-Values across Conditions",
+             label = "tab:outineffective", align = c("l", rep("r", 8))),
+      include.colnames = FALSE, sanitize.rownames.function = identity,
+      include.rownames = TRUE, NA.string = "-", caption.placement = "top", 
+      sanitize.text.function = function(x){x}, booktabs = TRUE,
+      add.to.row = addtorow,
+      file = "Tables/outIneffective.tex")
 
 # END
