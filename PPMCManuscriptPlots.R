@@ -93,6 +93,11 @@ dev.off()
 
 # Example when the TV-DPCM does not fit the data ----
 
+## DON'T RUN ##
+# We saved the objects of the Stan fit of the empirical analyses as RDS.
+# However, these files take too much space to be included in the GitHub
+# repository. If interested in getting these files, send a request to 
+# secastroal@unal.edu.co.
 # Load saved fit and data.
 standata <- readRDS("Fits/NegAMUwithNA_data.rds")
 fit      <- readRDS("Fits/NegAMUwithNA.rds")
